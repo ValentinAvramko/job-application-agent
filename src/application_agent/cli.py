@@ -21,8 +21,8 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("show-memory", help="Print current runtime memory as JSON.")
 
     ingest = subparsers.add_parser("ingest-vacancy", help="Create a vacancy scaffold and remember it.")
-    ingest.add_argument("--company", required=True)
-    ingest.add_argument("--position", required=True)
+    ingest.add_argument("--company", default="")
+    ingest.add_argument("--position", default="")
     ingest.add_argument("--source-url", default="")
     ingest.add_argument("--source-channel", default="Manual")
     ingest.add_argument("--source-type", default="")

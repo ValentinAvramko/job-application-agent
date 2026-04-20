@@ -158,8 +158,6 @@ class AnalyzeVacancyWorkflow:
 
         vacancy_id = request.vacancy_id
         if not vacancy_id:
-            if not request.company.strip() or not request.position.strip():
-                raise ValueError("analyze-vacancy requires either vacancy_id or company + position.")
             ingest_result = IngestVacancyWorkflow().run(
                 layout=layout,
                 store=store,
