@@ -29,13 +29,13 @@ class AnalyzeWorkflowTests(unittest.TestCase):
 
         cv_dir = workspace_dir / "CV"
         cv_dir.mkdir(parents=True, exist_ok=True)
-        (cv_dir / "HoE.md").write_text(
+        (cv_dir / "HoD.md").write_text(
             "\n".join(
                 [
-                    "# HoE Resume",
-                    "- Led engineering teams across platform and delivery domains.",
-                    "- Built platform strategy, architecture review, and cross-functional execution model.",
-                    "- Scaled managers and senior engineers in a multi-team environment.",
+                    "# HoD Resume",
+                    "- Руководил командами разработки и развивал лидов.",
+                    "- Выстраивал процессы поставки, декомпозиции и кросс-функционального взаимодействия.",
+                    "- Улучшал архитектурные решения и стабильность ключевых сервисов.",
                     "",
                 ]
             ),
@@ -51,14 +51,14 @@ class AnalyzeWorkflowTests(unittest.TestCase):
             layout=layout,
             store=store,
             request=IngestVacancyRequest(
-                company="TaxDome",
-                position="VP of Engineering",
+                company="ПримерТех",
+                position="Руководитель разработки",
                 source_text="\n".join(
                     [
-                        "Responsibilities:",
-                        "- Lead multiple engineering teams and managers.",
-                        "- Drive platform strategy, architecture decisions, and delivery execution.",
-                        "- Partner with product and operations on company-wide priorities.",
+                        "Чем предстоит заниматься:",
+                        "- Руководить командой разработки и развивать тимлидов.",
+                        "- Улучшать процессы планирования, декомпозиции и поставки.",
+                        "- Участвовать в архитектурных решениях и повышении надежности сервисов.",
                     ]
                 ),
             ),
@@ -85,10 +85,16 @@ class AnalyzeWorkflowTests(unittest.TestCase):
         task_memory = json.loads(store.task_memory_path.read_text(encoding="utf-8"))
         workflow_runs = json.loads(store.workflow_runs_path.read_text(encoding="utf-8"))
 
-        self.assertIn("Selected Resume: HoE", analysis_text)
+        self.assertIn("Выбранное резюме: HoD", analysis_text)
+        self.assertIn("## Сводка", analysis_text)
+        self.assertIn("## Матрица требований", analysis_text)
         self.assertIn("status: analyzed", meta_text)
-        self.assertIn("selected_resume: HoE", meta_text)
-        self.assertIn("Permanent Candidates", adoptions_text)
+        self.assertIn("selected_resume: HoD", meta_text)
+        self.assertIn("Кандидаты в постоянные сигналы", adoptions_text)
+        self.assertIn("Общие рекомендации по добавлению из MASTER в выбранную ролевую версию", adoptions_text)
+        self.assertIn("Обновление раздела `О себе (профиль)`", adoptions_text)
+        self.assertIn("Обновление раздела `Ключевые компетенции`", adoptions_text)
+        self.assertIn("Обновление раздела `Опыт работы`", adoptions_text)
         self.assertEqual(task_memory["active_workflow"], "analyze-vacancy")
         self.assertEqual(len(workflow_runs), 2)
 
