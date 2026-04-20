@@ -6,6 +6,7 @@ from pathlib import Path
 
 from application_agent.memory.store import JsonMemoryStore
 from application_agent.workspace import WorkspaceLayout
+from application_agent.workflows.analyze_vacancy import AnalyzeVacancyRequest
 from application_agent.workflows.ingest_vacancy import IngestVacancyRequest
 from application_agent.workflows.registry import build_default_registry
 
@@ -32,6 +33,22 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--work-mode", default="Не указано")
     ingest.add_argument("--target-mode", default="balanced")
     ingest.add_argument("--include-employer-channels", action="store_true")
+
+    analyze = subparsers.add_parser("analyze-vacancy", help="Create the first-pass fit analysis for a vacancy.")
+    analyze.add_argument("--vacancy-id", default="")
+    analyze.add_argument("--company", default="")
+    analyze.add_argument("--position", default="")
+    analyze.add_argument("--source-url", default="")
+    analyze.add_argument("--source-channel", default="Manual")
+    analyze.add_argument("--source-type", default="")
+    analyze.add_argument("--source-text", default="")
+    analyze.add_argument("--input-file", default="")
+    analyze.add_argument("--language", default="")
+    analyze.add_argument("--country", default="")
+    analyze.add_argument("--work-mode", default="")
+    analyze.add_argument("--target-mode", default="")
+    analyze.add_argument("--selected-resume", default="")
+    analyze.add_argument("--include-employer-channels", action="store_true")
     return parser
 
 
@@ -80,10 +97,33 @@ def main() -> int:
         print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
         return 0
 
+    if args.command == "analyze-vacancy":
+        source_text = args.source_text
+        if args.input_file:
+            source_text = Path(args.input_file).read_text(encoding="utf-8")
+        request = AnalyzeVacancyRequest(
+            vacancy_id=args.vacancy_id or None,
+            company=args.company,
+            position=args.position,
+            source_text=source_text,
+            source_url=args.source_url,
+            source_channel=args.source_channel,
+            source_type=args.source_type,
+            language=args.language,
+            country=args.country,
+            work_mode=args.work_mode,
+            target_mode=args.target_mode,
+            selected_resume=args.selected_resume,
+            include_employer_channels=args.include_employer_channels,
+        )
+        workflow = build_default_registry().get("analyze-vacancy")
+        result = workflow.run(layout=layout, store=store, request=request)
+        print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
+        return 0
+
     parser.error(f"Unsupported command: {args.command}")
     return 2
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from application_agent.workflows.analyze_vacancy import AnalyzeVacancyWorkflow
 from application_agent.workflows.ingest_vacancy import IngestVacancyWorkflow
 
 
@@ -24,6 +25,6 @@ class WorkflowRegistry:
 
 def build_default_registry() -> WorkflowRegistry:
     registry = WorkflowRegistry()
+    registry.register(AnalyzeVacancyWorkflow())
     registry.register(IngestVacancyWorkflow())
     return registry
-

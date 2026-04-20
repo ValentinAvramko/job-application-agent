@@ -49,6 +49,7 @@ class JsonMemoryStore:
         )
         self._write_if_missing(self.user_memory_path, UserMemory(last_updated=now).to_dict())
         self._write_if_missing(self.workflow_runs_path, [])
+        self._sync_project_memory_defaults(now)
 
     def load_task_memory(self) -> TaskMemory:
         self.bootstrap()
@@ -99,6 +100,32 @@ class JsonMemoryStore:
     def _write_if_missing(self, path: Path, payload: object) -> None:
         if not path.exists():
             self._write_json(path, payload)
+
+    def _sync_project_memory_defaults(self, now: str) -> None:
+        with self.project_memory_path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+
+        changed = False
+        changed |= self._merge_ordered_defaults(payload, "workflow_catalog", WORKFLOW_CATALOG)
+        changed |= self._merge_ordered_defaults(payload, "role_resumes", ROLE_RESUMES)
+        changed |= self._merge_ordered_defaults(payload, "contact_regions", CONTACT_REGIONS)
+
+        if changed:
+            payload["last_updated"] = now
+            self._write_json(self.project_memory_path, payload)
+
+    def _merge_ordered_defaults(self, payload: dict[str, object], key: str, defaults: tuple[str, ...]) -> bool:
+        values = payload.get(key)
+        if not isinstance(values, list):
+            payload[key] = list(defaults)
+            return True
+
+        changed = False
+        for item in defaults:
+            if item not in values:
+                values.append(item)
+                changed = True
+        return changed
 
     def _write_json(self, path: Path, payload: object) -> None:
         with path.open("w", encoding="utf-8", newline="\n") as handle:

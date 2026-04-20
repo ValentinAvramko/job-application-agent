@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-import shutil
 import sys
 import unittest
+import uuid
 from datetime import date
 from pathlib import Path
 
@@ -19,8 +19,7 @@ class IngestWorkflowTests(unittest.TestCase):
     def test_ingest_creates_vacancy_scaffold_and_memory(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
         temp_root.mkdir(exist_ok=True)
-        workspace_dir = temp_root / "ingest-workflow"
-        shutil.rmtree(workspace_dir, ignore_errors=True)
+        workspace_dir = temp_root / f"ingest-workflow-{uuid.uuid4().hex}"
         workspace_dir.mkdir(parents=True, exist_ok=True)
 
         layout = WorkspaceLayout(workspace_dir)
