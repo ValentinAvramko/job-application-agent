@@ -17,7 +17,9 @@ from application_agent.workflows.registry import build_default_registry
 
 class IngestWorkflowTests(unittest.TestCase):
     def test_ingest_creates_vacancy_scaffold_and_memory(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=temp_root) as tmpdir:
             layout = WorkspaceLayout(Path(tmpdir))
             layout.bootstrap()
             store = JsonMemoryStore(layout)

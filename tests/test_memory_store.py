@@ -14,7 +14,9 @@ from application_agent.workspace import WorkspaceLayout
 
 class MemoryStoreTests(unittest.TestCase):
     def test_bootstrap_creates_runtime_files(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=temp_root) as tmpdir:
             layout = WorkspaceLayout(Path(tmpdir))
             layout.bootstrap()
             store = JsonMemoryStore(layout)
@@ -31,4 +33,3 @@ class MemoryStoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

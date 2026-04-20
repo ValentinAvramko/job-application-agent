@@ -22,10 +22,10 @@
 ## Быстрый старт
 
 ```powershell
-python -m application_agent.cli bootstrap --root ..
-python -m application_agent.cli list-workflows
-python -m application_agent.cli ingest-vacancy --company "Example" --position "Engineering Manager" --source-channel "Manual" --source-text "Short vacancy text"
-python -m application_agent.cli show-memory --root ..
+python run_agent.py --root ../.. bootstrap
+python run_agent.py --root ../.. list-workflows
+python run_agent.py --root ../.. ingest-vacancy --company "Example" --position "Engineering Manager" --source-channel "Manual" --source-text "Short vacancy text"
+python run_agent.py --root ../.. show-memory
 ```
 
 ## Следующие шаги
@@ -34,4 +34,6 @@ python -m application_agent.cli show-memory --root ..
 - обновление Excel;
 - постоянная память по подтверждённым сигналам;
 - orchestration для следующих workflow.
+
+Если агент запускается не из submodule, а из корня private repo, можно передать `--root .`.
 
