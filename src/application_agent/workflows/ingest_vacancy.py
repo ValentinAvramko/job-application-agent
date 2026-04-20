@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timezone
 from html import unescape
 from html.parser import HTMLParser
+from importlib import resources
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
@@ -50,6 +51,24 @@ CYRILLIC_MAP = {
     "\u044f": "ya",
 }
 
+HH_COUNTRY_MAP = {
+    "1": "\u0420\u043e\u0441\u0441\u0438\u044f",
+    "16": "\u0411\u0435\u043b\u0430\u0440\u0443\u0441\u044c",
+}
+
+def load_country_map() -> dict[str, str]:
+    raw_entries = json.loads(resources.files("application_agent.data").joinpath("iso_countries.json").read_text(encoding="utf-8"))
+    mapping: dict[str, str] = {}
+    for entry in raw_entries:
+        name = str(entry["name"])
+        mapping[name.lower()] = name
+        mapping[str(entry["alpha2"]).lower()] = name
+        mapping[str(entry["alpha3"]).lower()] = name
+    return mapping
+
+
+CANONICAL_COUNTRY_MAP = load_country_map()
+
 BLOCK_TAGS = {
     "article",
     "blockquote",
@@ -79,6 +98,10 @@ TITLE_PATTERNS = (
     ),
     re.compile("Work in\\s+(?P<company>.+?)\\s*[\\-\\u2013\\u2014]\\s*(?P<position>.+?)(?:\\s*[\\|\\-\\u2013\\u2014].*)?$", re.IGNORECASE),
     re.compile("(?P<position>.+?)\\s*[\\-\\u2013\\u2014]\\s*(?P<company>.+?)(?:\\s*[\\|\\-\\u2013\\u2014].*)?$", re.IGNORECASE),
+)
+HH_TITLE_PATTERN = re.compile(
+    "\\u0412\\u0430\\u043a\\u0430\\u043d\\u0441\\u0438\\u044f\\s+(?P<position>.+?)\\s+\\u0432\\s+(?P<city>.+?),\\s+\\u0440\\u0430\\u0431\\u043e\\u0442\\u0430\\s+\\u0432\\s+\\u043a\\u043e\\u043c\\u043f\\u0430\\u043d\\u0438\\u0438\\s+(?P<company>.+?)(?:\\s*[\\|\\-\\u2013\\u2014].*)?$",
+    re.IGNORECASE,
 )
 BROKEN_MARKERS = ("\u00d0", "\u00d1", "\u00d2", "\u00d3", "\u00d4", "\u00d5", "\u00d6", "\u00d7", "\u00d8", "\u00d9", "\u00da", "\u00db", "\u00dc", "\u00dd", "\u00de", "\u00df", "\u00c2", "\u00c3")
 
@@ -135,6 +158,30 @@ def decode_bytes(raw: bytes, encodings: list[str]) -> str:
     return max(repaired_candidates, key=text_score)
 
 
+def collapse_blank_lines(text: str) -> str:
+    lines = [line.rstrip() for line in text.splitlines()]
+    collapsed: list[str] = []
+    blank = False
+    for line in lines:
+        if not line.strip():
+            if not blank and collapsed:
+                collapsed.append("")
+            blank = True
+            continue
+        collapsed.append(line.strip())
+        blank = False
+    return "\n".join(collapsed).strip()
+
+
+def normalize_embedded_markdown_headings(text: str) -> str:
+    def repl(match: re.Match[str]) -> str:
+        level = len(match.group(1))
+        normalized_level = 3 if level < 3 else level
+        return f"{'#' * normalized_level} "
+
+    return re.sub(r"^(#{1,6})\s+", repl, text, flags=re.MULTILINE)
+
+
 class HtmlTextExtractor(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -166,6 +213,89 @@ class HtmlTextExtractor(HTMLParser):
 
     def get_text(self) -> str:
         return clean_multiline_text("".join(self.parts))
+
+
+class HtmlMarkdownExtractor(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+        self.skip_depth = 0
+        self.list_depth = 0
+        self.in_strong = 0
+
+    def _ensure_line(self) -> None:
+        if not self.parts:
+            return
+        if not self.parts[-1].endswith("\n"):
+            self.parts.append("\n")
+
+    def _ensure_blank_line(self) -> None:
+        joined = "".join(self.parts)
+        if not joined.endswith("\n\n"):
+            self._ensure_line()
+            self.parts.append("\n")
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in SKIP_TAGS:
+            self.skip_depth += 1
+            return
+        if self.skip_depth:
+            return
+        if tag in {"h1", "h2", "h3"}:
+            self._ensure_blank_line()
+            level = {"h1": "### ", "h2": "### ", "h3": "#### "}[tag]
+            self.parts.append(level)
+            return
+        if tag in {"p", "div", "section"}:
+            self._ensure_blank_line()
+            return
+        if tag in {"ul", "ol"}:
+            self.list_depth += 1
+            self._ensure_line()
+            return
+        if tag == "li":
+            self._ensure_line()
+            indent = "  " * max(self.list_depth - 1, 0)
+            self.parts.append(f"{indent}- ")
+            return
+        if tag == "br":
+            self._ensure_line()
+            return
+        if tag in {"strong", "b"}:
+            self.parts.append("**")
+            self.in_strong += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in SKIP_TAGS:
+            self.skip_depth = max(0, self.skip_depth - 1)
+            return
+        if self.skip_depth:
+            return
+        if tag in {"ul", "ol"}:
+            self.list_depth = max(0, self.list_depth - 1)
+            self._ensure_blank_line()
+            return
+        if tag in {"p", "div", "section", "li", "h1", "h2", "h3"}:
+            self._ensure_line()
+            if tag in {"h1", "h2", "h3", "p", "section"}:
+                self._ensure_blank_line()
+            return
+        if tag in {"strong", "b"} and self.in_strong:
+            self.parts.append("**")
+            self.in_strong -= 1
+
+    def handle_data(self, data: str) -> None:
+        if self.skip_depth:
+            return
+        self.parts.append(data)
+
+    def get_markdown(self) -> str:
+        raw = "".join(self.parts)
+        raw = raw.replace("\r", "")
+        raw = re.sub(r"[ \t]+\n", "\n", raw)
+        raw = re.sub(r"-\s*\n\s*", "- ", raw)
+        raw = re.sub(r"\n{3,}", "\n\n", raw)
+        return collapse_blank_lines(clean_multiline_text(raw))
 
 
 class VacancyPageParser(HTMLParser):
@@ -233,18 +363,66 @@ class VacancyPageParser(HTMLParser):
         return clean_text("".join(self.h1_parts))
 
 
+class HHDescriptionParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.depth = 0
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attrs_dict = {key.lower(): value for key, value in attrs if key}
+        if self.depth == 0 and attrs_dict.get("data-qa") == "vacancy-description":
+            self.depth = 1
+            return
+        if self.depth:
+            self.depth += 1
+            self.parts.append(self.get_starttag_text())
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self.depth:
+            self.parts.append(self.get_starttag_text())
+
+    def handle_endtag(self, tag: str) -> None:
+        if not self.depth:
+            return
+        if self.depth > 1:
+            self.parts.append(f"</{tag}>")
+        self.depth -= 1
+
+    def handle_data(self, data: str) -> None:
+        if self.depth:
+            self.parts.append(data)
+
+    def get_html(self) -> str:
+        return "".join(self.parts).strip()
+
+
 @dataclass
 class VacancySourceDetails:
     company: str = ""
     position: str = ""
     source_text: str = ""
+    source_markdown: str = ""
     language: str = ""
+    source_channel: str = ""
+    country: str = ""
+    city: str = ""
+    work_mode: str = ""
+    employment_type: str = ""
+    work_schedule: str = ""
+    key_skills: list[str] = field(default_factory=list)
 
 
 def html_to_text(html: str) -> str:
     parser = HtmlTextExtractor()
     parser.feed(html)
     return parser.get_text()
+
+
+def html_to_markdown(html: str) -> str:
+    parser = HtmlMarkdownExtractor()
+    parser.feed(html)
+    return parser.get_markdown()
 
 
 def slugify(value: str, fallback: str) -> str:
@@ -278,28 +456,61 @@ def parse_hh_vacancy_url(source_url: str) -> str | None:
     return match.group(1)
 
 
+def infer_source_channel(source_url: str, source_text: str, explicit: str = "") -> str:
+    if explicit.strip():
+        return explicit.strip()
+    url = source_url.strip()
+    if not url:
+        return "Manual"
+    host = urlparse(url).netloc.lower()
+    path = urlparse(url).path.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if host.endswith("hh.ru"):
+        return "HeadHunter"
+    if host.endswith("linkedin.com"):
+        return "LinkedIn"
+    if host.endswith("career.habr.com"):
+        return "Habr Career"
+    if any(token in host for token in ("career", "careers", "jobs")) or any(token in path for token in ("/career", "/careers", "/job", "/jobs")):
+        return "Company Site"
+    if source_text.strip():
+        return "Website"
+    return "Website"
+
+
+def strip_value_label(text: str) -> str:
+    cleaned = clean_text(text)
+    if ":" in cleaned:
+        _, value = cleaned.split(":", 1)
+        return clean_text(value)
+    return cleaned
+
+
+def is_unspecified(value: str) -> bool:
+    cleaned = clean_text(value).lower()
+    return cleaned in {"", "\u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e", "n/a", "null"}
+
+
 def fetch_url(source_url: str, *, accept: str) -> str:
     request = Request(
         source_url,
         headers={
-            "User-Agent": "application-agent/0.1 (+https://api.hh.ru)",
+            "User-Agent": "Mozilla/5.0 (compatible; application-agent/0.1)",
             "Accept": accept,
         },
     )
     with urlopen(request, timeout=15) as response:
         raw = response.read()
         header_encoding = response.headers.get_content_charset()
-        candidates = [header_encoding]
-        if "json" in accept:
-            candidates.extend(["utf-8", "utf-8-sig", "cp1251", "latin-1"])
-        else:
-            candidates.extend(["utf-8", "utf-8-sig", "cp1251", "latin-1"])
+        candidates = [header_encoding, "utf-8", "utf-8-sig", "cp1251", "latin-1"]
         return decode_bytes(raw, [encoding for encoding in candidates if encoding])
 
 
 def parse_hh_vacancy_payload(payload: str) -> VacancySourceDetails:
     data = json.loads(payload)
     description = html_to_text(str(data.get("description", "") or ""))
+    description_markdown = html_to_markdown(str(data.get("description", "") or ""))
     if not description:
         description = clean_multiline_text(
             "\n".join(
@@ -309,12 +520,34 @@ def parse_hh_vacancy_payload(payload: str) -> VacancySourceDetails:
                 ]
             )
         )
+        description_markdown = description
     employer = data.get("employer") or {}
+    area = data.get("area") or {}
+    city = clean_text(str(area.get("name", "") or ""))
+    key_skills = [clean_text(str(item.get("name", "") or "")) for item in data.get("key_skills", []) if isinstance(item, dict)]
+    country = resolve_hh_country(
+        city=city,
+        text="\n".join(
+            [
+                description,
+                str(data.get("snippet", {}).get("responsibility", "") or ""),
+                str(data.get("snippet", {}).get("requirement", "") or ""),
+            ]
+        ),
+        area_country=str(area.get("country", "") or ""),
+    )
     return VacancySourceDetails(
         company=clean_text(str(employer.get("name", "") or "")),
         position=clean_text(str(data.get("name", "") or "")),
-        source_text=description,
+        source_text=build_enriched_source_text(description, key_skills, "", "", ""),
+        source_markdown=build_enriched_source_markdown(description_markdown, key_skills),
         language=clean_text(str(data.get("language", "") or "")),
+        source_channel="HeadHunter",
+        country=country,
+        city=city,
+        work_mode=clean_text(str((data.get("schedule") or {}).get("name", "") or "")),
+        employment_type=clean_text(str((data.get("employment") or {}).get("name", "") or "")),
+        key_skills=[skill for skill in key_skills if skill],
     )
 
 
@@ -330,6 +563,43 @@ def iter_json_nodes(value: object) -> list[dict[str, object]]:
         for item in value:
             nodes.extend(iter_json_nodes(item))
     return nodes
+
+
+def normalize_country_value(value: str) -> str:
+    cleaned = clean_text(value)
+    if not cleaned:
+        return ""
+    return CANONICAL_COUNTRY_MAP.get(cleaned.lower(), cleaned)
+
+
+def extract_country_from_country_node(value: object) -> str:
+    if isinstance(value, dict):
+        return normalize_country_value(str(value.get("name", "") or value.get("addressCountry", "") or ""))
+    if isinstance(value, str):
+        return normalize_country_value(value)
+    return ""
+
+
+def extract_structured_location(value: object) -> tuple[str, str]:
+    if isinstance(value, list):
+        for item in value:
+            city, country = extract_structured_location(item)
+            if city or country:
+                return city, country
+        return "", ""
+    if not isinstance(value, dict):
+        return "", ""
+
+    address = value.get("address") if isinstance(value.get("address"), dict) else {}
+    city = clean_text(str(address.get("addressLocality", "") or value.get("addressLocality", "") or ""))
+    country = normalize_country_value(
+        str(
+            address.get("addressCountry", "")
+            or value.get("addressCountry", "")
+            or ""
+        )
+    )
+    return city, country
 
 
 def parse_structured_job_posting(chunks: list[str]) -> VacancySourceDetails:
@@ -353,16 +623,32 @@ def parse_structured_job_posting(chunks: list[str]) -> VacancySourceDetails:
             company = ""
             if isinstance(organization, dict):
                 company = clean_text(str(organization.get("name", "") or ""))
+            description_html = str(node.get("description", "") or "")
+            description_text = html_to_text(description_html)
+            description_markdown = html_to_markdown(description_html)
+            city, country = extract_structured_location(node.get("jobLocation"))
+            applicant_country = extract_country_from_country_node(node.get("applicantLocationRequirements"))
+            country = applicant_country or country
             return VacancySourceDetails(
                 company=company,
                 position=clean_text(str(node.get("title", "") or node.get("name", "") or "")),
-                source_text=html_to_text(str(node.get("description", "") or "")),
+                source_text=description_text,
+                source_markdown=description_markdown,
+                country=country,
+                city=city,
             )
     return VacancySourceDetails()
 
 
 def derive_title_parts(raw_title: str) -> VacancySourceDetails:
     cleaned = clean_text(raw_title)
+    hh_match = HH_TITLE_PATTERN.match(cleaned)
+    if hh_match:
+        return VacancySourceDetails(
+            company=clean_text(hh_match.groupdict().get("company", "") or ""),
+            position=clean_text(hh_match.groupdict().get("position", "") or ""),
+            city=clean_text(hh_match.groupdict().get("city", "") or ""),
+        )
     for pattern in TITLE_PATTERNS:
         match = pattern.match(cleaned)
         if match:
@@ -373,11 +659,176 @@ def derive_title_parts(raw_title: str) -> VacancySourceDetails:
     return VacancySourceDetails(position=cleaned)
 
 
-def parse_generic_vacancy_page(html: str) -> VacancySourceDetails:
+def extract_hh_global_var(html: str, name: str) -> str:
+    match = re.search(rf'{re.escape(name)}:\s*"([^"]+)"', html)
+    return clean_text(match.group(1)) if match else ""
+
+
+def extract_hh_text_by_qa(html: str, data_qa: str) -> str:
+    match = re.search(rf'data-qa="{re.escape(data_qa)}"[^>]*>(.*?)</(?:p|div|span)>', html, flags=re.S)
+    return html_to_text(match.group(1)) if match else ""
+
+
+def extract_hh_description_html(html: str) -> str:
+    parser = HHDescriptionParser()
+    parser.feed(html)
+    return parser.get_html()
+
+
+def extract_hh_skills(html: str) -> list[str]:
+    skills = re.findall(
+        r'data-qa="skills-element"[^>]*>.*?<div[^>]*magritte-tag__label[^>]*>(.*?)</div>',
+        html,
+        flags=re.S,
+    )
+    cleaned = [clean_text(skill) for skill in skills if clean_text(skill)]
+    return list(dict.fromkeys(cleaned))
+
+
+def extract_hh_city_from_meta(description: str) -> str:
+    cleaned = clean_text(description)
+    match = re.search(r"\.\s*([^.]+)\.\s*\u0422\u0440\u0435\u0431\u0443\u0435\u043c\u044b\u0439 \u043e\u043f\u044b\u0442:", cleaned)
+    if match:
+        return clean_text(match.group(1))
+    return ""
+
+
+def infer_country_from_text(text: str) -> str:
+    lower = clean_multiline_text(text).lower()
+    if "\u0431\u0435\u043b\u0430\u0440\u0443\u0441" in lower or "\u0431\u0435\u043b. \u0440\u0443\u0431" in lower or "\u0431\u0435\u043b \u0440\u0443\u0431" in lower or "byn" in lower:
+        return "\u0411\u0435\u043b\u0430\u0440\u0443\u0441\u044c"
+    if "\u043a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d" in lower or "\u0442\u0435\u043d\u0433\u0435" in lower or "kzt" in lower:
+        return "\u041a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d"
+    return ""
+
+
+def resolve_hh_country(
+    *,
+    structured_country: str = "",
+    city: str = "",
+    text: str = "",
+    country_id: str = "",
+    area_country: str = "",
+) -> str:
+    normalized_structured_country = normalize_country_value(structured_country)
+    if normalized_structured_country:
+        return normalized_structured_country
+    text_country = infer_country_from_text(text)
+    if text_country:
+        return text_country
+    normalized_area_country = normalize_country_value(area_country)
+    if normalized_area_country:
+        return normalized_area_country
+    return normalize_country_value(HH_COUNTRY_MAP.get(clean_text(country_id), ""))
+
+
+def build_enriched_source_text(
+    description: str,
+    key_skills: list[str],
+    employment_type: str,
+    work_schedule: str,
+    work_mode: str,
+) -> str:
+    sections: list[str] = []
+    if description.strip():
+        sections.append(clean_multiline_text(description))
+    details: list[str] = []
+    if employment_type:
+        details.append(f"\u0417\u0430\u043d\u044f\u0442\u043e\u0441\u0442\u044c: {employment_type}")
+    if work_schedule:
+        details.append(f"\u0413\u0440\u0430\u0444\u0438\u043a: {work_schedule}")
+    if work_mode:
+        details.append(f"\u0424\u043e\u0440\u043c\u0430\u0442 \u0440\u0430\u0431\u043e\u0442\u044b: {work_mode}")
+    if details:
+        sections.append("\n".join(details))
+    if key_skills:
+        sections.append(
+            "\u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 \u043d\u0430\u0432\u044b\u043a\u0438:\n" + "\n".join(f"- {skill}" for skill in key_skills)
+        )
+    return "\n\n".join(section for section in sections if section.strip()).strip()
+
+
+def build_enriched_source_markdown(description_markdown: str, key_skills: list[str]) -> str:
+    sections: list[str] = []
+    normalized_description = normalize_embedded_markdown_headings(description_markdown.strip())
+    if normalized_description:
+        sections.append(normalized_description)
+    has_skills_heading = bool(re.search(r"(?m)^#{1,6}\s+Ключевые навыки\s*$", normalized_description))
+    if key_skills and not has_skills_heading:
+        sections.append("### Ключевые навыки\n" + "\n".join(f"- {skill}" for skill in key_skills))
+    return "\n\n".join(section for section in sections if section.strip()).strip()
+
+
+def parse_hh_vacancy_page(html: str) -> VacancySourceDetails:
+    page = VacancyPageParser()
+    page.feed(html)
+    structured = parse_structured_job_posting(page.json_ld_chunks)
+
+    title_parts = derive_title_parts(page.meta.get("og:title") or page.title or page.h1)
+    city_from_meta = extract_hh_city_from_meta(page.meta.get("description", "") or page.meta.get("og:description", ""))
+    description_html = extract_hh_description_html(html)
+    description_markdown = html_to_markdown(description_html) if description_html else ""
+    description_text = html_to_text(description_html) if description_html else ""
+
+    employment_type = strip_value_label(extract_hh_text_by_qa(html, "common-employment-text"))
+    work_schedule = strip_value_label(extract_hh_text_by_qa(html, "work-schedule-by-days-text"))
+    work_mode = strip_value_label(extract_hh_text_by_qa(html, "work-formats-text"))
+    key_skills = extract_hh_skills(html)
+    country_id = extract_hh_global_var(html, "country")
+    country = resolve_hh_country(
+        structured_country=structured.country,
+        city=structured.city or city_from_meta or title_parts.city,
+        text="\n".join(
+            part
+            for part in [
+                page.meta.get("description", "") or page.meta.get("og:description", ""),
+                page.title,
+                page.h1,
+                description_text,
+            ]
+            if part
+        ),
+        country_id=country_id,
+    )
+
+    return VacancySourceDetails(
+        company=structured.company or title_parts.company or derive_title_parts(page.h1).company,
+        position=page.h1 or structured.position or title_parts.position,
+        source_text=build_enriched_source_text(description_text, key_skills, employment_type, work_schedule, work_mode),
+        source_markdown=build_enriched_source_markdown(description_markdown, key_skills),
+        language=clean_text(page.html_lang),
+        source_channel="HeadHunter",
+        country=country,
+        city=structured.city or city_from_meta or title_parts.city,
+        work_mode=work_mode,
+        employment_type=employment_type,
+        work_schedule=work_schedule,
+        key_skills=key_skills,
+    )
+
+
+def infer_work_mode_from_text(text: str) -> str:
+    lower = clean_multiline_text(text).lower()
+    if "\u0443\u0434\u0430\u043b" in lower or "remote" in lower:
+        return "\u0443\u0434\u0430\u043b\u0451\u043d\u043d\u043e"
+    if "\u0433\u0438\u0431\u0440\u0438\u0434" in lower or "hybrid" in lower:
+        return "\u0433\u0438\u0431\u0440\u0438\u0434"
+    if "\u043e\u0444\u0438\u0441" in lower or "office" in lower:
+        return "\u043e\u0444\u0438\u0441"
+    return ""
+
+
+def parse_generic_vacancy_page(html: str, source_url: str = "") -> VacancySourceDetails:
     parser = VacancyPageParser()
     parser.feed(html)
     structured = parse_structured_job_posting(parser.json_ld_chunks)
     title_parts = derive_title_parts(parser.meta.get("og:title") or parser.title or parser.h1)
+
+    source_markdown = structured.source_markdown
+    if not source_markdown:
+        source_markdown = clean_multiline_text(parser.meta.get("description", "") or parser.meta.get("og:description", ""))
+    if not source_markdown:
+        source_markdown = html_to_markdown(html)
 
     source_text = structured.source_text
     if not source_text:
@@ -389,28 +840,87 @@ def parse_generic_vacancy_page(html: str) -> VacancySourceDetails:
         company=structured.company or title_parts.company,
         position=structured.position or parser.h1 or title_parts.position,
         source_text=source_text,
+        source_markdown=source_markdown,
         language=clean_text(parser.html_lang),
+        source_channel=infer_source_channel(source_url, source_text),
+        country=structured.country,
+        city=structured.city or title_parts.city,
+        work_mode=infer_work_mode_from_text(source_text),
+        key_skills=[],
     )
 
 
 def fetch_source_details(source_url: str) -> VacancySourceDetails:
     vacancy_id = parse_hh_vacancy_url(source_url)
+    html = ""
     if vacancy_id:
         try:
             payload = fetch_url(f"https://api.hh.ru/vacancies/{vacancy_id}", accept="application/json")
             details = parse_hh_vacancy_payload(payload)
-            if details.company or details.position or details.source_text:
-                return details
+            html = fetch_url(source_url, accept="text/html,application/xhtml+xml")
+            html_details = parse_hh_vacancy_page(html)
+            return merge_source_details(details, html_details, source_url)
         except Exception:
             pass
+        if not html:
+            html = fetch_url(source_url, accept="text/html,application/xhtml+xml")
+        return parse_hh_vacancy_page(html)
     html = fetch_url(source_url, accept="text/html,application/xhtml+xml")
-    return parse_generic_vacancy_page(html)
+    return parse_generic_vacancy_page(html, source_url)
+
+
+def merge_source_details(base: VacancySourceDetails, overlay: VacancySourceDetails, source_url: str) -> VacancySourceDetails:
+    key_skills = overlay.key_skills or base.key_skills
+    description_text = overlay.source_text or base.source_text
+    description_markdown = overlay.source_markdown or base.source_markdown or description_text
+    if key_skills and "\u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 \u043d\u0430\u0432\u044b\u043a\u0438" not in description_text:
+        description_text = build_enriched_source_text(
+            overlay.source_text or base.source_text,
+            key_skills,
+            overlay.employment_type or base.employment_type,
+            overlay.work_schedule or base.work_schedule,
+            overlay.work_mode or base.work_mode,
+        )
+    if key_skills and "\u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 \u043d\u0430\u0432\u044b\u043a\u0438" not in description_markdown:
+        description_markdown = build_enriched_source_markdown(description_markdown, key_skills)
+    return VacancySourceDetails(
+        company=overlay.company or base.company,
+        position=overlay.position or base.position,
+        source_text=description_text,
+        source_markdown=description_markdown,
+        language=overlay.language or base.language,
+        source_channel=overlay.source_channel or base.source_channel or infer_source_channel(source_url, description_text),
+        country=overlay.country or base.country,
+        city=overlay.city or base.city,
+        work_mode=overlay.work_mode or base.work_mode,
+        employment_type=overlay.employment_type or base.employment_type,
+        work_schedule=overlay.work_schedule or base.work_schedule,
+        key_skills=key_skills,
+    )
 
 
 def enrich_request(request: "IngestVacancyRequest") -> "IngestVacancyRequest":
+    source_markdown = request.source_markdown.strip() or request.source_text.strip()
+    if source_markdown:
+        source_markdown = build_enriched_source_markdown(source_markdown, request.key_skills)
+    source_channel = infer_source_channel(request.source_url, request.source_text, request.source_channel)
+    request = replace(request, source_markdown=source_markdown, source_channel=source_channel)
+
     if not request.source_url.strip():
+        if is_unspecified(request.country):
+            request = replace(request, country="")
+        if is_unspecified(request.work_mode):
+            request = replace(request, work_mode="")
         return request
-    needs_enrichment = not request.company.strip() or not request.position.strip() or not request.source_text.strip()
+
+    needs_enrichment = (
+        not request.company.strip()
+        or not request.position.strip()
+        or not request.source_text.strip()
+        or is_unspecified(request.country)
+        or is_unspecified(request.work_mode)
+        or not request.key_skills
+    )
     if not needs_enrichment:
         return request
     try:
@@ -422,12 +932,36 @@ def enrich_request(request: "IngestVacancyRequest") -> "IngestVacancyRequest":
     if not language.strip() and details.language:
         language = details.language
 
+    country = request.country
+    if is_unspecified(country):
+        country = details.country
+
+    work_mode = request.work_mode
+    if is_unspecified(work_mode):
+        work_mode = details.work_mode
+
+    key_skills = request.key_skills or details.key_skills
+    if request.source_markdown.strip():
+        source_markdown = build_enriched_source_markdown(request.source_markdown.strip(), key_skills)
+    elif details.source_markdown.strip():
+        source_markdown = build_enriched_source_markdown(details.source_markdown.strip(), key_skills)
+    else:
+        source_markdown = build_enriched_source_markdown(details.source_text, key_skills)
+
     return replace(
         request,
         company=request.company.strip() or details.company,
         position=request.position.strip() or details.position,
         source_text=request.source_text.strip() or details.source_text,
+        source_markdown=source_markdown,
         language=language,
+        source_channel=request.source_channel.strip() or details.source_channel or infer_source_channel(request.source_url, details.source_text),
+        country=country,
+        city=request.city.strip() or details.city,
+        work_mode=work_mode,
+        employment_type=request.employment_type.strip() or details.employment_type,
+        work_schedule=request.work_schedule.strip() or details.work_schedule,
+        key_skills=key_skills,
     )
 
 
@@ -436,12 +970,17 @@ class IngestVacancyRequest:
     company: str = ""
     position: str = ""
     source_text: str = ""
+    source_markdown: str = ""
     source_url: str = ""
-    source_channel: str = "Manual"
+    source_channel: str = ""
     source_type: str = ""
     language: str = "ru"
-    country: str = "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e"
-    work_mode: str = "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e"
+    country: str = ""
+    city: str = ""
+    work_mode: str = ""
+    employment_type: str = ""
+    work_schedule: str = ""
+    key_skills: list[str] = field(default_factory=list)
     target_mode: str = "balanced"
     include_employer_channels: bool = False
     ingest_date: date = field(default_factory=date.today)
@@ -508,17 +1047,20 @@ class IngestVacancyWorkflow:
         )
 
     def _render_meta(self, request: IngestVacancyRequest, vacancy_id: str, timestamp: str) -> str:
+        country = request.country.strip() or "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e"
+        work_mode = request.work_mode.strip() or "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e"
+        source_channel = request.source_channel.strip() or infer_source_channel(request.source_url, request.source_text)
         return "\n".join(
             [
                 f"vacancy_id: {vacancy_id}",
                 f"source_type: {request.normalized_source_type()}",
                 f"source_url: {request.source_url or 'null'}",
-                f"source_channel: {request.source_channel}",
+                f"source_channel: {source_channel}",
                 f"company: {request.company}",
                 f"position: {request.position}",
                 f"language: {request.language}",
-                f"country: {request.country}",
-                f"work_mode: {request.work_mode}",
+                f"country: {country}",
+                f"work_mode: {work_mode}",
                 'is_active: "\u0414\u0430"',
                 f"ingested_at: {timestamp}",
                 "selected_resume: undecided",
@@ -532,24 +1074,43 @@ class IngestVacancyWorkflow:
         )
 
     def _render_source(self, request: IngestVacancyRequest, vacancy_id: str) -> str:
-        return "\n".join(
-            [
-                "# \u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438",
-                "",
-                "## \u041f\u0430\u0441\u043f\u043e\u0440\u0442",
-                "",
-                f"- \u041a\u043e\u043c\u043f\u0430\u043d\u0438\u044f: {request.company}",
-                f"- \u041f\u043e\u0437\u0438\u0446\u0438\u044f: {request.position}",
-                f"- ID \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438: {vacancy_id}",
-                f"- \u0418\u0441\u0445\u043e\u0434\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430: {request.source_url or 'n/a'}",
-                f"- \u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a: {request.source_channel}",
-                "",
-                "## \u0418\u0441\u0445\u043e\u0434\u043d\u044b\u0439 \u0442\u0435\u043a\u0441\u0442",
-                "",
-                request.source_text.strip() or "<!-- \u0412\u0441\u0442\u0430\u0432\u044c \u0441\u044e\u0434\u0430 \u0438\u0441\u0445\u043e\u0434\u043d\u044b\u0439 \u0442\u0435\u043a\u0441\u0442 \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438 \u0431\u0435\u0437 \u0438\u043d\u0442\u0435\u0440\u043f\u0440\u0435\u0442\u0430\u0446\u0438\u0438. -->",
-                "",
-            ]
-        )
+        lines = [
+            "# \u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438",
+            "",
+            "## \u041f\u0430\u0441\u043f\u043e\u0440\u0442",
+            "",
+            f"- \u041a\u043e\u043c\u043f\u0430\u043d\u0438\u044f: {request.company}",
+            f"- \u041f\u043e\u0437\u0438\u0446\u0438\u044f: {request.position}",
+            f"- ID \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438: {vacancy_id}",
+            f"- \u0418\u0441\u0445\u043e\u0434\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430: {request.source_url or 'n/a'}",
+            f"- \u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a: {request.source_channel or infer_source_channel(request.source_url, request.source_text)}",
+            "",
+            "## \u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440\u044b \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438",
+            "",
+        ]
+
+        params = [
+            ("\u0421\u0442\u0440\u0430\u043d\u0430", request.country.strip()),
+            ("\u0413\u043e\u0440\u043e\u0434", request.city.strip()),
+            ("\u0417\u0430\u043d\u044f\u0442\u043e\u0441\u0442\u044c", request.employment_type.strip()),
+            ("\u0413\u0440\u0430\u0444\u0438\u043a", request.work_schedule.strip()),
+            ("\u0424\u043e\u0440\u043c\u0430\u0442 \u0440\u0430\u0431\u043e\u0442\u044b", request.work_mode.strip()),
+        ]
+        visible_params = [(label, value) for label, value in params if value]
+        if visible_params:
+            lines.extend([f"- {label}: {value}" for label, value in visible_params])
+        else:
+            lines.append("- \u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e")
+
+        lines.extend(["", "## \u0418\u0441\u0445\u043e\u0434\u043d\u044b\u0439 \u0442\u0435\u043a\u0441\u0442", ""])
+        if request.source_markdown.strip():
+            lines.append(request.source_markdown.strip())
+        elif request.source_text.strip():
+            lines.append(request.source_text.strip())
+        else:
+            lines.append("<!-- \u0412\u0441\u0442\u0430\u0432\u044c \u0441\u044e\u0434\u0430 \u0438\u0441\u0445\u043e\u0434\u043d\u044b\u0439 \u0442\u0435\u043a\u0441\u0442 \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438 \u0431\u0435\u0437 \u0438\u043d\u0442\u0435\u0440\u043f\u0440\u0435\u0442\u0430\u0446\u0438\u0438. -->")
+        lines.append("")
+        return "\n".join(lines)
 
     def _render_analysis(self, vacancy_id: str, request: IngestVacancyRequest) -> str:
         return "\n".join(
