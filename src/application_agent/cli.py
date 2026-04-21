@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 from pathlib import Path
 
 from application_agent.memory.store import JsonMemoryStore
@@ -9,6 +10,63 @@ from application_agent.workspace import WorkspaceLayout
 from application_agent.workflows.analyze_vacancy import AnalyzeVacancyRequest
 from application_agent.workflows.ingest_vacancy import IngestVacancyRequest
 from application_agent.workflows.registry import build_default_registry
+
+
+def extract_vacancy_id_from_artifacts(artifacts: list[str]) -> str:
+    for artifact in artifacts:
+        path = Path(artifact)
+        if path.name in {"meta.yml", "source.md", "analysis.md", "adoptions.md"}:
+            return path.parent.name
+    raise ValueError("Unable to determine vacancy_id from workflow artifacts.")
+
+
+def build_ingest_commit_message(vacancy_id: str) -> str:
+    return f"Ingest vacancy {vacancy_id}"
+
+
+def run_git_command(repo_root: Path, args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+
+
+def autopush_ingest_artifacts(repo_root: Path, artifacts: list[str]) -> str:
+    tracked_artifacts = [
+        str(Path(artifact).resolve().relative_to(repo_root))
+        for artifact in artifacts
+        if Path(artifact).resolve().is_relative_to(repo_root)
+    ]
+    if not tracked_artifacts:
+        raise ValueError("No ingest artifacts are located inside the workspace repository.")
+
+    vacancy_id = extract_vacancy_id_from_artifacts(artifacts)
+    add_result = run_git_command(repo_root, ["add", "--", *tracked_artifacts])
+    if add_result.returncode != 0:
+        raise RuntimeError(f"Failed to stage ingest artifacts: {add_result.stderr.strip() or add_result.stdout.strip()}")
+
+    commit_message = build_ingest_commit_message(vacancy_id)
+    commit_result = run_git_command(repo_root, ["commit", "-m", commit_message])
+    if commit_result.returncode != 0:
+        output = commit_result.stderr.strip() or commit_result.stdout.strip()
+        if "nothing to commit" not in output.lower():
+            raise RuntimeError(f"Failed to commit ingest artifacts: {output}")
+
+    branch_result = run_git_command(repo_root, ["branch", "--show-current"])
+    if branch_result.returncode != 0:
+        raise RuntimeError(f"Failed to detect current git branch: {branch_result.stderr.strip() or branch_result.stdout.strip()}")
+    branch = branch_result.stdout.strip() or "main"
+
+    push_result = run_git_command(repo_root, ["push", "origin", branch])
+    if push_result.returncode != 0:
+        raise RuntimeError(f"Failed to push ingest artifacts: {push_result.stderr.strip() or push_result.stdout.strip()}")
+
+    return commit_message
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -94,6 +152,8 @@ def main() -> int:
         )
         workflow = build_default_registry().get("ingest-vacancy")
         result = workflow.run(layout=layout, store=store, request=request)
+        commit_message = autopush_ingest_artifacts(layout.root, result.artifacts)
+        result.summary = f"{result.summary} Выполнены git commit и push: {commit_message}."
         print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
         return 0
 
