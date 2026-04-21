@@ -1,0 +1,72 @@
+{
+  "RU": {
+    "name_ru": "Россия",
+    "aliases": ["Российская Федерация", "РФ"],
+    "hh_ids": ["1"],
+    "text_hints": ["россия", "российская федерация"]
+  },
+  "BY": {
+    "name_ru": "Беларусь",
+    "aliases": ["Белоруссия"],
+    "hh_ids": ["16"],
+    "text_hints": ["беларус", "бел. руб", "бел руб", "byn"]
+  },
+  "KZ": {
+    "name_ru": "Казахстан",
+    "aliases": ["Republic of Kazakhstan"],
+    "text_hints": ["казахстан", "тенге", "kzt"]
+  },
+  "DE": {
+    "name_ru": "Германия",
+    "aliases": ["ФРГ", "Deutschland"]
+  },
+  "PL": {
+    "name_ru": "Польша",
+    "aliases": ["Polska"]
+  },
+  "UA": {
+    "name_ru": "Украина",
+    "aliases": ["Ukraina"]
+  },
+  "US": {
+    "name_ru": "США",
+    "aliases": ["USA", "United States of America"]
+  },
+  "GB": {
+    "name_ru": "Великобритания",
+    "aliases": ["UK", "Britain", "Great Britain"]
+  },
+  "ES": {
+    "name_ru": "Испания",
+    "aliases": ["España"]
+  },
+  "MX": {
+    "name_ru": "Мексика",
+    "aliases": ["México"]
+  },
+  "UZ": {
+    "name_ru": "Узбекистан"
+  },
+  "KG": {
+    "name_ru": "Кыргызстан",
+    "aliases": ["Киргизия"]
+  },
+  "AM": {
+    "name_ru": "Армения"
+  },
+  "AZ": {
+    "name_ru": "Азербайджан"
+  },
+  "GE": {
+    "name_ru": "Грузия"
+  },
+  "MD": {
+    "name_ru": "Молдова"
+  },
+  "TJ": {
+    "name_ru": "Таджикистан"
+  },
+  "TM": {
+    "name_ru": "Туркменистан"
+  }
+}

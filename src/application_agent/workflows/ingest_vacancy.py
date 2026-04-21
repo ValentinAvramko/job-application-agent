@@ -6,13 +6,17 @@ from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timezone
 from html import unescape
 from html.parser import HTMLParser
-from importlib import resources
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from application_agent.integrations.response_monitoring import ResponseMonitoringIngestRecord, append_ingest_record
 from application_agent.memory.models import WorkflowRun
 from application_agent.memory.store import JsonMemoryStore
+from application_agent.normalization.countries import (
+    infer_country_name_from_text,
+    normalize_country_name,
+    resolve_country_name_from_hh_id,
+)
 from application_agent.utils.simple_yaml import load_simple_yaml, write_simple_yaml
 from application_agent.workflows.base import WorkflowResult
 from application_agent.workspace import WorkspaceLayout
@@ -52,24 +56,6 @@ CYRILLIC_MAP = {
     "\u044e": "yu",
     "\u044f": "ya",
 }
-
-HH_COUNTRY_MAP = {
-    "1": "\u0420\u043e\u0441\u0441\u0438\u044f",
-    "16": "\u0411\u0435\u043b\u0430\u0440\u0443\u0441\u044c",
-}
-
-def load_country_map() -> dict[str, str]:
-    raw_entries = json.loads(resources.files("application_agent.data").joinpath("iso_countries.json").read_text(encoding="utf-8"))
-    mapping: dict[str, str] = {}
-    for entry in raw_entries:
-        name = str(entry["name"])
-        mapping[name.lower()] = name
-        mapping[str(entry["alpha2"]).lower()] = name
-        mapping[str(entry["alpha3"]).lower()] = name
-    return mapping
-
-
-CANONICAL_COUNTRY_MAP = load_country_map()
 
 BLOCK_TAGS = {
     "article",
@@ -756,7 +742,7 @@ def normalize_country_value(value: str) -> str:
     cleaned = clean_text(value)
     if not cleaned:
         return ""
-    return CANONICAL_COUNTRY_MAP.get(cleaned.lower(), cleaned)
+    return normalize_country_name(cleaned)
 
 
 def normalize_language_tag(value: str) -> str:
@@ -1025,12 +1011,7 @@ def extract_hh_city_from_meta(description: str) -> str:
 
 
 def infer_country_from_text(text: str) -> str:
-    lower = clean_multiline_text(text).lower()
-    if "\u0431\u0435\u043b\u0430\u0440\u0443\u0441" in lower or "\u0431\u0435\u043b. \u0440\u0443\u0431" in lower or "\u0431\u0435\u043b \u0440\u0443\u0431" in lower or "byn" in lower:
-        return "\u0411\u0435\u043b\u0430\u0440\u0443\u0441\u044c"
-    if "\u043a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d" in lower or "\u0442\u0435\u043d\u0433\u0435" in lower or "kzt" in lower:
-        return "\u041a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d"
-    return ""
+    return infer_country_name_from_text(clean_multiline_text(text))
 
 
 def resolve_hh_country(
@@ -1050,7 +1031,7 @@ def resolve_hh_country(
     normalized_area_country = normalize_country_value(area_country)
     if normalized_area_country:
         return normalized_area_country
-    return normalize_country_value(HH_COUNTRY_MAP.get(clean_text(country_id), ""))
+    return resolve_country_name_from_hh_id(clean_text(country_id))
 
 
 def build_enriched_source_text(

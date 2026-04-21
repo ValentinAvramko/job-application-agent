@@ -369,9 +369,9 @@ class IngestWorkflowTests(unittest.TestCase):
         self.assertEqual(details.country, "\u0411\u0435\u043b\u0430\u0440\u0443\u0441\u044c")
 
     def test_normalize_country_value_supports_full_iso_codes(self) -> None:
-        self.assertEqual(normalize_country_value("KZ"), "Kazakhstan")
-        self.assertEqual(normalize_country_value("DEU"), "Germany")
-        self.assertEqual(normalize_country_value("PL"), "Poland")
+        self.assertEqual(normalize_country_value("KZ"), "Казахстан")
+        self.assertEqual(normalize_country_value("DEU"), "Германия")
+        self.assertEqual(normalize_country_value("PL"), "Польша")
         self.assertEqual(normalize_country_value("\u041a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d"), "\u041a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d")
 
     def test_normalize_language_tag_returns_primary_subtag(self) -> None:
