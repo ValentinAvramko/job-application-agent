@@ -426,6 +426,40 @@ class IngestWorkflowTests(unittest.TestCase):
         self.assertNotIn("Powered by PeopleForce", details.source_text)
         self.assertNotIn("Polski", details.source_text)
 
+    def test_parse_generic_vacancy_page_infers_company_from_branding_text(self) -> None:
+        html = """
+        <html lang="en">
+          <head>
+            <title>Engineering Manager</title>
+            <meta name="description" content="We’re looking for curious, driven people to join Plata’s team." />
+          </head>
+          <body>
+            <main>
+              <p>We are Plata</p>
+              <h2>Engineering Manager</h2>
+              <p>Lead the engineering organization through the next stage of growth.</p>
+            </main>
+            <footer>
+              <a href="https://www.linkedin.com/company/bancoplata/">LinkedIn</a>
+            </footer>
+          </body>
+        </html>
+        """
+
+        details = parse_generic_vacancy_page(html, "https://careers.bancoplata.mx/vacancy/details?id=5107481008")
+
+        self.assertEqual(details.company, "Plata")
+        self.assertEqual(details.position, "Engineering Manager")
+        self.assertEqual(details.language, "en")
+
+    def test_enrich_request_surfaces_fetch_error_when_required_fields_are_missing(self) -> None:
+        with patch(
+            "application_agent.workflows.ingest_vacancy.fetch_source_details",
+            side_effect=RuntimeError("connection refused"),
+        ):
+            with self.assertRaisesRegex(ValueError, "Failed to fetch vacancy details from source_url"):
+                enrich_request(IngestVacancyRequest(source_url="https://careers.bancoplata.mx/vacancy/details?id=5107481008"))
+
 
 if __name__ == "__main__":
     unittest.main()

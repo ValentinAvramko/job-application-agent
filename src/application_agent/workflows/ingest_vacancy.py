@@ -127,6 +127,27 @@ HH_TITLE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 BROKEN_MARKERS = ("\u00d0", "\u00d1", "\u00d2", "\u00d3", "\u00d4", "\u00d5", "\u00d6", "\u00d7", "\u00d8", "\u00d9", "\u00da", "\u00db", "\u00dc", "\u00dd", "\u00de", "\u00df", "\u00c2", "\u00c3")
+GENERIC_COMPANY_STOPWORDS = {
+    "career",
+    "careers",
+    "company",
+    "home",
+    "job",
+    "jobs",
+    "open roles",
+    "role",
+    "team",
+    "this role",
+    "us",
+    "vacancy",
+}
+GENERIC_COMPANY_TEXT_PATTERNS = (
+    re.compile(r"\bWe are\s+(?P<company>[^\n\r|]{1,60})", re.IGNORECASE),
+    re.compile(r"\bJoin\s+(?P<company>[^\n\r|]{1,60}?)(?:['’]s)?\s+team\b", re.IGNORECASE),
+    re.compile(r"\bCareers at\s+(?P<company>[^\n\r|]{1,60})", re.IGNORECASE),
+    re.compile(r"\bJob openings at\s+(?P<company>[^\n\r|]{1,60})", re.IGNORECASE),
+    re.compile(r"\bAbout\s+(?P<company>[^\n\r|]{1,60})", re.IGNORECASE),
+)
 
 
 def normalize_inline(text: str) -> str:
@@ -203,6 +224,34 @@ def normalize_embedded_markdown_headings(text: str) -> str:
         return f"{'#' * normalized_level} "
 
     return re.sub(r"^(#{1,6})\s+", repl, text, flags=re.MULTILINE)
+
+
+def cleanup_company_candidate(value: str) -> str:
+    cleaned = clean_text(value)
+    if not cleaned:
+        return ""
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = re.sub(r"\s+(team|careers?|jobs?|vacancies?)$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"(?:['’]s)\s*$", "", cleaned)
+    cleaned = re.sub(r"[|,;:()\[\]{}]+$", "", cleaned).strip()
+    return cleaned
+
+
+def is_plausible_company_name(value: str) -> bool:
+    cleaned = cleanup_company_candidate(value)
+    if not cleaned:
+        return False
+    if len(cleaned) > 80:
+        return False
+    lower = cleaned.lower()
+    if lower in GENERIC_COMPANY_STOPWORDS:
+        return False
+    if lower.startswith(("open ", "this ", "join ", "about ", "see ")):
+        return False
+    words = [part for part in re.split(r"\s+", lower) if part]
+    if words and all(word in GENERIC_COMPANY_STOPWORDS for word in words):
+        return False
+    return True
 
 
 class HtmlTextExtractor(HTMLParser):
@@ -852,6 +901,79 @@ def derive_title_parts(raw_title: str) -> VacancySourceDetails:
     return VacancySourceDetails(position=cleaned)
 
 
+def infer_company_from_branding_text(text: str) -> str:
+    cleaned_text = clean_multiline_text(text)
+    if not cleaned_text:
+        return ""
+    for pattern in GENERIC_COMPANY_TEXT_PATTERNS:
+        match = pattern.search(cleaned_text)
+        if not match:
+            continue
+        candidate = cleanup_company_candidate(match.groupdict().get("company", "") or "")
+        if is_plausible_company_name(candidate):
+            return candidate
+    return ""
+
+
+def infer_company_from_social_links(html: str) -> str:
+    match = re.search(r"https?://(?:[\w.-]+\.)?linkedin\.com/company/([A-Za-z0-9-]+)/?", html, flags=re.IGNORECASE)
+    if not match:
+        return ""
+    slug = match.group(1).strip("-")
+    if not slug:
+        return ""
+    candidate = cleanup_company_candidate(" ".join(part.capitalize() for part in slug.split("-") if part))
+    return candidate if is_plausible_company_name(candidate) else ""
+
+
+def infer_company_from_host(source_url: str) -> str:
+    host = urlparse(source_url).netloc.lower()
+    if not host:
+        return ""
+    labels = [
+        label
+        for label in host.split(".")
+        if label and label not in {"www", "career", "careers", "job", "jobs", "vacancy", "vacancies"}
+    ]
+    if not labels:
+        return ""
+    candidate = cleanup_company_candidate(" ".join(part.capitalize() for part in labels[0].split("-") if part))
+    return candidate if is_plausible_company_name(candidate) else ""
+
+
+def infer_generic_company(parser: VacancyPageParser, html: str, source_url: str, text: str) -> str:
+    meta_candidates = (
+        parser.meta.get("application-name", ""),
+        parser.meta.get("og:site_name", ""),
+        parser.meta.get("apple-mobile-web-app-title", ""),
+    )
+    for candidate in meta_candidates:
+        candidate = cleanup_company_candidate(candidate)
+        if is_plausible_company_name(candidate):
+            return candidate
+
+    combined_text = "\n".join(
+        part
+        for part in (
+            parser.meta.get("og:title", ""),
+            parser.title,
+            parser.h1,
+            parser.meta.get("description", ""),
+            parser.meta.get("og:description", ""),
+            text,
+        )
+        if part
+    )
+    for candidate in (
+        infer_company_from_branding_text(combined_text),
+        infer_company_from_social_links(html),
+        infer_company_from_host(source_url),
+    ):
+        if is_plausible_company_name(candidate):
+            return cleanup_company_candidate(candidate)
+    return ""
+
+
 def extract_hh_global_var(html: str, name: str) -> str:
     match = re.search(rf'{re.escape(name)}:\s*"([^"]+)"', html)
     return clean_text(match.group(1)) if match else ""
@@ -1036,9 +1158,10 @@ def parse_generic_vacancy_page(html: str, source_url: str = "") -> VacancySource
         else:
             source_markdown = body_markdown
     source_markdown = strip_generic_ui_noise(source_markdown)
+    company = structured.company or title_parts.company or infer_generic_company(parser, html, source_url, source_text or body_text)
 
     return VacancySourceDetails(
-        company=structured.company or title_parts.company,
+        company=company,
         position=structured.position or parser.h1 or title_parts.position,
         source_text=source_text,
         source_markdown=source_markdown,
@@ -1126,7 +1249,14 @@ def enrich_request(request: "IngestVacancyRequest") -> "IngestVacancyRequest":
         return request
     try:
         details = fetch_source_details(request.source_url.strip())
-    except Exception:
+    except Exception as exc:
+        missing_required = [name for name, value in (("company", request.company), ("position", request.position)) if not value.strip()]
+        if missing_required:
+            missing = ", ".join(missing_required)
+            raise ValueError(
+                f"Failed to fetch vacancy details from source_url {request.source_url.strip()}: {exc}. "
+                f"Missing required fields: {missing}. Provide them manually or retry with a reachable URL."
+            ) from exc
         return request
 
     language = request.language
