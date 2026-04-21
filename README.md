@@ -38,6 +38,7 @@ python run_agent.py --root ../.. show-memory
   Показывает доступные workflow, которые можно запускать через CLI.
 - `python run_agent.py --root ../.. ingest-vacancy --company "Example" --position "Engineering Manager" --source-channel "Manual" --source-text "Short vacancy text"`
   Создаёт карточку вакансии, заполняет `meta.yml`, `source.md`, `analysis.md`, `adoptions.md`, добавляет строку в `response-monitoring.xlsx` и обновляет runtime memory.
+  Публикация в git не выполняется автоматически: commit/push остаются отдельным ручным шагом по `tooling/git-workflow.md`.
 - `python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager`
   Выполняет стартовый анализ уже созданной вакансии: подбирает ролевое резюме и формирует начальный fit-анализ.
 - `python run_agent.py --root ../.. show-memory`

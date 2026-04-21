@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-workflow-contract-alignment-and-safety`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-21 17:08`
+- Last updated: `2026-04-21 17:27`
 - Overall status: `in_progress`
 
 ## Objective
@@ -25,14 +25,13 @@
 Подтвержденное тестами состояние:
 
 - `python -m unittest discover -s tests` проходит;
-- тесты покрывают ingest/analyze workflow, memory store, source channel normalization, country catalog, Playwright renderer и CLI autopush behavior.
+- тесты покрывают ingest/analyze workflow, memory store, source channel normalization, country catalog, Playwright renderer и CLI publication boundary.
 
 Подтвержденные проблемы контракта:
 
-- CLI `ingest-vacancy` после успешного workflow всегда вызывает `autopush_ingest_artifacts`, то есть делает `git add`, `git commit`, `git push`;
-- design-материалы в корне ожидают подтверждение пользователя перед публикацией и описывают ручной git flow через `tooling/git/*.ps1`;
-- `agent_memory/workflows/ingest-vacancy.md` отстает от кода и до сих пор трактует Excel-интеграцию как future work;
+- M2 убрал auto-publish из CLI `ingest-vacancy`: workflow теперь ограничен локальными мутациями workspace, а git-публикация остается отдельным manual step;
 - runtime-файлы содержат ссылки на вакансии, которых больше нет в `vacancies/`, значит отсутствует явный контракт на cleanup/reconciliation;
+- `bootstrap` по-прежнему смешан между CLI-командой, `project_memory.workflow_catalog` и workflow listing;
 - current workflow catalog ограничен тремя командами, хотя root-spec описывает больший целевой набор операций.
 
 ## Scope
@@ -122,7 +121,7 @@
 
 ### M2. Mutation And Publication Safety Policy
 
-- Status: `in_progress`
+- Status: `done`
 - Goal:
   - принять и оформить явную политику того, что workflow может менять автоматически, а что требует отдельного подтверждения или ручного шага.
 - Deliverables:
@@ -138,11 +137,14 @@
   - `Get-Content -Raw ..\git-workflow.md`
   - `Get-Content -Raw ..\run-ingest-analyze.md`
 - Notes / discoveries:
-  - ручные PowerShell-скрипты публикации уже существуют, поэтому текущее автоповедение CLI выглядит архитектурно спорным.
+  - Принятое решение: `ingest-vacancy` выполняет только local mutation (`vacancies/`, runtime memory, `response-monitoring.xlsx`) и не делает `git add` / `git commit` / `git push`.
+  - Публикация остается отдельным шагом через `tooling/git-workflow.md` и PowerShell-скрипты `tooling/git/*.ps1`.
+  - `src/application_agent/cli.py` очищен от git-side effects; `tests/test_cli.py` теперь подтверждает, что CLI возвращает workflow result без post-run публикационного хвоста.
+  - Operator-facing docs синхронизированы в `README.md`, `tooling/run-ingest-analyze.md`, `tooling/git-workflow.md` и `agent_memory/workflows/ingest-vacancy.md`.
 
 ### M3. Runtime Reconciliation And Missing-Artifact Behavior
 
-- Status: `planned`
+- Status: `in_progress`
 - Goal:
   - определить, как агент должен вести себя, когда память ссылается на удаленные или архивированные vacancy artifacts, и закрепить это в коде/контрактах.
 - Deliverables:
@@ -184,20 +186,21 @@
 - `2026-04-21 16:43` — `unittest` принят как текущий validation baseline. — Он реально запускается в данном окружении, в отличие от `pytest`. — Все milestones плана должны использовать команды, воспроизводимые без дополнительной установки.
 - `2026-04-21 16:43` — Исторический `ingest-refactor-plan.md` оставлен как reference о завершенном рефакторинге, но не как основной план текущего workstream. — Он не покрывает вопросы runtime safety, publication flow и contract drift. — Новый план берет более широкий operational scope.
 - `2026-04-21 17:08` — Для M1 source of truth собран из кода и тестов, а root runbook/docs трактуются как expected-operator contract. — Иначе невозможно честно разделить фактическое поведение и drift в документации. — M2 должен выровнять именно operator-facing boundary, а не только внутренние описания.
+- `2026-04-21 17:27` — Auto-publish после `ingest-vacancy` удален из CLI-контракта. — Это соответствует уже существующему manual git flow и ожиданию явного подтверждения перед публикацией private artifacts. — Публикация остается внешним операторским действием, а не скрытым side effect workflow.
 
 ## Progress log
 
 - `2026-04-21 16:43` — По коду, тестам и runbook подтверждено текущее поведение `bootstrap`, `ingest-vacancy`, `analyze-vacancy`, включая Excel integration и git-side effects в CLI. — `python -m unittest discover -s tests` -> `36 tests, OK`. — Status: `planned`.
 - `2026-04-21 16:43` — Зафиксированы ключевые contradictions: outdated workflow docs, auto-publish conflict, stale runtime state, расхождение в Excel-схеме и неполный workflow catalog относительно target-spec. — Требуется явное contract alignment до расширения функциональности. — Status: `planned`.
 - `2026-04-21 17:08` — M1 дополнен contract matrix, contradiction ledger и списком owner-level решений по publication, Excel dependency и stale runtime handling. — Validation выявила дополнительный drift: `bootstrap` числится в catalog, но не в workflow registry/listing; `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory` и `python -m unittest discover -s tests` завершились успешно. — Status: `done`.
+- `2026-04-21 17:27` — M2 зафиксировал local-only publication boundary: git-side effects удалены из `ingest-vacancy`, а README/runbook/private workflow docs синхронизированы с manual publish flow. — `python -m unittest tests.test_cli tests.test_ingest_workflow tests.test_analyze_workflow` -> `24 tests, OK`; `Get-Content -Raw ..\git-workflow.md` и `Get-Content -Raw ..\run-ingest-analyze.md` подтверждают обновленный operator contract. — Status: `done`.
 
 ## Current state
 
-- Current milestone: `M2`
+- Current milestone: `M3`
 - Current status: `in_progress`
-- Next step: `Развести local mutation и git publication boundary в CLI/docs/tests, начиная с решения по auto-publish у ingest-vacancy.`
+- Next step: `Ввести reconciliation/guardrails для stale runtime state и задокументировать поведение при отсутствии vacancy artifacts.`
 - Active blockers:
-  - Нет решения по допустимости auto-commit/auto-push из CLI.
   - Нет согласованного ответа, как трактовать stale runtime entries.
   - Не согласован канонический Excel mapping contract.
 - Open questions:
