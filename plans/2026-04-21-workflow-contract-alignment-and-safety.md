@@ -4,77 +4,80 @@
 - Slug: `2026-04-21-workflow-contract-alignment-and-safety`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-21 18:03`
+- Last updated: `2026-04-21 19:51`
 - Overall status: `done`
 
 ## Objective
 
-Собрать единый, проверяемый контракт для уже реализованных workflow (`bootstrap`, `ingest-vacancy`, `analyze-vacancy`) и связанных side effects так, чтобы код, документация, runtime memory, Excel-обновления и git-публикация не противоречили друг другу и не создавали скрытых рисков для private workspace.
+Собрать единый, проверяемый контракт для уже реализованных workflow (`bootstrap`, `ingest-vacancy`, `analyze-vacancy`) и связанных side effects так, чтобы код, документация, runtime memory, Excel updates и git-публикация не противоречили друг другу и не создавали скрытых рисков для private workspace.
 
 ## Background and context
 
-Текущая реализация в `tooling/application-agent/src` уже включает:
+На момент старта workstream в `tooling/application-agent/src` уже существовали:
 
 - CLI entrypoint и workflow registry;
 - `JsonMemoryStore` для runtime-файлов;
-- `ingest-vacancy` с генерацией vacancy scaffold, обновлением памяти и записью в `response-monitoring.xlsx`;
-- `analyze-vacancy` с выбором ролевого резюме, fit-эвристикой и генерацией vacancy-local analysis/adoptions;
+- `ingest-vacancy` с vacancy scaffold, runtime updates и записью в `response-monitoring.xlsx`;
+- `analyze-vacancy` с выбором role resume, fit-эвристикой и vacancy-local analysis/adoptions;
 - extraction/parsing stack для HH и generic career pages;
-- Playwright fallback через `npx playwright`.
+- Playwright fallback.
 
 Подтвержденное тестами состояние:
 
 - `python -m unittest discover -s tests` проходит;
-- тесты покрывают ingest/analyze workflow, memory store, source channel normalization, country catalog, Playwright renderer и CLI publication boundary.
+- тесты покрывают ingest/analyze workflow, memory store, channel normalization, country catalog, Playwright renderer и CLI publication boundary.
 
-Подтвержденные проблемы контракта:
+Ключевые проблемы, которые были подтверждены и закрывались этим workstream:
 
-- M2 убрал auto-publish из CLI `ingest-vacancy`: workflow теперь ограничен локальными мутациями workspace, а git-публикация остается отдельным manual step;
-- M3 добавил report-first reconciliation contract: `show-memory` теперь явно помечает stale task/workflow references, а `analyze-vacancy` выдает точную ошибку при работе с отсутствующей вакансией;
-- `bootstrap` по-прежнему смешан между CLI-командой, `project_memory.workflow_catalog` и workflow listing;
-- current workflow catalog ограничен тремя командами, хотя root-spec описывает больший целевой набор операций.
+- скрытые git side effects после `ingest-vacancy`;
+- несогласованность operator-facing docs и фактического поведения CLI;
+- stale runtime references на уже отсутствующие vacancy artifacts;
+- смешение CLI commands, workflow registry и workflow catalog.
+
+Отдельно:
+
+- содержательные результаты завершенного ingest refactor включены в этот plan как часть current state и completion summary, поэтому отдельный historical `ingest-refactor-plan.md` больше не нужен как активный источник истины;
+- ordered backlog remaining workflows, собранный в M4, теперь служит входом для master-plan sequencing, а не немедленным trigger для feature expansion.
 
 ## Scope
 
 ### In scope
 
 - contract matrix для `bootstrap`, `ingest-vacancy`, `analyze-vacancy`;
-- правила мутаций root-артефактов: `vacancies/`, `agent_memory/runtime/`, `response-monitoring.xlsx`;
-- правила git-side effects и границы автоматической публикации;
-- политика работы с stale runtime state и отсутствующими vacancy-артефактами;
-- backlog по расширению workflow catalog после стабилизации текущего контура.
+- правила мутаций root artifacts: `vacancies/`, `agent_memory/runtime/`, `response-monitoring.xlsx`;
+- границы git-side effects и publication behavior;
+- политика работы со stale runtime state и отсутствующими vacancy artifacts;
+- ordered backlog remaining workflows после стабилизации safety boundary.
 
 ### Out of scope
 
-- реализация новых feature workflow в этом плане;
-- наполнение root knowledge/profile/adoptions реальными данными;
-- редизайн PDF/LinkedIn output pipeline;
-- изменение исторических архивов в корне без отдельной необходимости.
+- реализация новых feature workflows;
+- наполнение `knowledge/`, `profile/`, `adoptions/` реальными данными;
+- redesign PDF/LinkedIn output pipeline;
+- repository cleanup и migration/removal superseded planning artifacts.
 
 ## Assumptions
 
-- `unittest`, а не `pytest`, является текущим воспроизводимым validation path в этом репозитории;
-- текущие `src/` и `tests/` точнее отражают фактическое поведение, чем часть устаревших root-документов;
-- если auto-commit/auto-push будет сохранен, это должно быть явно признано проектным решением и отражено во всех runbook/контрактах;
+- `unittest`, а не `pytest`, является текущим воспроизводимым validation baseline;
+- `src/` и `tests/` описывают current behavior точнее, чем superseded planning docs;
 - дальнейшее расширение workflow catalog безопасно только после стабилизации контрактов текущих трех команд.
 
 ## Risks and unknowns
 
-- скрытая публикация private-артефактов может нарушать ожидания пользователя и manual release flow;
-- изменение contract boundary может сломать уже используемый daily flow, если не будет подтверждено тестами и runbook;
-- неясно, нужно ли удалять, архивировать или игнорировать stale runtime entries при отсутствии vacancy folders;
-- неясно, является ли `response-monitoring.xlsx` обязательным hard dependency для ingest или должен поддерживаться degradable mode;
-- Playwright fallback зависит от наличия `npx` и внешней сетевой среды, что повышает риск нестабильных реальных прогонов.
+- hidden publication behavior мог нарушать ожидания пользователя;
+- contract drift между кодом и operator docs мог ломать повседневный flow;
+- stale runtime history может требовать отдельной стратегии reconciliation в будущем;
+- canonical Excel mapping contract и degradable-mode policy для `response-monitoring.xlsx` остаются follow-up задачами.
 
 ## External touchpoints
 
-- `C:\Users\avramko\OneDrive\Documents\Career\vacancies\` — чтение / обновление / проверка — scaffold и анализ вакансий являются прямыми результатами workflow.
-- `C:\Users\avramko\OneDrive\Documents\Career\agent_memory\runtime\` — чтение / обновление / проверка — task/project/user memory и журнал запусков.
-- `C:\Users\avramko\OneDrive\Documents\Career\agent_memory\workflows\` — чтение / обновление / проверка — workflow contracts в private-layer documentation.
-- `C:\Users\avramko\OneDrive\Documents\Career\response-monitoring.xlsx` — чтение / обновление / проверка — ingest side effect и внешний контракт Excel.
-- `C:\Users\avramko\OneDrive\Documents\Career\CV\` — чтение / проверка — `analyze-vacancy` выбирает и читает ролевые резюме отсюда.
-- `C:\Users\avramko\OneDrive\Documents\Career\tooling\git\` — чтение / обновление / проверка — intended git flow и публикационные скрипты.
-- `C:\Users\avramko\OneDrive\Documents\Career\tooling\run-ingest-analyze.md` и `tooling\git-workflow.md` — чтение / обновление / проверка — runbook и CLI expectations.
+- `C:\Users\avramko\OneDrive\Documents\Career\vacancies\` — чтение / обновление / проверка — scaffold и analysis artifacts;
+- `C:\Users\avramko\OneDrive\Documents\Career\agent_memory\runtime\` — чтение / обновление / проверка — task/project/user memory и run history;
+- `C:\Users\avramko\OneDrive\Documents\Career\agent_memory\workflows\` — чтение / обновление / проверка — workflow contracts;
+- `C:\Users\avramko\OneDrive\Documents\Career\response-monitoring.xlsx` — чтение / обновление / проверка — ingest side effect и внешний Excel contract;
+- `C:\Users\avramko\OneDrive\Documents\Career\CV\` — чтение / проверка — role resumes для `analyze-vacancy`;
+- `C:\Users\avramko\OneDrive\Documents\Career\tooling\git\` — чтение / обновление / проверка — intended git flow;
+- `C:\Users\avramko\OneDrive\Documents\Career\tooling\run-ingest-analyze.md` и `tooling\git-workflow.md` — чтение / обновление / проверка — operator-facing contract.
 
 ## Milestones
 
@@ -83,177 +86,139 @@
 - Status: `done`
 - Goal:
   - описать current state для CLI-команд, workflow artifacts, memory updates, Excel writes и git-side effects;
-  - зафиксировать все подтвержденные противоречия между кодом, тестами и документацией.
+  - зафиксировать подтвержденные противоречия между кодом, тестами и документацией.
 - Deliverables:
   - matrix `command -> inputs -> outputs -> side effects -> validation -> contradictions`;
-  - приоритизированный contradiction ledger;
+  - prioritized contradiction ledger;
   - список решений, требующих product/owner confirmation.
 - Acceptance criteria:
   - для `bootstrap`, `ingest-vacancy`, `analyze-vacancy` перечислены все подтвержденные side effects;
-  - явно отмечены конфликты по auto-publish, Excel-контракту, stale runtime и outdated docs;
+  - явно отмечены конфликты по auto-publish, Excel contract, stale runtime и workflow catalog;
   - можно продолжать работу без повторного чтения всего репозитория.
 - Validation commands:
   - `python run_agent.py --root ../.. list-workflows`
   - `python run_agent.py --root ../.. show-memory`
   - `python -m unittest discover -s tests`
 - Notes / discoveries:
-  - Current contract matrix:
+  - source of truth для current behavior собирался из кода и тестов, а docs трактовались как expected operator contract.
 
-    | Command | Confirmed inputs | Confirmed outputs | Confirmed side effects | Evidence | Current contradiction |
-    | --- | --- | --- | --- | --- | --- |
-    | `bootstrap` | `--root` | JSON с `created_directories` | Создает каталоги workspace и bootstrap-файлы runtime memory (`task-memory.json`, `project-memory.json`, `user-memory.json`, `workflow-runs.json`); backfill'ит `workflow_catalog`; не пишет run history; не трогает git | `src/application_agent/cli.py`, `src/application_agent/workspace.py`, `src/application_agent/memory/store.py`, `tests/test_memory_store.py`, `README.md` | `bootstrap` существует как CLI-команда и как элемент `project_memory.workflow_catalog`, но не возвращается командой `list-workflows`, потому что не зарегистрирован в workflow registry |
-    | `ingest-vacancy` | `company`/`position` или данные, извлекаемые из `source_url`; `source_text`/`input_file`; channel/language/country/work-mode flags | JSON `WorkflowResult` + summary CLI | Создает `vacancies/<id>/{meta.yml,source.md,analysis.md,adoptions.md}`; добавляет строку в `response-monitoring.xlsx`; обновляет `task-memory.json`; пишет запись в `workflow-runs.json`; после возврата workflow CLI делает `git add`, `git commit`, `git push origin <current-branch>` | `src/application_agent/workflows/ingest_vacancy.py`, `src/application_agent/integrations/response_monitoring.py`, `src/application_agent/cli.py`, `tests/test_ingest_workflow.py`, `tests/test_cli.py`, `README.md` | `tooling/run-ingest-analyze.md` описывает ingest как локальный mutating run без Excel/git side effects; `agent_memory/workflows/ingest-vacancy.md` считает Excel future work; `tooling/git-workflow.md` закрепляет ручную публикацию через PowerShell scripts |
-    | `analyze-vacancy` | `--vacancy-id` или inline ingest-поля (`company`, `position`, `source_*`) + optional `selected_resume` | JSON `WorkflowResult` | При наличии `vacancy_id` читает `meta.yml` и `source.md`, выбирает resume из `CV/`, обновляет `meta.yml`, `analysis.md`, `adoptions.md`, `task-memory.json`, `workflow-runs.json`; если `vacancy_id` отсутствует, сначала запускает in-process ingest и наследует его артефакты | `src/application_agent/workflows/analyze_vacancy.py`, `tests/test_analyze_workflow.py`, `README.md`, `tooling/run-ingest-analyze.md` | Root-spec ожидает дальнейшую эволюцию adoptions/output pipeline, но текущий контракт закреплен на vacancy-local `adoptions.md` и не описывает migration boundary |
-
-  - Prioritized contradiction ledger:
-    - `P0` CLI `ingest-vacancy` автопубликует изменения в git, хотя root runbook и `tooling/git-workflow.md` описывают публикацию как отдельный, подтверждаемый вручную шаг.
-    - `P1` `agent_memory/workflows/ingest-vacancy.md` устарел: документ обещает только файловый scaffold и runtime memory, но код уже пишет в Excel и `workflow-runs.json`.
-    - `P1` `tooling/run-ingest-analyze.md` недоописывает ingest side effects: из runbook нельзя понять, что `response-monitoring.xlsx` меняется и что CLI сейчас пытается коммитить/пушить.
-    - `P1` Runtime memory не имеет reconciliation contract: `agent_memory/runtime/task-memory.json` ссылается на `20260421-dinamichno-razvivayuschayasya-sudohodnaya-kompaniya-direktor-po-tsifrovomu-razvitiyu-i-tehnologiyam-cto-02`, но `Test-Path` для соответствующей папки вакансии возвращает `False`.
-    - `P2` `bootstrap` числится в `WORKFLOW_CATALOG`, но `list-workflows` показывает только `ingest-vacancy` и `analyze-vacancy`; сейчас смешаны CLI commands и registry-backed workflows.
-    - `P2` `project-memory.json` и `WORKFLOW_CATALOG` перечисляют только `bootstrap`, `ingest-vacancy`, `analyze-vacancy`, тогда как root target-spec описывает более длинную очередь операций; граница между implemented contract и roadmap пока не закреплена.
-
-  - Decisions requiring owner confirmation before contract is finalized:
-    - Должен ли CLI `ingest-vacancy` вообще выполнять `git commit`/`git push`, или публикация должна быть вынесена в явный ручной/отдельный workflow?
-    - Является ли `response-monitoring.xlsx` обязательным hard dependency для ingest, или нужен degradable mode без падения workflow?
-    - При stale runtime entry нужно автоматически очищать ссылку, помечать ее как missing/archived или только предупреждать пользователя?
-    - Нужно ли считать vacancy-local `adoptions.md` временным контрактом до отдельной миграции в корневой `adoptions/` pipeline?
-
-### M2. Mutation And Publication Safety Policy
+### M2. Local-Only Publication Boundary
 
 - Status: `done`
 - Goal:
-  - принять и оформить явную политику того, что workflow может менять автоматически, а что требует отдельного подтверждения или ручного шага.
+  - убрать скрытые git side effects и выровнять operator-facing contract.
 - Deliverables:
-  - решение по auto-commit/auto-push в `ingest-vacancy`;
-  - обновленные CLI/docs/tests под выбранную политику;
-  - runbook с явным разделением local mutation и publication.
+  - CLI contract без auto-publish после `ingest-vacancy`;
+  - синхронизированные docs/runbooks/private workflow docs.
 - Acceptance criteria:
-  - поведение CLI и документация больше не противоречат друг другу;
-  - пользовательские ожидания по подтверждению публикации отражены явно;
-  - тесты подтверждают выбранный contract boundary.
+  - `ingest-vacancy` больше не делает скрытый publish;
+  - документация описывает фактическую локальную mutation boundary;
+  - validation baseline остается зеленым.
 - Validation commands:
   - `python -m unittest tests.test_cli tests.test_ingest_workflow tests.test_analyze_workflow`
   - `Get-Content -Raw ..\git-workflow.md`
   - `Get-Content -Raw ..\run-ingest-analyze.md`
 - Notes / discoveries:
-  - Принятое решение: `ingest-vacancy` выполняет только local mutation (`vacancies/`, runtime memory, `response-monitoring.xlsx`) и не делает `git add` / `git commit` / `git push`.
-  - Публикация остается отдельным шагом через `tooling/git-workflow.md` и PowerShell-скрипты `tooling/git/*.ps1`.
-  - `src/application_agent/cli.py` очищен от git-side effects; `tests/test_cli.py` теперь подтверждает, что CLI возвращает workflow result без post-run публикационного хвоста.
-  - Operator-facing docs синхронизированы в `README.md`, `tooling/run-ingest-analyze.md`, `tooling/git-workflow.md` и `agent_memory/workflows/ingest-vacancy.md`.
+  - publication закреплена как отдельный manual step, а не workflow side effect.
 
-### M3. Runtime Reconciliation And Missing-Artifact Behavior
+### M3. Report-First Reconciliation For Runtime State
 
 - Status: `done`
 - Goal:
-  - определить, как агент должен вести себя, когда память ссылается на удаленные или архивированные vacancy artifacts, и закрепить это в коде/контрактах.
+  - добавить безопасную диагностику stale runtime state без автоочистки истории.
 - Deliverables:
-  - политика работы со stale entries в `task-memory.json` и `workflow-runs.json`;
-  - обновленные workflow contracts и validation scenarios;
-  - при необходимости utility/guardrails для reconciliation.
+  - reconciliation layer в `show-memory`;
+  - guardrails для missing vacancy artifacts;
+  - tests на stale runtime references.
 - Acceptance criteria:
-  - поведение при отсутствии vacancy folder формализовано;
-  - CLI и workflow не подразумевают молча существование артефакта, которого уже нет;
-  - есть воспроизводимый способ проверить корректность runtime state.
+  - stale references явно показываются как stale/missing;
+  - `analyze-vacancy` возвращает точную ошибку при отсутствии vacancy folder;
+  - полный `unittest` baseline проходит.
 - Validation commands:
-  - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\vacancies\20260421-dinamichno-razvivayuschayasya-sudohodnaya-kompaniya-direktor-po-tsifrovomu-razvitiyu-i-tehnologiyam-cto-02"`
   - `python run_agent.py --root ../.. show-memory`
   - `python -m unittest discover -s tests`
 - Notes / discoveries:
-  - Принятое решение: reconciliation остаётся недеструктивным. Runtime history не чистится молча, но `show-memory` всегда показывает `reconciliation.task_memory` и `reconciliation.workflow_runs`.
-  - `task_memory` считается `stale`, если отсутствует активная vacancy folder или любой путь из `active_artifacts`; `workflow_runs` сохраняют историю, но перечисляют missing artifacts отдельным списком.
-  - `analyze-vacancy` теперь различает полностью отсутствующую vacancy folder и неполный scaffold, чтобы runtime drift не выглядел как обычная ошибка чтения файлов.
-  - Реальный validation-прогон подтвердил, что stale references накоплены массово, а не точечно: `show-memory` возвращает `reconciliation.workflow_runs.stale_run_count` с множеством исторических записей.
+  - выбрана report-first strategy вместо автоочистки, чтобы не потерять audit trail.
 
-### M4. Workflow Catalog Expansion Queue
+### M4. Ordered Backlog After Safety Stabilization
 
 - Status: `done`
 - Goal:
-  - после стабилизации текущих контрактов разбить target operations из root-spec на реалистичную очередь внедрения.
+  - превратить migrated target workflow catalog в ordered backlog с dependency gates и validation baseline.
 - Deliverables:
-  - ordered backlog для `prepare-screening`, `rebuild-master`, `rebuild-role-resume`, `build-linkedin`, `export-resume-pdf` и сопутствующих memory/adoptions integrations;
-  - dependency map между новыми workflow и уже существующим кодом.
+  - ordered backlog для `prepare-screening`, `rebuild-master`, `rebuild-role-resume`, `build-linkedin`, `export-resume-pdf`;
+  - dependency map между remaining workflows и уже существующим кодом.
 - Acceptance criteria:
-  - каждая будущая операция имеет хотя бы минимальный input/output contract, external touchpoints и validation baseline;
+  - каждая будущая операция имеет минимальный input/output contract, external touchpoints и validation baseline;
   - очередь расширения не смешивает feature work с unresolved safety fixes.
 - Validation commands:
-  - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\plans\resume-agent-spec.md`
-  - `rg -n "prepare-screening|rebuild-master|rebuild-role-resume|build-linkedin|export-resume-pdf" C:\Users\avramko\OneDrive\Documents\Career\plans\resume-agent-spec.md`
+  - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\2026-04-21-repository-reconstruction-and-backlog.md`
+  - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\2026-04-21-prepare-screening-workflow.md`
   - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\2026-04-21-workflow-contract-alignment-and-safety.md`
 - Notes / discoveries:
   - Ordered backlog after safety stabilization:
 
     | Priority | Workflow | Proposed minimal contract | External touchpoints | Dependency gate | Validation baseline |
     | --- | --- | --- | --- | --- | --- |
-    | `1` | `prepare-screening` | Input: `vacancy_id`, optional `selected_resume`, `output_language`, `preparation_depth`. Output: proposed `vacancies/<vacancy_id>/screening.md` с interview storyline, self-intro script и screening questions. | `vacancies/<id>/meta.yml`, `analysis.md`, `adoptions.md`, `CV/<role>.md` | Зависит только от уже стабилизированных `ingest-vacancy`/`analyze-vacancy`; не требует migration `adoptions/accepted` или PDF pipeline. | `python run_agent.py --root ../.. prepare-screening --vacancy-id <id>` + smoke-check результата в `vacancies/<id>/screening.md` |
-    | `2` | `rebuild-master` | Input: `CV/MASTER.md`, accepted permanent signals, confirmed new user facts, processed vacancy history. Output: обновленный `CV/MASTER.md` + change report. | `CV/MASTER.md`, `adoptions/accepted/MASTER.md` или эквивалентный accepted-signal store, `agent_memory/runtime/`, `knowledge/` | Требует явного решения по каноническому permanent-signal store и по тому, что считается подтвержденным input. | Целевой unittest на deterministic diff + smoke-проверка change report |
-    | `3` | `rebuild-role-resume` | Input: `CV/MASTER.md`, role signal base, target role, optional `output_language`. Output: обновленный `CV/<role>.md` + diff summary. | `CV/MASTER.md`, `CV/CIO.md|CTO.md|HoE.md|HoD.md|EM.md`, `knowledge/roles/`, `adoptions/accepted/` | Зависит от `rebuild-master`, иначе role resume будет строиться поверх устаревшего master source of truth. | `python run_agent.py --root ../.. rebuild-role-resume --role <role>` + diff/assertions по ключевым разделам |
-    | `4` | `build-linkedin` | Input: `CV/MASTER.md`, optional target role/language. Output: proposed `profile/linkedin.md` или аналогичный draft artifact с headline/about/experience bullets и gap list. | `CV/MASTER.md`, `profile/`, optional `knowledge/roles/` | Зависит от стабилизированного `MASTER`; не должен читать vacancy-local temporary edits как source of truth. | Smoke-check draft + unit tests на секции и language/contact overrides |
-    | `5` | `export-resume-pdf` | Input: target resume, `output_language`, `contact_region`, optional template. Output: PDF file и render verification artifact. | `CV/<role>.md` или `CV/MASTER.md`, `profile/contact-regions.yml`, `templates/`, PDF/doc runtime | Зависит от готовых текстовых resume artifacts и отдельного contract для contact-region/language overrides. | CLI export + render/visual verification через PDF tooling |
+    | `1` | `prepare-screening` | Input: `vacancy_id`, optional `selected_resume`, `output_language`, `preparation_depth`. Output: `vacancies/<vacancy_id>/screening.md` со storyline, self-intro и screening questions. | `vacancies/<id>/meta.yml`, `analysis.md`, `adoptions.md`, `CV/<role>.md` | Опирается на existing vacancy-local contour. | `python run_agent.py --root ../.. prepare-screening --vacancy-id <id>` |
+    | `2` | `rebuild-master` | Input: `CV/MASTER.md`, accepted permanent signals, confirmed new user facts, processed vacancy history. Output: updated `CV/MASTER.md` + change report. | `CV/MASTER.md`, `adoptions/accepted/MASTER.md`, `agent_memory/runtime/`, `knowledge/` | Требует explicit permanent-signal store. | targeted unittest + smoke diff |
+    | `3` | `rebuild-role-resume` | Input: `CV/MASTER.md`, role signal base, target role. Output: updated `CV/<role>.md` + diff summary. | `CV/MASTER.md`, role CV files, `knowledge/roles/`, `adoptions/accepted/` | Зависит от `rebuild-master`. | targeted CLI/test validation |
+    | `4` | `build-linkedin` | Input: `CV/MASTER.md`, optional role/language. Output: draft `profile/linkedin.md` или аналогичный artifact. | `CV/MASTER.md`, `profile/`, optional `knowledge/roles/` | Зависит от стабильного `MASTER`. | smoke-check draft |
+    | `5` | `export-resume-pdf` | Input: target resume, `output_language`, `contact_region`, optional template. Output: PDF + render verification artifact. | `CV/<role>.md` или `CV/MASTER.md`, `profile/contact-regions.yml`, `templates/` | Не стартует до фиксации rendering/contact contract. | CLI export + render verification |
 
-  - Dependency map:
-    - `prepare-screening` можно брать первым, потому что он использует уже существующий vacancy-local контур и не зависит от pending решений по permanent signal storage.
-    - `rebuild-master` должен идти раньше `rebuild-role-resume` и `build-linkedin`, потому что именно `MASTER` остается главным source of truth по спецификации.
-    - `build-linkedin` логически дешевле `export-resume-pdf`: сначала стабилизируются текстовые производные от `MASTER`, затем уже добавляется рендеринг с profile/contact overlays.
-    - `export-resume-pdf` не должен стартовать до фиксации contract по `contact_region` и `output_language`, иначе PDF pipeline закрепит неустойчивый интерфейс.
   - Explicit hold points before feature expansion:
-    - для `rebuild-master` / `rebuild-role-resume` нужно сначала закрепить destination для permanent adoptions и accepted signals;
-    - для `export-resume-pdf` нужен отдельный rendering contract с `profile/contact-regions.yml` и шаблонами;
+    - для `rebuild-master` / `rebuild-role-resume` нужно закрепить destination для permanent adoptions и accepted signals;
+    - для `export-resume-pdf` нужен отдельный rendering contract;
     - для всех новых workflows `bootstrap`/catalog boundary должен быть переосмыслен так, чтобы `list-workflows`, registry и `project_memory.workflow_catalog` описывали один и тот же набор операций.
 
 ## Decision log
 
-- `2026-04-21 16:43` — Текущий workflow stack рассматривается как отдельный workstream, а не как часть общего artifact cleanup. — Основные риски связаны с side effects и контрактами поведения кода. — Это позволяет сначала стабилизировать безопасную основу, а уже потом расширять функциональность.
-- `2026-04-21 16:43` — `unittest` принят как текущий validation baseline. — Он реально запускается в данном окружении, в отличие от `pytest`. — Все milestones плана должны использовать команды, воспроизводимые без дополнительной установки.
-- `2026-04-21 16:43` — Исторический `ingest-refactor-plan.md` оставлен как reference о завершенном рефакторинге, но не как основной план текущего workstream. — Он не покрывает вопросы runtime safety, publication flow и contract drift. — Новый план берет более широкий operational scope.
-- `2026-04-21 17:08` — Для M1 source of truth собран из кода и тестов, а root runbook/docs трактуются как expected-operator contract. — Иначе невозможно честно разделить фактическое поведение и drift в документации. — M2 должен выровнять именно operator-facing boundary, а не только внутренние описания.
-- `2026-04-21 17:27` — Auto-publish после `ingest-vacancy` удален из CLI-контракта. — Это соответствует уже существующему manual git flow и ожиданию явного подтверждения перед публикацией private artifacts. — Публикация остается внешним операторским действием, а не скрытым side effect workflow.
-- `2026-04-21 17:46` — Для stale runtime выбран report-first reconciliation вместо автоочистки. — История запусков может быть нужна для аудита, поэтому удалять или переписывать ее без явного решения рискованно. — Safety boundary переносится в явную диагностику через `show-memory` и более точные workflow errors.
-- `2026-04-21 18:03` — Очередь расширения начинается с `prepare-screening`, а не с rebuild/export flows. — Это единственная следующая операция из target-spec, которая минимально зависит от unresolved contracts по permanent signals, accepted adoptions и profile overlays. — Таким образом feature expansion не откатывает уже закрытые safety milestones.
+- `2026-04-21 16:43` — Текущий workflow stack рассматривается как отдельный workstream, а не как часть общего artifact cleanup. — Основные риски связаны с side effects и behavioral contracts. — Это позволяет сначала стабилизировать безопасную основу, а потом расширять функциональность.
+- `2026-04-21 16:43` — `unittest` принят как текущий validation baseline. — Он реально запускается в данном окружении, в отличие от `pytest`. — Все milestones этого плана используют воспроизводимые команды.
+- `2026-04-21 16:43` — Содержательные итоги завершенного ingest refactor перенесены в этот safety workstream, а не остаются отдельным активным планом. — Historical refactor-plan не покрывает runtime safety, publication flow и contract drift. — Этот план берет более широкий operational scope.
+- `2026-04-21 17:27` — Auto-publish после `ingest-vacancy` удален из CLI-контракта. — Это соответствует manual git flow и ожиданию явного подтверждения перед публикацией private artifacts. — Publication остается внешним операторским действием.
+- `2026-04-21 17:46` — Для stale runtime выбран report-first reconciliation вместо автоочистки. — История запусков может быть нужна для аудита. — Safety boundary переносится в явную диагностику через `show-memory`.
+- `2026-04-21 18:03` — M4 превратил migrated target workflow catalog в ordered backlog с dependency gates и validation baseline. — Remaining workflows получили минимальные contracts и hold points. — Это закрыло safety workstream, но не сделало feature expansion обязательным следующим шагом.
+- `2026-04-21 19:51` — После пересмотра master plan этот workstream больше не диктует немедленный старт `prepare-screening`. — Feature expansion отложена до repository cleanup и current workflow completion gate. — Следующий шаг по этому плану теперь reference-only и служит входом для master-plan sequencing.
 
 ## Progress log
 
 - `2026-04-21 16:43` — По коду, тестам и runbook подтверждено текущее поведение `bootstrap`, `ingest-vacancy`, `analyze-vacancy`, включая Excel integration и git-side effects в CLI. — `python -m unittest discover -s tests` -> `36 tests, OK`. — Status: `planned`.
-- `2026-04-21 16:43` — Зафиксированы ключевые contradictions: outdated workflow docs, auto-publish conflict, stale runtime state, расхождение в Excel-схеме и неполный workflow catalog относительно target-spec. — Требуется явное contract alignment до расширения функциональности. — Status: `planned`.
-- `2026-04-21 17:08` — M1 дополнен contract matrix, contradiction ledger и списком owner-level решений по publication, Excel dependency и stale runtime handling. — Validation выявила дополнительный drift: `bootstrap` числится в catalog, но не в workflow registry/listing; `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory` и `python -m unittest discover -s tests` завершились успешно. — Status: `done`.
-- `2026-04-21 17:27` — M2 зафиксировал local-only publication boundary: git-side effects удалены из `ingest-vacancy`, а README/runbook/private workflow docs синхронизированы с manual publish flow. — `python -m unittest tests.test_cli tests.test_ingest_workflow tests.test_analyze_workflow` -> `24 tests, OK`; `Get-Content -Raw ..\git-workflow.md` и `Get-Content -Raw ..\run-ingest-analyze.md` подтверждают обновленный operator contract. — Status: `done`.
-- `2026-04-21 17:46` — M3 добавил reconciliation-слой в `show-memory`, новые тесты на stale runtime references и более точные ошибки `analyze-vacancy` для отсутствующей vacancy folder. — `Test-Path ...cto-02` -> `False`; `python run_agent.py --root ../.. show-memory` показывает `reconciliation.task_memory.status = "stale"` и накопленные `runs_with_missing_artifacts`; `python -m unittest discover -s tests` -> `36 tests, OK`. — Status: `done`.
-- `2026-04-21 18:03` — M4 превратил target operations из `resume-agent-spec.md` в ordered backlog с dependency gates и validation baseline. — `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\plans\resume-agent-spec.md`, `rg -n "prepare-screening|rebuild-master|rebuild-role-resume|build-linkedin|export-resume-pdf" ...` и повторное чтение текущего плана подтвердили, что очередь покрывает весь заявленный target catalog без смешения с unresolved safety work. — Status: `done`.
+- `2026-04-21 17:08` — M1 собрал contract matrix, contradiction ledger и список owner-level решений. — `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory` и `python -m unittest discover -s tests` завершились успешно. — Status: `done`.
+- `2026-04-21 17:27` — M2 зафиксировал local-only publication boundary и синхронизировал operator docs с manual publish flow. — `python -m unittest tests.test_cli tests.test_ingest_workflow tests.test_analyze_workflow` -> `24 tests, OK`. — Status: `done`.
+- `2026-04-21 17:46` — M3 добавил reconciliation-слой в `show-memory`, новые tests на stale runtime references и более точные ошибки `analyze-vacancy`. — Полный `unittest` baseline остается зеленым. — Status: `done`.
+- `2026-04-21 18:03` — M4 зафиксировал ordered backlog remaining workflows и dependency gates. — Backlog теперь является planning input, а не командой к немедленному старту новой реализации. — Status: `done`.
+- `2026-04-21 19:51` — План синхронизирован с обновленным master plan и migration/removal superseded planning artifacts. — Дополнительной кодовой валидации не требовалось, так как обновлялась только плановая последовательность. — Status: `done`.
 
 ## Current state
 
 - Current milestone: `M4`
 - Current status: `done`
-- Next step: `Открыть отдельный implementation plan для workflow #1 в очереди — prepare-screening.`
+- Next step: `Использовать findings этого плана как вход в master-plan sequence: сначала repository cleanup и migration/removal superseded plan artifacts, затем completion gate по текущему workflow-стеку, и только потом planning remaining workflows.`
 - Active blockers:
-  - Не согласован канонический Excel mapping contract.
+  - Feature expansion сознательно отложена master plan до завершения repository cleanup и current workflow completion gate.
+  - Не согласован канонический Excel mapping contract и degradable-mode policy.
 - Open questions:
   - Должен ли `ingest-vacancy` уметь работать без `response-monitoring.xlsx`, если файла нет или он поврежден?
   - Должен ли `analyze-vacancy` по-прежнему писать vacancy-local `adoptions.md`, если проект перейдет к корневому `adoptions/inbox/<vacancy_id>.md`?
-  - Какой набор workflow нужно считать "минимально готовым" до начала feature expansion?
+  - Какой набор existing workflows нужно считать "минимально готовым" до начала feature expansion?
 
 ## Completion summary
 
 - Поставлено:
   - M1: contract matrix и contradiction ledger для `bootstrap`, `ingest-vacancy`, `analyze-vacancy`;
-  - M2: manual publication boundary без git-side effects в CLI;
-  - M3: report-first reconciliation в `show-memory` и guardrails для missing vacancy artifacts;
-  - M4: ordered backlog для `prepare-screening`, `rebuild-master`, `rebuild-role-resume`, `build-linkedin`, `export-resume-pdf`.
+  - M2: local-only publication boundary без hidden git side effects;
+  - M3: report-first reconciliation для stale runtime state;
+  - M4: ordered backlog remaining workflows с dependency gates.
 - Провалидировано:
   - `python run_agent.py --root ../.. list-workflows`
   - `python run_agent.py --root ../.. show-memory`
   - `python -m unittest discover -s tests`
   - `python -m unittest tests.test_cli tests.test_ingest_workflow tests.test_analyze_workflow`
-  - чтение root-spec и runbook-документов по validation commands milestone'ов.
 - Оставшиеся follow-up задачи:
-  - закрепить канонический Excel mapping contract и degradable-mode policy;
+  - закрепить canonical Excel mapping contract и degradable-mode policy;
   - решить migration path от vacancy-local `adoptions.md` к корневому `adoptions/` pipeline;
-  - выровнять `bootstrap`, workflow registry и `project_memory.workflow_catalog`.
+  - определить completion gate по текущему workflow-стеку до feature expansion.
 - Остаточные риски:
-  - `show-memory` уже выявляет большой объём исторических stale references, поэтому будущим workflow понадобится аккуратная работа с legacy runtime history;
-  - feature expansion в resume-generation ветке может снова разъехаться с root-spec, если не вести отдельные implementation plans по очереди.
-- Затронутые root artifacts:
-  - `tooling/run-ingest-analyze.md`
-  - `tooling/git-workflow.md`
-  - `agent_memory/workflows/ingest-vacancy.md`
-  - pinned commit `tooling/application-agent` в private repo.
+  - stale runtime history по-прежнему требует аккуратной дальнейшей работы;
+  - без master-plan gate feature expansion может снова разъехаться с root contracts и cleanup workstream.
