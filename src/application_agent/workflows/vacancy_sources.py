@@ -9,9 +9,7 @@ from html.parser import HTMLParser
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-from application_agent.integrations.response_monitoring import ResponseMonitoringIngestRecord, append_ingest_record
-from application_agent.memory.models import WorkflowRun
-from application_agent.memory.store import JsonMemoryStore
+from application_agent.integrations.playwright_renderer import render_page_with_playwright
 from application_agent.normalization.countries import (
     infer_country_name_from_text,
     normalize_country_name,
@@ -22,10 +20,6 @@ from application_agent.normalization.generic_page_rules import (
     GENERIC_UI_NOISE_LINES as DATA_GENERIC_UI_NOISE_LINES,
 )
 from application_agent.normalization.source_channels import infer_source_channel as infer_source_channel_value
-from application_agent.utils.simple_yaml import load_simple_yaml, write_simple_yaml
-from application_agent.workflows.base import WorkflowResult
-from application_agent.workspace import WorkspaceLayout
-
 CYRILLIC_MAP = {
     "\u0430": "a",
     "\u0431": "b",
@@ -1157,6 +1151,38 @@ def parse_generic_vacancy_page(html: str, source_url: str = "") -> VacancySource
     )
 
 
+def looks_like_js_heavy_html(html: str) -> bool:
+    lower = html.lower()
+    return any(
+        token in lower
+        for token in (
+            "__next_data__",
+            "__nuxt",
+            "window.__initial_state__",
+            "window.__apollo_state__",
+            "webpack",
+            "framer",
+            "data-reactroot",
+            "application/ld+json",
+        )
+    )
+
+
+def should_use_playwright_fallback(html: str, details: VacancySourceDetails) -> bool:
+    source_text = clean_multiline_text(details.source_text)
+    if not source_text:
+        return True
+    if looks_like_truncated_summary(source_text):
+        return True
+    if len(source_text) < 400 and looks_like_js_heavy_html(html):
+        return True
+    if len(source_text) < 250:
+        return True
+    if not details.company.strip() or not details.position.strip():
+        return True
+    return False
+
+
 def fetch_source_details(source_url: str) -> VacancySourceDetails:
     vacancy_id = parse_hh_vacancy_url(source_url)
     html = ""
@@ -1173,7 +1199,15 @@ def fetch_source_details(source_url: str) -> VacancySourceDetails:
             html = fetch_url(source_url, accept="text/html,application/xhtml+xml")
         return parse_hh_vacancy_page(html)
     html = fetch_url(source_url, accept="text/html,application/xhtml+xml")
-    return parse_generic_vacancy_page(html, source_url)
+    details = parse_generic_vacancy_page(html, source_url)
+    if should_use_playwright_fallback(html, details):
+        try:
+            rendered_page = render_page_with_playwright(source_url)
+            rendered_details = parse_generic_vacancy_page(rendered_page.html, rendered_page.url or source_url)
+            return merge_source_details(details, rendered_details, rendered_page.url or source_url)
+        except Exception:
+            pass
+    return details
 
 
 def merge_source_details(base: VacancySourceDetails, overlay: VacancySourceDetails, source_url: str) -> VacancySourceDetails:

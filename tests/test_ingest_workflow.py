@@ -13,6 +13,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from application_agent.integrations.response_monitoring import ResponseMonitoringIngestRecord, append_ingest_record
+from application_agent.integrations.playwright_renderer import PlaywrightRenderedPage
 from application_agent.memory.store import JsonMemoryStore
 from application_agent.workspace import WorkspaceLayout
 from application_agent.workflows.ingest_vacancy import (
@@ -21,6 +22,7 @@ from application_agent.workflows.ingest_vacancy import (
     build_vacancy_id,
     build_response_monitoring_record,
     enrich_request,
+    fetch_source_details,
     infer_source_channel,
     normalize_country_value,
     normalize_language_tag,
@@ -28,6 +30,7 @@ from application_agent.workflows.ingest_vacancy import (
     parse_hh_vacancy_page,
     parse_hh_vacancy_payload,
 )
+from application_agent.workflows.vacancy_sources import should_use_playwright_fallback
 from application_agent.workflows.registry import build_default_registry
 
 
@@ -653,6 +656,72 @@ class IngestWorkflowTests(unittest.TestCase):
         self.assertEqual(details.company, "Plata")
         self.assertEqual(details.position, "Engineering Manager")
         self.assertEqual(details.language, "en")
+
+    def test_should_use_playwright_fallback_for_thin_generic_content(self) -> None:
+        html = """
+        <html>
+          <head>
+            <script src="/static/app.js"></script>
+          </head>
+          <body>
+            <div id="root"></div>
+          </body>
+        </html>
+        """
+        details = VacancySourceDetails(
+            company="",
+            position="Engineering Manager",
+            source_text="Short summary",
+        )
+
+        self.assertTrue(should_use_playwright_fallback(html, details))
+
+    def test_fetch_source_details_uses_playwright_fallback_for_thin_generic_page(self) -> None:
+        initial_html = """
+        <html>
+          <head>
+            <script src="/static/app.js"></script>
+          </head>
+          <body>
+            <div id="root"></div>
+          </body>
+        </html>
+        """
+        initial_details = VacancySourceDetails(
+            company="",
+            position="Engineering Manager",
+            source_text="Short summary",
+            source_markdown="Short summary",
+            source_channel="Website",
+        )
+        rendered_details = VacancySourceDetails(
+            company="Plata",
+            position="Engineering Manager",
+            source_text="Full rendered vacancy text with enough detail to trust the browser fallback.",
+            source_markdown="### About role\n\nFull rendered vacancy text with enough detail to trust the browser fallback.",
+            source_channel="Company Site",
+            language="en",
+        )
+        rendered_page = PlaywrightRenderedPage(
+            html="<html><body><main><h1>Engineering Manager</h1><p>Full rendered vacancy text with enough detail to trust the browser fallback.</p></main></body></html>",
+            url="https://careers.bancoplata.mx/vacancy/details?id=5107481008",
+            title="Engineering Manager",
+        )
+
+        with patch(
+            "application_agent.workflows.vacancy_sources.fetch_url",
+            return_value=initial_html,
+        ), patch(
+            "application_agent.workflows.vacancy_sources.parse_generic_vacancy_page",
+            side_effect=[initial_details, rendered_details],
+        ), patch(
+            "application_agent.workflows.vacancy_sources.render_page_with_playwright",
+            return_value=rendered_page,
+        ):
+            details = fetch_source_details("https://careers.bancoplata.mx/vacancy/details?id=5107481008")
+
+        self.assertEqual(details.company, "Plata")
+        self.assertIn("Full rendered vacancy text", details.source_text)
 
     def test_enrich_request_surfaces_fetch_error_when_required_fields_are_missing(self) -> None:
         with patch(
