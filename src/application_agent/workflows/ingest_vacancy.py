@@ -7,12 +7,10 @@ from datetime import date, datetime, timezone
 from html import unescape
 from html.parser import HTMLParser
 from importlib import resources
-from io import BytesIO
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
-from xml.etree import ElementTree as ET
-from zipfile import ZIP_DEFLATED, ZipFile
 
+from application_agent.integrations.response_monitoring import ResponseMonitoringIngestRecord, append_ingest_record
 from application_agent.memory.models import WorkflowRun
 from application_agent.memory.store import JsonMemoryStore
 from application_agent.utils.simple_yaml import load_simple_yaml, write_simple_yaml
@@ -131,32 +129,6 @@ HH_TITLE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 BROKEN_MARKERS = ("\u00d0", "\u00d1", "\u00d2", "\u00d3", "\u00d4", "\u00d5", "\u00d6", "\u00d7", "\u00d8", "\u00d9", "\u00da", "\u00db", "\u00dc", "\u00dd", "\u00de", "\u00df", "\u00c2", "\u00c3")
-SPREADSHEET_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
-MC_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006"
-REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-XR_NS = "http://schemas.microsoft.com/office/spreadsheetml/2014/revision"
-RESPONSE_MONITORING_SHEET = "\u0414\u0430\u043d\u043d\u044b\u0435"
-RESPONSE_MONITORING_COLUMNS = tuple("ABCDEFGHIJK")
-RESPONSE_MONITORING_METHOD_MAP = {
-    "headhunter": "\u0421\u0430\u0439\u0442 HH",
-    "head hunter": "\u0421\u0430\u0439\u0442 HH",
-    "hh": "\u0421\u0430\u0439\u0442 HH",
-    "linkedin": "LinkedIn",
-    "company site": "\u0421\u0430\u0439\u0442 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438",
-    "website": "\u0421\u0430\u0439\u0442 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438",
-    "email": "Email",
-    "telegram": "Telegram",
-    "whatsapp": "WhatsApp",
-    "\u0440\u0435\u043a\u0440\u0443\u0442\u0435\u0440": "\u0420\u0435\u043a\u0440\u0443\u0442\u0435\u0440",
-    "\u043a\u0430\u0434\u0440\u043e\u0432\u043e\u0435 \u0430\u0433\u0435\u043d\u0442\u0441\u0442\u0432\u043e": "\u041a\u0430\u0434\u0440\u043e\u0432\u043e\u0435 \u0430\u0433\u0435\u043d\u0442\u0441\u0442\u0432\u043e",
-    "\u0440\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u044f": "\u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u044f",
-    "manual": "\u0414\u0440\u0443\u0433\u043e\u0435",
-}
-
-ET.register_namespace("", SPREADSHEET_NS)
-ET.register_namespace("mc", MC_NS)
-ET.register_namespace("r", REL_NS)
-ET.register_namespace("xr", XR_NS)
 GENERIC_COMPANY_STOPWORDS = {
     "career",
     "careers",
@@ -693,204 +665,18 @@ def is_unspecified(value: str) -> bool:
     return cleaned in {"", "\u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e", "n/a", "null"}
 
 
-def excel_date_serial(value: date) -> int:
-    epoch = date(1899, 12, 30)
-    return (value - epoch).days
-
-
-def response_monitoring_display_value(value: str, default: str = "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e") -> str:
-    cleaned = clean_text(value)
-    return default if is_unspecified(cleaned) else cleaned
-
-
-def normalize_response_monitoring_method(source_channel: str, source_url: str) -> str:
-    channel = clean_text(source_channel).lower()
-    if channel in RESPONSE_MONITORING_METHOD_MAP:
-        return RESPONSE_MONITORING_METHOD_MAP[channel]
-
-    host = urlparse(source_url).netloc.lower()
-    if host.startswith("www."):
-        host = host[4:]
-    if host.endswith("hh.ru"):
-        return "\u0421\u0430\u0439\u0442 HH"
-    if host.endswith("linkedin.com"):
-        return "LinkedIn"
-    if channel in {"company site", "website"} or any(token in host for token in ("career", "careers", "jobs")):
-        return "\u0421\u0430\u0439\u0442 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438"
-    return "\u0414\u0440\u0443\u0433\u043e\u0435"
-
-
-def build_response_monitoring_entry(request: "IngestVacancyRequest", vacancy_id: str) -> dict[str, str | int]:
+def build_response_monitoring_record(request: "IngestVacancyRequest", vacancy_id: str) -> ResponseMonitoringIngestRecord:
     source_channel = request.source_channel.strip() or infer_source_channel(request.source_url, request.source_text)
-    return {
-        "A": vacancy_id,
-        "B": source_channel,
-        "C": request.source_url.strip(),
-        "D": "\u0414\u0430",
-        "E": request.company.strip(),
-        "F": request.position.strip(),
-        "G": response_monitoring_display_value(request.country),
-        "H": response_monitoring_display_value(request.work_mode),
-        "I": normalize_response_monitoring_method(source_channel, request.source_url),
-        "J": "\u041d\u0435\u0442",
-        "K": excel_date_serial(request.ingest_date),
-    }
-
-
-def find_response_monitoring_sheet_path(workbook_xml: ET.Element, relationships_xml: ET.Element) -> str:
-    relmap = {
-        rel.attrib["Id"]: rel.attrib["Target"]
-        for rel in relationships_xml
-        if rel.attrib.get("Id") and rel.attrib.get("Target")
-    }
-    sheets = workbook_xml.find(f"{{{SPREADSHEET_NS}}}sheets")
-    if sheets is None:
-        raise ValueError("Workbook is missing sheets definition.")
-    for sheet in sheets:
-        if sheet.attrib.get("name") != RESPONSE_MONITORING_SHEET:
-            continue
-        relation_id = sheet.attrib.get(f"{{{REL_NS}}}id")
-        if not relation_id or relation_id not in relmap:
-            break
-        target = relmap[relation_id].lstrip("/")
-        return target if target.startswith("xl/") else f"xl/{target}"
-    raise ValueError(f"Workbook does not contain sheet '{RESPONSE_MONITORING_SHEET}'.")
-
-
-def collect_sheet_rows(sheet_xml: ET.Element) -> list[ET.Element]:
-    sheet_data = sheet_xml.find(f"{{{SPREADSHEET_NS}}}sheetData")
-    if sheet_data is None:
-        raise ValueError("Worksheet is missing sheetData.")
-    return sheet_data.findall(f"{{{SPREADSHEET_NS}}}row")
-
-
-def cell_value(cell: ET.Element) -> str:
-    cell_type = cell.attrib.get("t")
-    if cell_type == "inlineStr":
-        return "".join(node.text or "" for node in cell.findall(f".//{{{SPREADSHEET_NS}}}t"))
-    value_node = cell.find(f"{{{SPREADSHEET_NS}}}v")
-    return value_node.text or "" if value_node is not None else ""
-
-
-def row_cells_by_column(row: ET.Element) -> dict[str, ET.Element]:
-    cells: dict[str, ET.Element] = {}
-    for cell in row.findall(f"{{{SPREADSHEET_NS}}}c"):
-        ref = cell.attrib.get("r", "")
-        column = "".join(char for char in ref if char.isalpha())
-        if column:
-            cells[column] = cell
-    return cells
-
-
-def find_blank_response_monitoring_row(rows: list[ET.Element]) -> ET.Element | None:
-    for row in rows:
-        row_index = int(row.attrib.get("r", "0") or 0)
-        if row_index < 3:
-            continue
-        cells = row_cells_by_column(row)
-        if all(not cell_value(cells[column]).strip() for column in RESPONSE_MONITORING_COLUMNS if column in cells):
-            return row
-    return None
-
-
-def build_empty_cell(cell_ref: str, style_id: str | None = None) -> ET.Element:
-    attributes = {"r": cell_ref}
-    if style_id:
-        attributes["s"] = style_id
-    return ET.Element(f"{{{SPREADSHEET_NS}}}c", attributes)
-
-
-def ensure_row_has_cells(row: ET.Element) -> dict[str, ET.Element]:
-    cells = row_cells_by_column(row)
-    row_index = int(row.attrib.get("r", "0") or 0)
-    for column in RESPONSE_MONITORING_COLUMNS:
-        if column in cells:
-            continue
-        cell = build_empty_cell(f"{column}{row_index}")
-        row.append(cell)
-        cells[column] = cell
-    return cells
-
-
-def set_cell_text(cell: ET.Element, value: str) -> None:
-    for child in list(cell):
-        cell.remove(child)
-    cell.attrib["t"] = "inlineStr"
-    is_node = ET.SubElement(cell, f"{{{SPREADSHEET_NS}}}is")
-    text_node = ET.SubElement(is_node, f"{{{SPREADSHEET_NS}}}t")
-    text_node.text = value
-
-
-def set_cell_number(cell: ET.Element, value: int) -> None:
-    for child in list(cell):
-        cell.remove(child)
-    cell.attrib.pop("t", None)
-    value_node = ET.SubElement(cell, f"{{{SPREADSHEET_NS}}}v")
-    value_node.text = str(value)
-
-
-def update_dimension_ref(sheet_xml: ET.Element, row_index: int) -> None:
-    dimension = sheet_xml.find(f"{{{SPREADSHEET_NS}}}dimension")
-    if dimension is None:
-        return
-    ref = dimension.attrib.get("ref", "")
-    if ":" not in ref:
-        return
-    start_ref, end_ref = ref.split(":", maxsplit=1)
-    end_column = "".join(char for char in end_ref if char.isalpha()) or "P"
-    dimension.attrib["ref"] = f"{start_ref}:{end_column}{row_index}"
-
-
-def normalize_response_monitoring_sheet_root(sheet_xml: ET.Element) -> None:
-    ignorable_key = f"{{{MC_NS}}}Ignorable"
-    uid_key = f"{{{XR_NS}}}uid"
-    if uid_key in sheet_xml.attrib:
-        sheet_xml.attrib[ignorable_key] = "xr"
-    else:
-        sheet_xml.attrib.pop(ignorable_key, None)
-
-
-def append_response_monitoring_row(workbook_path: Path, request: "IngestVacancyRequest", vacancy_id: str) -> int:
-    with ZipFile(workbook_path) as workbook:
-        workbook_xml = ET.fromstring(workbook.read("xl/workbook.xml"))
-        relationships_xml = ET.fromstring(workbook.read("xl/_rels/workbook.xml.rels"))
-        sheet_path = find_response_monitoring_sheet_path(workbook_xml, relationships_xml)
-        sheet_xml = ET.fromstring(workbook.read(sheet_path))
-        archive_entries = {name: workbook.read(name) for name in workbook.namelist()}
-
-    rows = collect_sheet_rows(sheet_xml)
-    target_row = find_blank_response_monitoring_row(rows)
-    if target_row is None:
-        sheet_data = sheet_xml.find(f"{{{SPREADSHEET_NS}}}sheetData")
-        if sheet_data is None:
-            raise ValueError("Worksheet is missing sheetData.")
-        row_index = int(rows[-1].attrib.get("r", "2") or 2) + 1 if rows else 3
-        template_cells = row_cells_by_column(rows[-1]) if rows else {}
-        target_row = ET.Element(f"{{{SPREADSHEET_NS}}}row", {"r": str(row_index)})
-        for column in RESPONSE_MONITORING_COLUMNS:
-            style_id = template_cells.get(column).attrib.get("s") if column in template_cells else None
-            target_row.append(build_empty_cell(f"{column}{row_index}", style_id))
-        sheet_data.append(target_row)
-        rows.append(target_row)
-        update_dimension_ref(sheet_xml, row_index)
-
-    row_index = int(target_row.attrib.get("r", "0") or 0)
-    cells = ensure_row_has_cells(target_row)
-    entry = build_response_monitoring_entry(request, vacancy_id)
-    for column, value in entry.items():
-        if isinstance(value, int):
-            set_cell_number(cells[column], value)
-        else:
-            set_cell_text(cells[column], value)
-
-    normalize_response_monitoring_sheet_root(sheet_xml)
-    archive_entries[sheet_path] = ET.tostring(sheet_xml, encoding="utf-8", xml_declaration=True)
-    buffer = BytesIO()
-    with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as target:
-        for name, content in archive_entries.items():
-            target.writestr(name, content)
-    workbook_path.write_bytes(buffer.getvalue())
-    return row_index
+    return ResponseMonitoringIngestRecord(
+        vacancy_id=vacancy_id,
+        source_channel=source_channel,
+        source_url=request.source_url.strip(),
+        company=request.company.strip(),
+        position=request.position.strip(),
+        country=request.country.strip(),
+        work_mode=request.work_mode.strip(),
+        ingest_date=request.ingest_date,
+    )
 
 
 def fetch_url(source_url: str, *, accept: str) -> str:
@@ -1588,7 +1374,7 @@ class IngestVacancyWorkflow:
         analysis_path.write_text(self._render_analysis(vacancy_id, request), encoding="utf-8", newline="\n")
         adoptions_path.write_text(self._render_adoptions(vacancy_id), encoding="utf-8", newline="\n")
         response_monitoring_path = layout.root / "response-monitoring.xlsx"
-        excel_row = append_response_monitoring_row(response_monitoring_path, request, vacancy_id)
+        excel_row = append_ingest_record(response_monitoring_path, build_response_monitoring_record(request, vacancy_id))
         meta_payload = load_simple_yaml(meta_path)
         meta_payload["excel_row"] = excel_row
         write_simple_yaml(meta_path, meta_payload)

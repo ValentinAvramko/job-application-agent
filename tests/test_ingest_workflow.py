@@ -12,13 +12,14 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from application_agent.integrations.response_monitoring import ResponseMonitoringIngestRecord, append_ingest_record
 from application_agent.memory.store import JsonMemoryStore
 from application_agent.workspace import WorkspaceLayout
 from application_agent.workflows.ingest_vacancy import (
     IngestVacancyRequest,
     VacancySourceDetails,
-    append_response_monitoring_row,
     build_vacancy_id,
+    build_response_monitoring_record,
     enrich_request,
     infer_source_channel,
     normalize_country_value,
@@ -126,7 +127,7 @@ class IngestWorkflowTests(unittest.TestCase):
         store.bootstrap()
         workflow = build_default_registry().get("ingest-vacancy")
 
-        with patch("application_agent.workflows.ingest_vacancy.append_response_monitoring_row", return_value=3):
+        with patch("application_agent.workflows.ingest_vacancy.append_ingest_record", return_value=3):
             result = workflow.run(
                 layout=layout,
                 store=store,
@@ -186,7 +187,7 @@ class IngestWorkflowTests(unittest.TestCase):
                 work_schedule="5/2",
                 key_skills=["DevSecOps", "CI/CD"],
             ),
-        ), patch("application_agent.workflows.ingest_vacancy.append_response_monitoring_row", return_value=42):
+        ), patch("application_agent.workflows.ingest_vacancy.append_ingest_record", return_value=42):
             result = workflow.run(
                 layout=layout,
                 store=store,
@@ -212,14 +213,8 @@ class IngestWorkflowTests(unittest.TestCase):
         self.assertNotIn("\n## \u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 \u043d\u0430\u0432\u044b\u043a\u0438\n", source_text)
         self.assertIn("\n### \u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 \u043d\u0430\u0432\u044b\u043a\u0438\n", source_text)
 
-    def test_append_response_monitoring_row_writes_columns_a_to_k(self) -> None:
-        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
-        temp_root.mkdir(exist_ok=True)
-        workbook_path = temp_root / f"response-monitoring-{uuid.uuid4().hex}.xlsx"
-        create_response_monitoring_workbook(workbook_path)
-
-        row_index = append_response_monitoring_row(
-            workbook_path,
+    def test_build_response_monitoring_record_maps_ingest_fields(self) -> None:
+        record = build_response_monitoring_record(
             IngestVacancyRequest(
                 company="\u0426\u0435\u043d\u0442\u0440 \u044d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u043d\u044b\u0445 \u0444\u0438\u043d\u0430\u043d\u0441\u043e\u0432",
                 position="\u0422\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u043b\u0438\u0434\u0435\u0440",
@@ -230,6 +225,40 @@ class IngestWorkflowTests(unittest.TestCase):
                 ingest_date=date(2026, 4, 21),
             ),
             "20260421-tsentr-elektronnyh-finansov-tehnicheskiy-lider",
+        )
+
+        self.assertEqual(
+            record,
+            ResponseMonitoringIngestRecord(
+                vacancy_id="20260421-tsentr-elektronnyh-finansov-tehnicheskiy-lider",
+                source_channel="HeadHunter",
+                source_url="https://hh.ru/vacancy/132242694",
+                company="\u0426\u0435\u043d\u0442\u0440 \u044d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u043d\u044b\u0445 \u0444\u0438\u043d\u0430\u043d\u0441\u043e\u0432",
+                position="\u0422\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u043b\u0438\u0434\u0435\u0440",
+                country="\u041a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d",
+                work_mode="\u043d\u0430 \u043c\u0435\u0441\u0442\u0435 \u0440\u0430\u0431\u043e\u0442\u043e\u0434\u0430\u0442\u0435\u043b\u044f",
+                ingest_date=date(2026, 4, 21),
+            ),
+        )
+
+    def test_append_ingest_record_writes_columns_a_to_k(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        workbook_path = temp_root / f"response-monitoring-{uuid.uuid4().hex}.xlsx"
+        create_response_monitoring_workbook(workbook_path)
+
+        row_index = append_ingest_record(
+            workbook_path,
+            ResponseMonitoringIngestRecord(
+                vacancy_id="20260421-tsentr-elektronnyh-finansov-tehnicheskiy-lider",
+                source_channel="HeadHunter",
+                source_url="https://hh.ru/vacancy/132242694",
+                company="\u0426\u0435\u043d\u0442\u0440 \u044d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u043d\u044b\u0445 \u0444\u0438\u043d\u0430\u043d\u0441\u043e\u0432",
+                position="\u0422\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u043b\u0438\u0434\u0435\u0440",
+                country="\u041a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d",
+                work_mode="\u043d\u0430 \u043c\u0435\u0441\u0442\u0435 \u0440\u0430\u0431\u043e\u0442\u043e\u0434\u0430\u0442\u0435\u043b\u044f",
+                ingest_date=date(2026, 4, 21),
+            ),
         )
 
         self.assertEqual(row_index, 3)

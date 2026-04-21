@@ -48,7 +48,7 @@ class AnalyzeWorkflowTests(unittest.TestCase):
         ingest = registry.get("ingest-vacancy")
         analyze = registry.get("analyze-vacancy")
 
-        with patch("application_agent.workflows.ingest_vacancy.append_response_monitoring_row", return_value=3):
+        with patch("application_agent.workflows.ingest_vacancy.append_ingest_record", return_value=3):
             ingest.run(
                 layout=layout,
                 store=store,
