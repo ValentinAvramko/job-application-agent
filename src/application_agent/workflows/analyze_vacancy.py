@@ -189,8 +189,17 @@ class AnalyzeVacancyWorkflow:
         analysis_path = vacancy_dir / "analysis.md"
         adoptions_path = vacancy_dir / "adoptions.md"
 
+        if not vacancy_dir.exists():
+            raise FileNotFoundError(
+                f"Vacancy '{vacancy_id}' is missing from vacancies/. Runtime memory or the provided vacancy_id is stale; "
+                "run ingest-vacancy again or pass an existing --vacancy-id."
+            )
+
         if not meta_path.exists() or not source_path.exists():
-            raise FileNotFoundError(f"Vacancy '{vacancy_id}' is missing meta.yml or source.md.")
+            raise FileNotFoundError(
+                f"Vacancy '{vacancy_id}' is incomplete: meta.yml or source.md is missing. "
+                "Re-run ingest-vacancy to rebuild the vacancy scaffold."
+            )
 
         meta = load_simple_yaml(meta_path)
         raw_source = extract_raw_source(source_path)

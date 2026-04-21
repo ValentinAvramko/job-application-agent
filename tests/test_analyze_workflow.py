@@ -100,6 +100,26 @@ class AnalyzeWorkflowTests(unittest.TestCase):
         self.assertEqual(task_memory["active_workflow"], "analyze-vacancy")
         self.assertEqual(len(workflow_runs), 2)
 
+    def test_analyze_reports_stale_vacancy_reference(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f"analyze-missing-vacancy-{uuid.uuid4().hex}"
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+
+        layout = WorkspaceLayout(workspace_dir)
+        layout.bootstrap()
+        store = JsonMemoryStore(layout)
+        store.bootstrap()
+
+        analyze = build_default_registry().get("analyze-vacancy")
+
+        with self.assertRaisesRegex(FileNotFoundError, "Runtime memory or the provided vacancy_id is stale"):
+            analyze.run(
+                layout=layout,
+                store=store,
+                request=AnalyzeVacancyRequest(vacancy_id="20260421-missing-role"),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

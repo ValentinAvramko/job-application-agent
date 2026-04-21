@@ -59,6 +59,62 @@ class MemoryStoreTests(unittest.TestCase):
         self.assertEqual(project_memory["role_resumes"], ["CIO", "CTO", "HoE", "HoD", "EM"])
         self.assertEqual(project_memory["contact_regions"], ["RU", "KZ", "EU"])
 
+    def test_snapshot_reports_stale_runtime_references(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f"memory-store-reconcile-{uuid.uuid4().hex}"
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+
+        layout = WorkspaceLayout(workspace_dir)
+        layout.bootstrap()
+        store = JsonMemoryStore(layout)
+        store.bootstrap()
+
+        missing_artifact = str(layout.vacancy_dir("20260421-missing-role") / "meta.yml")
+        store.task_memory_path.write_text(
+            json.dumps(
+                {
+                    "active_workflow": "ingest-vacancy",
+                    "active_vacancy_id": "20260421-missing-role",
+                    "active_artifacts": [missing_artifact],
+                    "updated_at": "2026-04-21T00:00:00+00:00",
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        store.workflow_runs_path.write_text(
+            json.dumps(
+                [
+                    {
+                        "workflow": "ingest-vacancy",
+                        "status": "completed",
+                        "started_at": "2026-04-21T00:00:00+00:00",
+                        "completed_at": "2026-04-21T00:00:01+00:00",
+                        "artifacts": [missing_artifact],
+                        "summary": "Created vacancy scaffold.",
+                    }
+                ],
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        snapshot = store.snapshot()
+
+        self.assertEqual(snapshot["reconciliation"]["task_memory"]["status"], "stale")
+        self.assertFalse(snapshot["reconciliation"]["task_memory"]["vacancy_dir_exists"])
+        self.assertEqual(snapshot["reconciliation"]["task_memory"]["missing_artifacts"], [missing_artifact])
+        self.assertEqual(snapshot["reconciliation"]["workflow_runs"]["stale_run_count"], 1)
+        self.assertEqual(
+            snapshot["reconciliation"]["workflow_runs"]["runs_with_missing_artifacts"][0]["missing_artifacts"],
+            [missing_artifact],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

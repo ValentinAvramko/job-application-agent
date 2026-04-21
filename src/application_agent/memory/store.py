@@ -83,11 +83,62 @@ class JsonMemoryStore:
         self._write_json(self.workflow_runs_path, workflow_runs)
 
     def snapshot(self) -> dict[str, object]:
+        task_memory = self.load_task_memory()
+        workflow_runs = self.load_workflow_runs()
         return {
-            "task_memory": self.load_task_memory().to_dict(),
+            "task_memory": task_memory.to_dict(),
             "project_memory": self.load_project_memory().to_dict(),
             "user_memory": self.load_user_memory().to_dict(),
-            "workflow_runs": self.load_workflow_runs(),
+            "workflow_runs": workflow_runs,
+            "reconciliation": self.build_reconciliation_report(task_memory, workflow_runs),
+        }
+
+    def build_reconciliation_report(
+        self, task_memory: TaskMemory | None = None, workflow_runs: list[dict[str, object]] | None = None
+    ) -> dict[str, object]:
+        task_memory = task_memory or self.load_task_memory()
+        workflow_runs = workflow_runs or self.load_workflow_runs()
+
+        active_vacancy_id = task_memory.active_vacancy_id
+        vacancy_dir_exists = bool(active_vacancy_id) and self.layout.vacancy_dir(active_vacancy_id).exists()
+        missing_task_artifacts = self._missing_paths(task_memory.active_artifacts)
+
+        if not active_vacancy_id and not task_memory.active_artifacts:
+            task_status = "empty"
+        elif vacancy_dir_exists and not missing_task_artifacts:
+            task_status = "ok"
+        else:
+            task_status = "stale"
+
+        stale_runs: list[dict[str, object]] = []
+        for run in workflow_runs:
+            artifacts = run.get("artifacts")
+            if not isinstance(artifacts, list):
+                continue
+
+            missing_artifacts = self._missing_paths(artifacts)
+            if not missing_artifacts:
+                continue
+
+            stale_runs.append(
+                {
+                    "workflow": run.get("workflow"),
+                    "completed_at": run.get("completed_at"),
+                    "missing_artifacts": missing_artifacts,
+                }
+            )
+
+        return {
+            "task_memory": {
+                "status": task_status,
+                "active_vacancy_id": active_vacancy_id,
+                "vacancy_dir_exists": vacancy_dir_exists,
+                "missing_artifacts": missing_task_artifacts,
+            },
+            "workflow_runs": {
+                "stale_run_count": len(stale_runs),
+                "runs_with_missing_artifacts": stale_runs,
+            },
         }
 
     def _load_dataclass(self, path: Path, model_cls):
@@ -131,4 +182,13 @@ class JsonMemoryStore:
         with path.open("w", encoding="utf-8", newline="\n") as handle:
             json.dump(payload, handle, ensure_ascii=False, indent=2)
             handle.write("\n")
+
+    def _missing_paths(self, paths: list[object]) -> list[str]:
+        missing: list[str] = []
+        for value in paths:
+            if not isinstance(value, str):
+                continue
+            if not Path(value).exists():
+                missing.append(value)
+        return missing
 

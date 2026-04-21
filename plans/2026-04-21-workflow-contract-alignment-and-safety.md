@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-workflow-contract-alignment-and-safety`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-21 17:27`
+- Last updated: `2026-04-21 17:46`
 - Overall status: `in_progress`
 
 ## Objective
@@ -30,7 +30,7 @@
 Подтвержденные проблемы контракта:
 
 - M2 убрал auto-publish из CLI `ingest-vacancy`: workflow теперь ограничен локальными мутациями workspace, а git-публикация остается отдельным manual step;
-- runtime-файлы содержат ссылки на вакансии, которых больше нет в `vacancies/`, значит отсутствует явный контракт на cleanup/reconciliation;
+- M3 добавил report-first reconciliation contract: `show-memory` теперь явно помечает stale task/workflow references, а `analyze-vacancy` выдает точную ошибку при работе с отсутствующей вакансией;
 - `bootstrap` по-прежнему смешан между CLI-командой, `project_memory.workflow_catalog` и workflow listing;
 - current workflow catalog ограничен тремя командами, хотя root-spec описывает больший целевой набор операций.
 
@@ -144,7 +144,7 @@
 
 ### M3. Runtime Reconciliation And Missing-Artifact Behavior
 
-- Status: `in_progress`
+- Status: `done`
 - Goal:
   - определить, как агент должен вести себя, когда память ссылается на удаленные или архивированные vacancy artifacts, и закрепить это в коде/контрактах.
 - Deliverables:
@@ -160,11 +160,14 @@
   - `python run_agent.py --root ../.. show-memory`
   - `python -m unittest discover -s tests`
 - Notes / discoveries:
-  - это отдельный contract problem, а не просто грязные данные: runtime может переживать удаление старых вакансий.
+  - Принятое решение: reconciliation остаётся недеструктивным. Runtime history не чистится молча, но `show-memory` всегда показывает `reconciliation.task_memory` и `reconciliation.workflow_runs`.
+  - `task_memory` считается `stale`, если отсутствует активная vacancy folder или любой путь из `active_artifacts`; `workflow_runs` сохраняют историю, но перечисляют missing artifacts отдельным списком.
+  - `analyze-vacancy` теперь различает полностью отсутствующую vacancy folder и неполный scaffold, чтобы runtime drift не выглядел как обычная ошибка чтения файлов.
+  - Реальный validation-прогон подтвердил, что stale references накоплены массово, а не точечно: `show-memory` возвращает `reconciliation.workflow_runs.stale_run_count` с множеством исторических записей.
 
 ### M4. Workflow Catalog Expansion Queue
 
-- Status: `planned`
+- Status: `in_progress`
 - Goal:
   - после стабилизации текущих контрактов разбить target operations из root-spec на реалистичную очередь внедрения.
 - Deliverables:
@@ -187,6 +190,7 @@
 - `2026-04-21 16:43` — Исторический `ingest-refactor-plan.md` оставлен как reference о завершенном рефакторинге, но не как основной план текущего workstream. — Он не покрывает вопросы runtime safety, publication flow и contract drift. — Новый план берет более широкий operational scope.
 - `2026-04-21 17:08` — Для M1 source of truth собран из кода и тестов, а root runbook/docs трактуются как expected-operator contract. — Иначе невозможно честно разделить фактическое поведение и drift в документации. — M2 должен выровнять именно operator-facing boundary, а не только внутренние описания.
 - `2026-04-21 17:27` — Auto-publish после `ingest-vacancy` удален из CLI-контракта. — Это соответствует уже существующему manual git flow и ожиданию явного подтверждения перед публикацией private artifacts. — Публикация остается внешним операторским действием, а не скрытым side effect workflow.
+- `2026-04-21 17:46` — Для stale runtime выбран report-first reconciliation вместо автоочистки. — История запусков может быть нужна для аудита, поэтому удалять или переписывать ее без явного решения рискованно. — Safety boundary переносится в явную диагностику через `show-memory` и более точные workflow errors.
 
 ## Progress log
 
@@ -194,18 +198,17 @@
 - `2026-04-21 16:43` — Зафиксированы ключевые contradictions: outdated workflow docs, auto-publish conflict, stale runtime state, расхождение в Excel-схеме и неполный workflow catalog относительно target-spec. — Требуется явное contract alignment до расширения функциональности. — Status: `planned`.
 - `2026-04-21 17:08` — M1 дополнен contract matrix, contradiction ledger и списком owner-level решений по publication, Excel dependency и stale runtime handling. — Validation выявила дополнительный drift: `bootstrap` числится в catalog, но не в workflow registry/listing; `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory` и `python -m unittest discover -s tests` завершились успешно. — Status: `done`.
 - `2026-04-21 17:27` — M2 зафиксировал local-only publication boundary: git-side effects удалены из `ingest-vacancy`, а README/runbook/private workflow docs синхронизированы с manual publish flow. — `python -m unittest tests.test_cli tests.test_ingest_workflow tests.test_analyze_workflow` -> `24 tests, OK`; `Get-Content -Raw ..\git-workflow.md` и `Get-Content -Raw ..\run-ingest-analyze.md` подтверждают обновленный operator contract. — Status: `done`.
+- `2026-04-21 17:46` — M3 добавил reconciliation-слой в `show-memory`, новые тесты на stale runtime references и более точные ошибки `analyze-vacancy` для отсутствующей vacancy folder. — `Test-Path ...cto-02` -> `False`; `python run_agent.py --root ../.. show-memory` показывает `reconciliation.task_memory.status = "stale"` и накопленные `runs_with_missing_artifacts`; `python -m unittest discover -s tests` -> `36 tests, OK`. — Status: `done`.
 
 ## Current state
 
-- Current milestone: `M3`
+- Current milestone: `M4`
 - Current status: `in_progress`
-- Next step: `Ввести reconciliation/guardrails для stale runtime state и задокументировать поведение при отсутствии vacancy artifacts.`
+- Next step: `Прочитать root target-spec и оформить implementation-ready backlog для следующих workflow поверх уже стабилизированных safety boundaries.`
 - Active blockers:
-  - Нет согласованного ответа, как трактовать stale runtime entries.
   - Не согласован канонический Excel mapping contract.
 - Open questions:
   - Должен ли `ingest-vacancy` уметь работать без `response-monitoring.xlsx`, если файла нет или он поврежден?
-  - Нужно ли отделить локальный mutating run от публикации в Git на уровне отдельных CLI-команд?
   - Должен ли `analyze-vacancy` по-прежнему писать vacancy-local `adoptions.md`, если проект перейдет к корневому `adoptions/inbox/<vacancy_id>.md`?
   - Какой набор workflow нужно считать "минимально готовым" до начала feature expansion?
 

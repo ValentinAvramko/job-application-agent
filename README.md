@@ -42,7 +42,7 @@ python run_agent.py --root ../.. show-memory
 - `python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager`
   Выполняет стартовый анализ уже созданной вакансии: подбирает ролевое резюме и формирует начальный fit-анализ.
 - `python run_agent.py --root ../.. show-memory`
-  Показывает текущее содержимое файловой памяти агента: задачи, артефакты и журнал запусков workflow.
+  Показывает текущее содержимое файловой памяти агента: задачи, артефакты и журнал запусков workflow, а также reconciliation-сводку по отсутствующим vacancy artifacts.
 
 `analyze-vacancy` также умеет стартовать без готового `vacancy_id`, если передать `--company`, `--position` и текст вакансии.
 
