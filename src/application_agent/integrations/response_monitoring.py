@@ -7,27 +7,14 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from application_agent.normalization.source_channels import normalize_response_method
+
 SPREADSHEET_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 MC_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006"
 REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 XR_NS = "http://schemas.microsoft.com/office/spreadsheetml/2014/revision"
-RESPONSE_MONITORING_SHEET = "Данные"
+RESPONSE_MONITORING_SHEET = "\u0414\u0430\u043d\u043d\u044b\u0435"
 RESPONSE_MONITORING_COLUMNS = tuple("ABCDEFGHIJK")
-RESPONSE_MONITORING_METHOD_MAP = {
-    "headhunter": "Сайт HH",
-    "head hunter": "Сайт HH",
-    "hh": "Сайт HH",
-    "linkedin": "LinkedIn",
-    "company site": "Сайт компании",
-    "website": "Сайт компании",
-    "email": "Email",
-    "telegram": "Telegram",
-    "whatsapp": "WhatsApp",
-    "рекрутер": "Рекрутер",
-    "кадровое агентство": "Кадровое агентство",
-    "рекомендация": "Рекомендация",
-    "manual": "Другое",
-}
 
 ET.register_namespace("", SPREADSHEET_NS)
 ET.register_namespace("mc", MC_NS)
@@ -90,13 +77,13 @@ def build_ingest_entry(record: ResponseMonitoringIngestRecord) -> dict[str, str 
         "A": record.vacancy_id,
         "B": record.source_channel.strip(),
         "C": record.source_url.strip(),
-        "D": "Да",
+        "D": "\u0414\u0430",
         "E": record.company.strip(),
         "F": record.position.strip(),
         "G": display_value(record.country),
         "H": display_value(record.work_mode),
-        "I": normalize_method(record.source_channel, record.source_url),
-        "J": "Нет",
+        "I": normalize_response_method(record.source_channel, record.source_url),
+        "J": "\u041d\u0435\u0442",
         "K": excel_date_serial(record.ingest_date),
     }
 
@@ -106,24 +93,9 @@ def excel_date_serial(value: date) -> int:
     return (value - epoch).days
 
 
-def display_value(value: str, default: str = "Не указано") -> str:
+def display_value(value: str, default: str = "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e") -> str:
     cleaned = value.strip()
-    return default if cleaned in {"", "Не указано", "n/a", "null"} else cleaned
-
-
-def normalize_method(source_channel: str, source_url: str) -> str:
-    channel = source_channel.strip().lower()
-    if channel in RESPONSE_MONITORING_METHOD_MAP:
-        return RESPONSE_MONITORING_METHOD_MAP[channel]
-
-    host = source_url.strip().lower()
-    if "hh.ru" in host:
-        return "Сайт HH"
-    if "linkedin.com" in host:
-        return "LinkedIn"
-    if any(token in host for token in ("career", "careers", "jobs")):
-        return "Сайт компании"
-    return "Другое"
+    return default if cleaned in {"", "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e", "n/a", "null"} else cleaned
 
 
 def find_response_monitoring_sheet_path(workbook_xml: ET.Element, relationships_xml: ET.Element) -> str:

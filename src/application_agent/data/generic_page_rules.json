@@ -1,0 +1,35 @@
+{
+  "ui_noise_lines": [
+    "apply now",
+    "share",
+    "share to",
+    "link",
+    "copy",
+    "department",
+    "development",
+    "powered by peopleforce",
+    "english",
+    "polski",
+    "deutsch",
+    "español",
+    "português",
+    "ukrainian",
+    "magyar",
+    "slovenčina",
+    "українська"
+  ],
+  "company_stopwords": [
+    "career",
+    "careers",
+    "company",
+    "home",
+    "job",
+    "jobs",
+    "open roles",
+    "role",
+    "team",
+    "this role",
+    "us",
+    "vacancy"
+  ]
+}

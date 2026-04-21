@@ -17,6 +17,11 @@ from application_agent.normalization.countries import (
     normalize_country_name,
     resolve_country_name_from_hh_id,
 )
+from application_agent.normalization.generic_page_rules import (
+    GENERIC_COMPANY_STOPWORDS as DATA_GENERIC_COMPANY_STOPWORDS,
+    GENERIC_UI_NOISE_LINES as DATA_GENERIC_UI_NOISE_LINES,
+)
+from application_agent.normalization.source_channels import infer_source_channel as infer_source_channel_value
 from application_agent.utils.simple_yaml import load_simple_yaml, write_simple_yaml
 from application_agent.workflows.base import WorkflowResult
 from application_agent.workspace import WorkspaceLayout
@@ -232,12 +237,12 @@ def is_plausible_company_name(value: str) -> bool:
     if len(cleaned) > 80:
         return False
     lower = cleaned.lower()
-    if lower in GENERIC_COMPANY_STOPWORDS:
+    if lower in DATA_GENERIC_COMPANY_STOPWORDS:
         return False
     if lower.startswith(("open ", "this ", "join ", "about ", "see ")):
         return False
     words = [part for part in re.split(r"\s+", lower) if part]
-    if words and all(word in GENERIC_COMPANY_STOPWORDS for word in words):
+    if words and all(word in DATA_GENERIC_COMPANY_STOPWORDS for word in words):
         return False
     return True
 
@@ -616,26 +621,7 @@ def parse_hh_vacancy_url(source_url: str) -> str | None:
 
 
 def infer_source_channel(source_url: str, source_text: str, explicit: str = "") -> str:
-    if explicit.strip():
-        return explicit.strip()
-    url = source_url.strip()
-    if not url:
-        return "Manual"
-    host = urlparse(url).netloc.lower()
-    path = urlparse(url).path.lower()
-    if host.startswith("www."):
-        host = host[4:]
-    if host.endswith("hh.ru"):
-        return "HeadHunter"
-    if host.endswith("linkedin.com"):
-        return "LinkedIn"
-    if host.endswith("career.habr.com"):
-        return "Habr Career"
-    if any(token in host for token in ("career", "careers", "jobs")) or any(token in path for token in ("/career", "/careers", "/job", "/jobs")):
-        return "Company Site"
-    if source_text.strip():
-        return "Website"
-    return "Website"
+    return infer_source_channel_value(source_url, source_text, explicit)
 
 
 def strip_value_label(text: str) -> str:
@@ -794,7 +780,7 @@ def is_generic_ui_noise_line(line: str) -> bool:
     cleaned = clean_text(line).strip(" -*#:\t").lower()
     if not cleaned:
         return False
-    if cleaned in GENERIC_UI_NOISE_LINES:
+    if cleaned in DATA_GENERIC_UI_NOISE_LINES:
         return True
     if cleaned.startswith("powered by "):
         return True

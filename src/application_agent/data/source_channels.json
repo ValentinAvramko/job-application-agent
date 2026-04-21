@@ -1,0 +1,33 @@
+{
+  "defaults": {
+    "manual": "Manual",
+    "website": "Website",
+    "response_method": "Другое"
+  },
+  "host_channel_rules": [
+    {"contains": "hh.ru", "channel": "HeadHunter"},
+    {"contains": "linkedin.com", "channel": "LinkedIn"},
+    {"contains": "career.habr.com", "channel": "Habr Career"}
+  ],
+  "company_site_host_tokens": ["career", "careers", "jobs"],
+  "company_site_path_tokens": ["/career", "/careers", "/job", "/jobs"],
+  "response_method_by_channel": {
+    "headhunter": "Сайт HH",
+    "head hunter": "Сайт HH",
+    "hh": "Сайт HH",
+    "linkedin": "LinkedIn",
+    "company site": "Сайт компании",
+    "website": "Сайт компании",
+    "email": "Email",
+    "telegram": "Telegram",
+    "whatsapp": "WhatsApp",
+    "рекрутер": "Рекрутер",
+    "кадровое агентство": "Кадровое агентство",
+    "рекомендация": "Рекомендация",
+    "manual": "Другое"
+  },
+  "response_method_host_rules": [
+    {"contains": "hh.ru", "method": "Сайт HH"},
+    {"contains": "linkedin.com", "method": "LinkedIn"}
+  ]
+}
