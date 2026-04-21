@@ -110,6 +110,24 @@
 | `C:\Users\avramko\OneDrive\Documents\Career\plans\repository-topology.md` | removed | `AGENTS.MD`, `plans/2026-04-21-repository-reconstruction-and-backlog.md`, `plans/2026-04-21-root-artifacts-and-output-normalization.md` | Root topology and routing rules now live in root instructions plus active submodule plans |
 | `C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\ingest-refactor-plan.md` | removed | `plans/2026-04-21-workflow-contract-alignment-and-safety.md`, `README.md` | Workflow/safety decisions were retained in the dedicated safety plan and in the repository README architecture notes |
 
+## M2 Canonical Contract Map
+
+| Artifact family | Canonical role | Non-canonical / derived layer | Owner / update path | Decision |
+| --- | --- | --- | --- | --- |
+| `CV/MASTER.md` | Single source of truth for durable candidate facts and verified career narrative | `CV/<role>.md` are derived role views; `CV/versions/` is historical snapshot storage; `CV/OPTIONAL_RULES.yml` is legacy/manual-only until code explicitly consumes it | Human-maintained; future rebuild workflows may read from it but should not supersede it | `MASTER.md` remains the only durable facts source for resume content |
+| `profile/contact-regions.yml` | Canonical store for contact overlays, region-specific contacts, relocation/location and public profile links | `templates/profile/contact-regions.template.yml` is only a seed template, not fallback runtime data | Human-maintained file under `profile/`; current workflows remain contact-agnostic until file exists | Missing file is a documented data gap, not a signal to duplicate contacts back into CV text |
+| `knowledge/roles/*.md`, `knowledge/company_signals/*.md` | Canonical normalized reusable signals after review/promotion from vacancy analysis | Vacancy-local notes and prompt corpora are raw inputs only | Curated manually or by future normalization workflows after review | `knowledge/` is a long-lived signal layer, but not a co-equal facts source with `CV/MASTER.md` |
+| `adoptions/inbox/<vacancy_id>.md` | Canonical per-vacancy review record for proposed resume changes | `vacancies/<id>/adoptions.md` is a generated staging/compatibility artifact for the current runtime | Future path: analyze flow may stage locally, then reviewed content is normalized into root inbox | Root `adoptions/inbox/` is the long-lived store; vacancy-local `adoptions.md` is not long-lived source of truth |
+| `adoptions/accepted/<target>.md` | Canonical accepted change log per target resume family (`MASTER.md`, `CIO.md`, `CTO.md`, `HoE.md`, `HoD.md`, `EM.md`) | Vacancy-local recommendations and prompt corpora | Manual review and promotion from inbox into accepted | Accepted adoptions are durable reusable guidance, not per-vacancy scratch notes |
+| `adoptions/questions/open.md` | Canonical backlog of unresolved data gaps that block durable normalization | Questions embedded in vacancy-local analysis/adoptions | Manual review from vacancy outputs into root questions backlog | Open questions should be centralized here once they become reusable across vacancies |
+| `vacancies/<id>/meta.yml`, `source.md` | Canonical per-vacancy raw record: metadata plus captured vacancy text/source | None for the same vacancy scope | Written by `ingest-vacancy` and updated by downstream workflows | `vacancies/` remains the canonical working folder for per-vacancy execution state |
+| `vacancies/<id>/analysis.md`, `screening.md` | Generated downstream artifacts for the same vacancy | Historical manual notes elsewhere | Written by `analyze-vacancy` and `prepare-screening` | These files stay vacancy-local and do not compete with long-lived root stores |
+| `response-monitoring.xlsx` | Canonical application ledger for ingest/application tracking | `templates/excel/response-monitoring-mapping.md` is a human-readable contract mirror | Workbook updated by integration code and manual spreadsheet review | Workbook columns are authoritative runtime contract; the template doc must mirror them, not replace them |
+| `templates/` | Human-facing reference/spec layer for future files and workflows | None | Manual upkeep only | Templates are not runtime inputs today and must not be treated as canonical data sources |
+| `agent_memory/` | Canonical runtime state, workflow contract and reconciliation layer for the tool | None | Managed by bootstrap, memory store and workflow execution | Canonical for execution state, but not a source of candidate/profile truth |
+| `promts/`, `responses.md`, `adoptions_00.md` | Legacy reference corpus only | Any attempt to treat them as current spec or runtime input | Read-only mining input for future distillation | Legacy corpus is explicitly non-canonical after M2 |
+| `Employers/`, `archive/` | Historical/manual output and one-off tailoring traces | None | Manual-only; future classification continues in M3 | These paths are not sources of truth for pipeline behavior |
+
 ## Milestones
 
 ### M1. Root Artifact Inventory And Migration Map
@@ -140,7 +158,7 @@
 
 ### M2. Canonical Root Contract Decisions
 
-- Status: `in_progress`
+- Status: `done`
 - Goal:
   - определить, какие root-артефакты являются источником истины, какие производными, а какие историческими;
   - встроить migrated target intent из старых root docs в новую структуру планов.
@@ -159,6 +177,9 @@
 - Notes / discoveries:
   - migrated target intent должен жить в active plans, а не в отдельном superseded root plan corpus;
   - M1 показал, что root contract decisions надо принимать относительно реального runtime graph, а не относительно только README/шаблонов.
+  - `CV/MASTER.md` сохранён как единственный durable facts source; `knowledge/` и `profile/` признаны вспомогательными canonical stores, но не заменой `MASTER`.
+  - `adoptions/inbox/` и `adoptions/accepted/` зафиксированы как long-lived canonical review layer, а vacancy-local `adoptions.md` — как generated staging/compatibility artifact текущего runtime.
+  - `templates/` и legacy prompt corpus признаны non-runtime reference layers; они не должны конкурировать с plan files и runtime stores как sources of truth.
 
 ### M3. Output Pipeline Migration Path
 
@@ -209,6 +230,7 @@
 - `2026-04-21 19:51` — Superseded root plan/spec artifacts должны быть не просто помечены, а полностью мигрированы в актуальные plans и затем удалены. — Это убирает параллельные источники истины в root `plans/`. — Migration/removal встроены в milestones M1-M4.
 - `2026-04-21 20:35` — `vacancies/<id>/adoptions.md` зафиксирован как текущий generated vacancy-local artifact, а не как long-lived canonical adoptions store. — Root `adoptions/` существует как целевая структура, но ещё не подключён к runtime. — M2 должен решить, остаётся ли vacancy-local слой, мигрируется ли он в inbox или живут оба слоя с разными ролями.
 - `2026-04-21 20:35` — Текущий runtime root-контракт фактически опирается на `CV/`, `vacancies/`, `agent_memory/` и `response-monitoring.xlsx`; `templates/` и legacy prompt corpus пока не являются runtime inputs. — Это подтверждено поиском по коду и фактической файловой структурой. — Дальнейшие решения нужно принимать относительно реального producer/consumer graph.
+- `2026-04-21 21:02` — Root canonical contracts разделены на три слоя: durable source-of-truth stores, vacancy-local generated execution artifacts и historical/reference layers. — Это позволило снять конфликт между root `adoptions/` и vacancy-local `adoptions.md`, а также между workbook-контрактом и template docs. — После M2 следующий фокус смещается на output pipeline migration path.
 
 ## Progress log
 
@@ -217,20 +239,21 @@
 - `2026-04-21 19:51` — План переприоритизирован в следующий активный этап master plan и расширен migration/removal задачей для superseded root planning artifacts. — Следующий фокус: inventory + migration map, а не feature work. — Status: `in_progress`.
 - `2026-04-21 19:51` — Содержательные решения superseded root planning artifacts перенесены в active plans, а сами root files удалены. — Дальнейший focus смещается с migration/removal на оставшиеся root contracts и producer/consumer inventory. — Status: `in_progress`.
 - `2026-04-21 20:35` — В план добавлены M1 inventory matrix и migration map по реальным root artifacts, включая `response-monitoring.xlsx`, `agent_memory/`, legacy corpus и уже удалённый root `plans/`. — Проверка кода показала, что runtime сегодня реально работает через `CV/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores; validation confirmed `Test-Path root/plans = False`, `Test-Path profile/contact-regions.yml = False`, `vacancies/` currently contains 3 directories. — Status: `done`.
+- `2026-04-21 21:02` — M2 canonical contract map добавлен в workstream-план и зафиксировал роли для `CV`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel, templates, legacy corpus и manual output traces. — Ключевые решения: `CV/MASTER.md` остаётся единственным durable facts source, root `adoptions/` — long-lived review layer, а vacancy-local `adoptions.md` — generated staging artifact. — Status: `done`.
 
 ## Current state
 
-- Current milestone: `M2`
+- Current milestone: `M3`
 - Current status: `in_progress`
-- Next step: `Зафиксировать canonical contract для CV, profile, knowledge, adoptions, vacancies, response-monitoring.xlsx и legacy corpus, а также разрешить конфликт между vacancy-local adoptions.md, root inbox-подходом и отсутствующим contact-regions.yml.`
+- Next step: `Определить target placement rules для output pipeline: как классифицировать `Employers/`, `archive/`, `CV/versions/`, manual PDF/DOCX traces и будущие export outputs между reusable pipeline, historical archive и one-off employer artifacts.`
 - Active blockers:
-  - Не определён canonical root-layer для контактов, долгоживущих сигналов и adoptions после инвентаризации фактических producer/consumer связей.
-  - Не решено, должен ли `vacancies/<id>/adoptions.md` остаться generated sidecar-artifact либо мигрировать в `adoptions/inbox/<vacancy_id>.md`.
   - Не определён target home для PDF/LinkedIn/export pipeline и employer-specific traces.
+  - Не определены retention/status rules для `Employers/`, `archive/` и `CV/versions/` как части будущего output pipeline.
+  - Current runtime всё ещё не синхронизирован с root `adoptions/` и `profile/contact-regions.yml`, даже после фиксации canonical contracts.
 - Open questions:
-  - Должен ли `CV/MASTER.md` оставаться единственным facts source, если часть нормализации переедет в `knowledge/` и `profile/`?
-  - Являются ли шаблоны в `templates/` runtime-contract inputs или это только human-facing reference/spec layer?
-  - Какой статус должны получить `promts/`, `responses.md` и `adoptions_00.md`: future test/spec source, historical-only corpus или промежуточный reference layer?
+  - Какие employer-specific traces нужно сохранить как examples/tests/reference, а какие оставить purely historical?
+  - Должен ли будущий export pipeline писать в `archive/`, в vacancy-local directories или в отдельный dedicated output family?
+  - Как связать manual renderers вроде `Employers/TaxDome/render_resume_pdf.py` с reusable export path без смешения one-off и productized outputs?
 
 ## Completion summary
 

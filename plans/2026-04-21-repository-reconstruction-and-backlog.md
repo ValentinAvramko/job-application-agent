@@ -155,7 +155,7 @@
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\ingest-refactor-plan.md"`
 - Notes / discoveries:
   - cleanup включает не только root data/output layer, но и migration/removal старых planning artifacts;
-  - M1 workstream-шаг по inventory/migration map закрыт; следующий фокус M3 — canonical root contracts и output-placement decisions.
+  - M1 workstream-шаг по inventory/migration map закрыт; M2 canonical root contracts тоже закрыт; следующий фокус M3 — output-placement decisions.
 
 ### M4. Current Workflow Completion Gate
 
@@ -206,6 +206,7 @@
 - `2026-04-21 19:51` — Старые плановые артефакты (`plans/resume-agent-spec.md`, `plans/repository-topology.md`, `tooling/application-agent/plans/ingest-refactor-plan.md`) должны быть не просто помечены, а содержательно перенесены в новые active plans и затем удалены. — Это убирает конкурирующие источники истины. — Migration/removal включены в M3.
 - `2026-04-21 19:51` — Planning remaining workflows отложен за completion gate по текущему workflow-стеку. — Safety findings недостаточно, чтобы считать `ingest-vacancy` и `analyze-vacancy` полностью доведёнными. — До завершения M4 feature expansion не является следующим шагом.
 - `2026-04-21 20:35` — M1 в workstream-плане root normalization завершён: добавлены inventory matrix и migration map, зафиксировано, какие root artifacts реально участвуют в runtime сегодня. — Это сместило активный шаг M3 с инвентаризации на canonical root contract decisions. — Master plan синхронизирован с новым состоянием workstream-а.
+- `2026-04-21 21:02` — M2 в workstream-плане root normalization завершён: canonical contracts закреплены для `CV`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel, templates и legacy corpus. — Это снимает часть source-of-truth конфликтов и переводит активный шаг M3 на output pipeline migration path. — Master plan обновлён без изменения общей очередности `M3 -> M4 -> M5`.
 
 ## Progress log
 
@@ -214,19 +215,20 @@
 - `2026-04-21 19:51` — Master plan пересобран после повторного review всех plans и superseded artifacts. — Последовательность зафиксирована как `M3 cleanup -> M4 completion gate -> M5 planning remaining workflows`. — Status: `in_progress`.
 - `2026-04-21 19:51` — Superseded plan/spec artifacts мигрированы в active plans и удалены из репозитория. — Валидация migration/removal теперь опирается на `Test-Path = False` для старых файлов и на содержимое новых plan files. — Status: `in_progress`.
 - `2026-04-21 20:35` — M1 в workstream-плане root normalization завершён: добавлены inventory matrix и migration map, подтверждено, что runtime реально живёт на `CV/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores. — M1 validation passed with `root/plans = False`, `profile/contact-regions.yml = False` and 3 current vacancy directories; активный шаг M3 смещён на canonical root contracts. — Status: `in_progress`.
+- `2026-04-21 21:02` — M2 в workstream-плане root normalization завершён: canonical contract map зафиксировал разделение между durable root stores, generated vacancy-local artifacts и historical/reference layers. — Ключевой результат: root `adoptions/` признан long-lived review layer, а `vacancies/<id>/adoptions.md` — staging artifact текущего runtime. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M3`
 - Current status: `in_progress`
-- Next step: `Продолжить M3 через M2 плана 2026-04-21-root-artifacts-and-output-normalization.md: определить canonical root contracts для CV, profile, knowledge, adoptions, vacancies, Excel и legacy corpus, а также снять конфликт vacancy-local и root-level adoptions.`
+- Next step: `Продолжить M3 через M3 плана 2026-04-21-root-artifacts-and-output-normalization.md: определить target placement rules для output pipeline, manual renderers, `Employers/`, `archive/` и `CV/versions/`.`
 - Active blockers:
-  - Не определён canonical root contract для `profile/`, `knowledge/`, `adoptions/`, output pipeline и legacy prompt corpus.
+  - Не определён target home и lifecycle policy для output pipeline, manual renderers и historical export traces.
   - Не зафиксирован отдельный completion gate по текущему workflow-стеку после safety workstream.
 - Open questions:
   - Какой набор `bootstrap` / `ingest-vacancy` / `analyze-vacancy` нужно считать минимально завершённым до M5?
   - Нужно ли после M3 открывать отдельный plan по completion gate текущих workflow или достаточно checklist внутри master plan?
-  - Должен ли `vacancies/<id>/adoptions.md` оставаться текущим generated artifact после появления root-level adoptions contract?
+  - Какие output traces должны остаться examples/reference, а какие purely historical?
 
 ## Completion summary
 
