@@ -4,8 +4,8 @@
 - Slug: `2026-04-21-workflow-contract-alignment-and-safety`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-21 17:46`
-- Overall status: `in_progress`
+- Last updated: `2026-04-21 18:03`
+- Overall status: `done`
 
 ## Objective
 
@@ -167,7 +167,7 @@
 
 ### M4. Workflow Catalog Expansion Queue
 
-- Status: `in_progress`
+- Status: `done`
 - Goal:
   - после стабилизации текущих контрактов разбить target operations из root-spec на реалистичную очередь внедрения.
 - Deliverables:
@@ -181,7 +181,25 @@
   - `rg -n "prepare-screening|rebuild-master|rebuild-role-resume|build-linkedin|export-resume-pdf" C:\Users\avramko\OneDrive\Documents\Career\plans\resume-agent-spec.md`
   - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\2026-04-21-workflow-contract-alignment-and-safety.md`
 - Notes / discoveries:
-  - target operations уже описаны на уровне intent, но еще не приведены к implementation-ready контрактам.
+  - Ordered backlog after safety stabilization:
+
+    | Priority | Workflow | Proposed minimal contract | External touchpoints | Dependency gate | Validation baseline |
+    | --- | --- | --- | --- | --- | --- |
+    | `1` | `prepare-screening` | Input: `vacancy_id`, optional `selected_resume`, `output_language`, `preparation_depth`. Output: proposed `vacancies/<vacancy_id>/screening.md` с interview storyline, self-intro script и screening questions. | `vacancies/<id>/meta.yml`, `analysis.md`, `adoptions.md`, `CV/<role>.md` | Зависит только от уже стабилизированных `ingest-vacancy`/`analyze-vacancy`; не требует migration `adoptions/accepted` или PDF pipeline. | `python run_agent.py --root ../.. prepare-screening --vacancy-id <id>` + smoke-check результата в `vacancies/<id>/screening.md` |
+    | `2` | `rebuild-master` | Input: `CV/MASTER.md`, accepted permanent signals, confirmed new user facts, processed vacancy history. Output: обновленный `CV/MASTER.md` + change report. | `CV/MASTER.md`, `adoptions/accepted/MASTER.md` или эквивалентный accepted-signal store, `agent_memory/runtime/`, `knowledge/` | Требует явного решения по каноническому permanent-signal store и по тому, что считается подтвержденным input. | Целевой unittest на deterministic diff + smoke-проверка change report |
+    | `3` | `rebuild-role-resume` | Input: `CV/MASTER.md`, role signal base, target role, optional `output_language`. Output: обновленный `CV/<role>.md` + diff summary. | `CV/MASTER.md`, `CV/CIO.md|CTO.md|HoE.md|HoD.md|EM.md`, `knowledge/roles/`, `adoptions/accepted/` | Зависит от `rebuild-master`, иначе role resume будет строиться поверх устаревшего master source of truth. | `python run_agent.py --root ../.. rebuild-role-resume --role <role>` + diff/assertions по ключевым разделам |
+    | `4` | `build-linkedin` | Input: `CV/MASTER.md`, optional target role/language. Output: proposed `profile/linkedin.md` или аналогичный draft artifact с headline/about/experience bullets и gap list. | `CV/MASTER.md`, `profile/`, optional `knowledge/roles/` | Зависит от стабилизированного `MASTER`; не должен читать vacancy-local temporary edits как source of truth. | Smoke-check draft + unit tests на секции и language/contact overrides |
+    | `5` | `export-resume-pdf` | Input: target resume, `output_language`, `contact_region`, optional template. Output: PDF file и render verification artifact. | `CV/<role>.md` или `CV/MASTER.md`, `profile/contact-regions.yml`, `templates/`, PDF/doc runtime | Зависит от готовых текстовых resume artifacts и отдельного contract для contact-region/language overrides. | CLI export + render/visual verification через PDF tooling |
+
+  - Dependency map:
+    - `prepare-screening` можно брать первым, потому что он использует уже существующий vacancy-local контур и не зависит от pending решений по permanent signal storage.
+    - `rebuild-master` должен идти раньше `rebuild-role-resume` и `build-linkedin`, потому что именно `MASTER` остается главным source of truth по спецификации.
+    - `build-linkedin` логически дешевле `export-resume-pdf`: сначала стабилизируются текстовые производные от `MASTER`, затем уже добавляется рендеринг с profile/contact overlays.
+    - `export-resume-pdf` не должен стартовать до фиксации contract по `contact_region` и `output_language`, иначе PDF pipeline закрепит неустойчивый интерфейс.
+  - Explicit hold points before feature expansion:
+    - для `rebuild-master` / `rebuild-role-resume` нужно сначала закрепить destination для permanent adoptions и accepted signals;
+    - для `export-resume-pdf` нужен отдельный rendering contract с `profile/contact-regions.yml` и шаблонами;
+    - для всех новых workflows `bootstrap`/catalog boundary должен быть переосмыслен так, чтобы `list-workflows`, registry и `project_memory.workflow_catalog` описывали один и тот же набор операций.
 
 ## Decision log
 
@@ -191,6 +209,7 @@
 - `2026-04-21 17:08` — Для M1 source of truth собран из кода и тестов, а root runbook/docs трактуются как expected-operator contract. — Иначе невозможно честно разделить фактическое поведение и drift в документации. — M2 должен выровнять именно operator-facing boundary, а не только внутренние описания.
 - `2026-04-21 17:27` — Auto-publish после `ingest-vacancy` удален из CLI-контракта. — Это соответствует уже существующему manual git flow и ожиданию явного подтверждения перед публикацией private artifacts. — Публикация остается внешним операторским действием, а не скрытым side effect workflow.
 - `2026-04-21 17:46` — Для stale runtime выбран report-first reconciliation вместо автоочистки. — История запусков может быть нужна для аудита, поэтому удалять или переписывать ее без явного решения рискованно. — Safety boundary переносится в явную диагностику через `show-memory` и более точные workflow errors.
+- `2026-04-21 18:03` — Очередь расширения начинается с `prepare-screening`, а не с rebuild/export flows. — Это единственная следующая операция из target-spec, которая минимально зависит от unresolved contracts по permanent signals, accepted adoptions и profile overlays. — Таким образом feature expansion не откатывает уже закрытые safety milestones.
 
 ## Progress log
 
@@ -199,12 +218,13 @@
 - `2026-04-21 17:08` — M1 дополнен contract matrix, contradiction ledger и списком owner-level решений по publication, Excel dependency и stale runtime handling. — Validation выявила дополнительный drift: `bootstrap` числится в catalog, но не в workflow registry/listing; `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory` и `python -m unittest discover -s tests` завершились успешно. — Status: `done`.
 - `2026-04-21 17:27` — M2 зафиксировал local-only publication boundary: git-side effects удалены из `ingest-vacancy`, а README/runbook/private workflow docs синхронизированы с manual publish flow. — `python -m unittest tests.test_cli tests.test_ingest_workflow tests.test_analyze_workflow` -> `24 tests, OK`; `Get-Content -Raw ..\git-workflow.md` и `Get-Content -Raw ..\run-ingest-analyze.md` подтверждают обновленный operator contract. — Status: `done`.
 - `2026-04-21 17:46` — M3 добавил reconciliation-слой в `show-memory`, новые тесты на stale runtime references и более точные ошибки `analyze-vacancy` для отсутствующей vacancy folder. — `Test-Path ...cto-02` -> `False`; `python run_agent.py --root ../.. show-memory` показывает `reconciliation.task_memory.status = "stale"` и накопленные `runs_with_missing_artifacts`; `python -m unittest discover -s tests` -> `36 tests, OK`. — Status: `done`.
+- `2026-04-21 18:03` — M4 превратил target operations из `resume-agent-spec.md` в ordered backlog с dependency gates и validation baseline. — `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\plans\resume-agent-spec.md`, `rg -n "prepare-screening|rebuild-master|rebuild-role-resume|build-linkedin|export-resume-pdf" ...` и повторное чтение текущего плана подтвердили, что очередь покрывает весь заявленный target catalog без смешения с unresolved safety work. — Status: `done`.
 
 ## Current state
 
 - Current milestone: `M4`
-- Current status: `in_progress`
-- Next step: `Прочитать root target-spec и оформить implementation-ready backlog для следующих workflow поверх уже стабилизированных safety boundaries.`
+- Current status: `done`
+- Next step: `Открыть отдельный implementation plan для workflow #1 в очереди — prepare-screening.`
 - Active blockers:
   - Не согласован канонический Excel mapping contract.
 - Open questions:
@@ -214,4 +234,26 @@
 
 ## Completion summary
 
-Заполняется после завершения workstream-а по alignment и safety.
+- Поставлено:
+  - M1: contract matrix и contradiction ledger для `bootstrap`, `ingest-vacancy`, `analyze-vacancy`;
+  - M2: manual publication boundary без git-side effects в CLI;
+  - M3: report-first reconciliation в `show-memory` и guardrails для missing vacancy artifacts;
+  - M4: ordered backlog для `prepare-screening`, `rebuild-master`, `rebuild-role-resume`, `build-linkedin`, `export-resume-pdf`.
+- Провалидировано:
+  - `python run_agent.py --root ../.. list-workflows`
+  - `python run_agent.py --root ../.. show-memory`
+  - `python -m unittest discover -s tests`
+  - `python -m unittest tests.test_cli tests.test_ingest_workflow tests.test_analyze_workflow`
+  - чтение root-spec и runbook-документов по validation commands milestone'ов.
+- Оставшиеся follow-up задачи:
+  - закрепить канонический Excel mapping contract и degradable-mode policy;
+  - решить migration path от vacancy-local `adoptions.md` к корневому `adoptions/` pipeline;
+  - выровнять `bootstrap`, workflow registry и `project_memory.workflow_catalog`.
+- Остаточные риски:
+  - `show-memory` уже выявляет большой объём исторических stale references, поэтому будущим workflow понадобится аккуратная работа с legacy runtime history;
+  - feature expansion в resume-generation ветке может снова разъехаться с root-spec, если не вести отдельные implementation plans по очереди.
+- Затронутые root artifacts:
+  - `tooling/run-ingest-analyze.md`
+  - `tooling/git-workflow.md`
+  - `agent_memory/workflows/ingest-vacancy.md`
+  - pinned commit `tooling/application-agent` в private repo.
