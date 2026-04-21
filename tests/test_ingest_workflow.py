@@ -7,6 +7,8 @@ import uuid
 from datetime import date
 from pathlib import Path
 from unittest.mock import patch
+from xml.etree import ElementTree as ET
+from zipfile import ZIP_DEFLATED, ZipFile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -15,6 +17,7 @@ from application_agent.workspace import WorkspaceLayout
 from application_agent.workflows.ingest_vacancy import (
     IngestVacancyRequest,
     VacancySourceDetails,
+    append_response_monitoring_row,
     build_vacancy_id,
     enrich_request,
     infer_source_channel,
@@ -25,6 +28,89 @@ from application_agent.workflows.ingest_vacancy import (
     parse_hh_vacancy_payload,
 )
 from application_agent.workflows.registry import build_default_registry
+
+
+def create_response_monitoring_workbook(path: Path) -> None:
+    workbook_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Данные" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>
+"""
+    workbook_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>
+"""
+    worksheet_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dimension ref="A1:P4"/>
+  <sheetData>
+    <row r="1">
+      <c r="A1" t="inlineStr"><is><t>Header</t></is></c>
+    </row>
+    <row r="2">
+      <c r="A2" t="inlineStr"><is><t>vacancy_id</t></is></c>
+    </row>
+    <row r="3">
+      <c r="A3" s="5"/>
+      <c r="B3" s="1"/>
+      <c r="C3" s="2"/>
+      <c r="D3" s="3"/>
+      <c r="E3" s="1"/>
+      <c r="F3" s="1"/>
+      <c r="G3" s="1"/>
+      <c r="H3" s="39"/>
+      <c r="I3" s="28"/>
+      <c r="J3" s="25"/>
+      <c r="K3" s="9"/>
+      <c r="L3" s="4"/>
+      <c r="M3" s="4"/>
+      <c r="N3" s="4"/>
+      <c r="O3" s="4"/>
+      <c r="P3" s="10"/>
+    </row>
+    <row r="4">
+      <c r="A4" s="6"/>
+      <c r="B4" s="6"/>
+      <c r="C4" s="7"/>
+      <c r="D4" s="8"/>
+      <c r="E4" s="7"/>
+      <c r="F4" s="7"/>
+      <c r="G4" s="7"/>
+      <c r="H4" s="11"/>
+      <c r="I4" s="29"/>
+      <c r="J4" s="26"/>
+      <c r="K4" s="12"/>
+      <c r="L4" s="13"/>
+      <c r="M4" s="13"/>
+      <c r="N4" s="13"/>
+      <c r="O4" s="13"/>
+      <c r="P4" s="14"/>
+    </row>
+  </sheetData>
+</worksheet>
+"""
+    content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>
+"""
+    root_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>
+"""
+    with ZipFile(path, "w", compression=ZIP_DEFLATED) as workbook:
+        workbook.writestr("[Content_Types].xml", content_types)
+        workbook.writestr("_rels/.rels", root_rels)
+        workbook.writestr("xl/workbook.xml", workbook_xml)
+        workbook.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
+        workbook.writestr("xl/worksheets/sheet1.xml", worksheet_xml)
 
 
 class IngestWorkflowTests(unittest.TestCase):
@@ -40,18 +126,19 @@ class IngestWorkflowTests(unittest.TestCase):
         store.bootstrap()
         workflow = build_default_registry().get("ingest-vacancy")
 
-        result = workflow.run(
-            layout=layout,
-            store=store,
-            request=IngestVacancyRequest(
-                company="Citix",
-                position="CIO",
-                source_text="Platform strategy and team leadership.",
-            ),
-        )
+        with patch("application_agent.workflows.ingest_vacancy.append_response_monitoring_row", return_value=3):
+            result = workflow.run(
+                layout=layout,
+                store=store,
+                request=IngestVacancyRequest(
+                    company="Citix",
+                    position="CIO",
+                    source_text="Platform strategy and team leadership.",
+                ),
+            )
 
         self.assertEqual(result.status, "completed")
-        self.assertEqual(len(result.artifacts), 4)
+        self.assertEqual(len(result.artifacts), 5)
 
         task_memory = json.loads(store.task_memory_path.read_text(encoding="utf-8"))
         self.assertEqual(task_memory["active_workflow"], "ingest-vacancy")
@@ -99,7 +186,7 @@ class IngestWorkflowTests(unittest.TestCase):
                 work_schedule="5/2",
                 key_skills=["DevSecOps", "CI/CD"],
             ),
-        ):
+        ), patch("application_agent.workflows.ingest_vacancy.append_response_monitoring_row", return_value=42):
             result = workflow.run(
                 layout=layout,
                 store=store,
@@ -117,12 +204,66 @@ class IngestWorkflowTests(unittest.TestCase):
         self.assertIn("source_channel: HeadHunter", meta_text)
         self.assertIn("country: \u0420\u043e\u0441\u0441\u0438\u044f", meta_text)
         self.assertIn("work_mode: \u0443\u0434\u0430\u043b\u0451\u043d\u043d\u043e", meta_text)
+        self.assertIn("excel_row: 42", meta_text)
         self.assertIn("## \u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440\u044b \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438", source_text)
         self.assertIn("- \u0413\u043e\u0440\u043e\u0434: \u041c\u043e\u0441\u043a\u0432\u0430", source_text)
         self.assertIn("- DevSecOps", source_text)
         self.assertIn("### \u0417\u043e\u043d\u0430 \u043e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043d\u043d\u043e\u0441\u0442\u0438", source_text)
         self.assertNotIn("\n## \u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 \u043d\u0430\u0432\u044b\u043a\u0438\n", source_text)
         self.assertIn("\n### \u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 \u043d\u0430\u0432\u044b\u043a\u0438\n", source_text)
+
+    def test_append_response_monitoring_row_writes_columns_a_to_k(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        workbook_path = temp_root / f"response-monitoring-{uuid.uuid4().hex}.xlsx"
+        create_response_monitoring_workbook(workbook_path)
+
+        row_index = append_response_monitoring_row(
+            workbook_path,
+            IngestVacancyRequest(
+                company="\u0426\u0435\u043d\u0442\u0440 \u044d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u043d\u044b\u0445 \u0444\u0438\u043d\u0430\u043d\u0441\u043e\u0432",
+                position="\u0422\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u043b\u0438\u0434\u0435\u0440",
+                source_url="https://hh.ru/vacancy/132242694",
+                source_channel="HeadHunter",
+                country="\u041a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d",
+                work_mode="\u043d\u0430 \u043c\u0435\u0441\u0442\u0435 \u0440\u0430\u0431\u043e\u0442\u043e\u0434\u0430\u0442\u0435\u043b\u044f",
+                ingest_date=date(2026, 4, 21),
+            ),
+            "20260421-tsentr-elektronnyh-finansov-tehnicheskiy-lider",
+        )
+
+        self.assertEqual(row_index, 3)
+
+        with ZipFile(workbook_path) as workbook:
+            sheet_xml = workbook.read("xl/worksheets/sheet1.xml")
+            root = ET.fromstring(sheet_xml)
+        ns = {"a": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        row = root.find(".//a:row[@r='3']", ns)
+        self.assertIsNotNone(row)
+        sheet_text = sheet_xml.decode("utf-8")
+        self.assertNotIn('Ignorable="x14ac xr xr2 xr3"', sheet_text)
+        values: dict[str, str] = {}
+        for cell in row.findall("a:c", ns):
+            ref = cell.attrib["r"]
+            column = "".join(char for char in ref if char.isalpha())
+            cell_type = cell.attrib.get("t")
+            if cell_type == "inlineStr":
+                values[column] = "".join(node.text or "" for node in cell.findall(".//a:t", ns))
+            else:
+                value_node = cell.find("a:v", ns)
+                values[column] = value_node.text if value_node is not None else ""
+
+        self.assertEqual(values["A"], "20260421-tsentr-elektronnyh-finansov-tehnicheskiy-lider")
+        self.assertEqual(values["B"], "HeadHunter")
+        self.assertEqual(values["C"], "https://hh.ru/vacancy/132242694")
+        self.assertEqual(values["D"], "\u0414\u0430")
+        self.assertEqual(values["E"], "\u0426\u0435\u043d\u0442\u0440 \u044d\u043b\u0435\u043a\u0442\u0440\u043e\u043d\u043d\u044b\u0445 \u0444\u0438\u043d\u0430\u043d\u0441\u043e\u0432")
+        self.assertEqual(values["F"], "\u0422\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u043b\u0438\u0434\u0435\u0440")
+        self.assertEqual(values["G"], "\u041a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d")
+        self.assertEqual(values["H"], "\u043d\u0430 \u043c\u0435\u0441\u0442\u0435 \u0440\u0430\u0431\u043e\u0442\u043e\u0434\u0430\u0442\u0435\u043b\u044f")
+        self.assertEqual(values["I"], "\u0421\u0430\u0439\u0442 HH")
+        self.assertEqual(values["J"], "\u041d\u0435\u0442")
+        self.assertEqual(values["K"], "46133")
 
     def test_render_source_keeps_full_passport_and_params_with_no_data_fallback(self) -> None:
         workflow = build_default_registry().get("ingest-vacancy")

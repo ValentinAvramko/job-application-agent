@@ -5,6 +5,7 @@ import sys
 import unittest
 import uuid
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -47,22 +48,23 @@ class AnalyzeWorkflowTests(unittest.TestCase):
         ingest = registry.get("ingest-vacancy")
         analyze = registry.get("analyze-vacancy")
 
-        ingest.run(
-            layout=layout,
-            store=store,
-            request=IngestVacancyRequest(
-                company="ПримерТех",
-                position="Руководитель разработки",
-                source_text="\n".join(
-                    [
-                        "Чем предстоит заниматься:",
-                        "- Руководить командой разработки и развивать тимлидов.",
-                        "- Улучшать процессы планирования, декомпозиции и поставки.",
-                        "- Участвовать в архитектурных решениях и повышении надежности сервисов.",
-                    ]
+        with patch("application_agent.workflows.ingest_vacancy.append_response_monitoring_row", return_value=3):
+            ingest.run(
+                layout=layout,
+                store=store,
+                request=IngestVacancyRequest(
+                    company="ПримерТех",
+                    position="Руководитель разработки",
+                    source_text="\n".join(
+                        [
+                            "Чем предстоит заниматься:",
+                            "- Руководить командой разработки и развивать тимлидов.",
+                            "- Улучшать процессы планирования, декомпозиции и поставки.",
+                            "- Участвовать в архитектурных решениях и повышении надежности сервисов.",
+                        ]
+                    ),
                 ),
-            ),
-        )
+            )
 
         vacancy_id = store.load_task_memory().active_vacancy_id
         self.assertIsNotNone(vacancy_id)

@@ -30,6 +30,7 @@ class CliTests(unittest.TestCase):
             str(repo_root / "vacancies" / "20260421-example-role" / "source.md"),
             str(repo_root / "vacancies" / "20260421-example-role" / "analysis.md"),
             str(repo_root / "vacancies" / "20260421-example-role" / "adoptions.md"),
+            str(repo_root / "response-monitoring.xlsx"),
         ]
         git_calls: list[list[str]] = []
 
@@ -53,6 +54,7 @@ class CliTests(unittest.TestCase):
                     "vacancies\\20260421-example-role\\source.md",
                     "vacancies\\20260421-example-role\\analysis.md",
                     "vacancies\\20260421-example-role\\adoptions.md",
+                    "response-monitoring.xlsx",
                 ],
                 ["commit", "-m", "Ingest vacancy 20260421-example-role"],
                 ["branch", "--show-current"],
