@@ -16,8 +16,8 @@
 1. `completed` Вынести работу с `response-monitoring.xlsx` и обновление `excel_row` из `ingest_vacancy.py` в отдельный модуль интеграции.
 2. `completed` Сделать единый каталог стран с каноническим кодом страны, локализованными именами и алиасами.
 3. `completed` Вынести `source_channel`, нормализацию способа отклика для `response-monitoring.xlsx` и другие справочные маппинги в data-driven слой.
-4. `in_progress` Разделить `ingest_vacancy.py` на provider, normalization и rendering слои.
-5. `pending` Добавить Playwright fallback для JS-rendered career sites, когда обычный HTML-fetch не даёт полноценного результата.
+4. `completed` Разделить `ingest_vacancy.py` на provider, normalization и rendering слои.
+5. `in_progress` Добавить Playwright fallback для JS-rendered career sites, когда обычный HTML-fetch не даёт полноценного результата.
 6. `pending` Провести финальную зачистку исключений, placeholder policy и тестовой структуры.
 
 ## Принципы
