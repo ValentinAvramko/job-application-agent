@@ -18,7 +18,7 @@
 3. `completed` Вынести `source_channel`, нормализацию способа отклика для `response-monitoring.xlsx` и другие справочные маппинги в data-driven слой.
 4. `completed` Разделить `ingest_vacancy.py` на provider, normalization и rendering слои.
 5. `completed` Добавить Playwright fallback для JS-rendered career sites, когда обычный HTML-fetch не даёт полноценного результата.
-6. `in_progress` Провести финальную зачистку исключений, placeholder policy и тестовой структуры.
+6. `completed` Провести финальную зачистку исключений, placeholder policy и тестовой структуры.
 
 ## Принципы
 

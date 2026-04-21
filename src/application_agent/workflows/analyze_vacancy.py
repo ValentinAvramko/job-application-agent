@@ -7,6 +7,7 @@ from pathlib import Path
 
 from application_agent.memory.models import WorkflowRun
 from application_agent.memory.store import JsonMemoryStore
+from application_agent.utils.placeholders import is_unspecified
 from application_agent.utils.simple_yaml import load_simple_yaml, write_simple_yaml
 from application_agent.workflows.base import WorkflowResult
 from application_agent.workflows.ingest_vacancy import IngestVacancyRequest, IngestVacancyWorkflow
@@ -576,9 +577,9 @@ def build_follow_up_questions(meta: dict[str, object], raw_source: str, gaps: li
     questions: list[str] = []
     if not raw_source.strip():
         questions.append("Нужен полный текст вакансии или хотя бы блок требований и задач.")
-    if str(meta.get("country", "")).strip() in {"", "Не указано"}:
+    if is_unspecified(str(meta.get("country", "")).strip()):
         questions.append("Уточнить географию и ожидания по юридическим ограничениям и релокации.")
-    if str(meta.get("work_mode", "")).strip() in {"", "Не указано"}:
+    if is_unspecified(str(meta.get("work_mode", "")).strip()):
         questions.append("Уточнить формат работы: офис / гибрид / удалённо.")
     if gaps:
         questions.append(f"Проверить, действительно ли обязателен пункт: {trim_signal(gaps[0])}")
@@ -867,4 +868,3 @@ def extract_raw_source(path: Path) -> str:
         if marker in text:
             return text.split(marker, maxsplit=1)[1].strip()
     return text.strip()
-

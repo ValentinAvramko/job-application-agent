@@ -8,6 +8,7 @@ from xml.etree import ElementTree as ET
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from application_agent.normalization.source_channels import normalize_response_method
+from application_agent.utils.placeholders import display_or_unspecified
 
 SPREADSHEET_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 MC_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -80,8 +81,8 @@ def build_ingest_entry(record: ResponseMonitoringIngestRecord) -> dict[str, str 
         "D": "\u0414\u0430",
         "E": record.company.strip(),
         "F": record.position.strip(),
-        "G": display_value(record.country),
-        "H": display_value(record.work_mode),
+        "G": display_or_unspecified(record.country),
+        "H": display_or_unspecified(record.work_mode),
         "I": normalize_response_method(record.source_channel, record.source_url),
         "J": "\u041d\u0435\u0442",
         "K": excel_date_serial(record.ingest_date),
@@ -91,11 +92,6 @@ def build_ingest_entry(record: ResponseMonitoringIngestRecord) -> dict[str, str 
 def excel_date_serial(value: date) -> int:
     epoch = date(1899, 12, 30)
     return (value - epoch).days
-
-
-def display_value(value: str, default: str = "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e") -> str:
-    cleaned = value.strip()
-    return default if cleaned in {"", "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e", "n/a", "null"} else cleaned
 
 
 def find_response_monitoring_sheet_path(workbook_xml: ET.Element, relationships_xml: ET.Element) -> str:

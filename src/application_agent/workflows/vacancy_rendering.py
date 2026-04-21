@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from application_agent.utils.placeholders import display_or_no_data, display_or_unspecified
+
 
 def render_meta(request: object, vacancy_id: str, timestamp: str, infer_source_channel: object, *, excel_row: int | None = None) -> str:
-    request_country = getattr(request, "country").strip() or "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e"
-    request_work_mode = getattr(request, "work_mode").strip() or "\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e"
+    request_country = display_or_unspecified(getattr(request, "country"))
+    request_work_mode = display_or_unspecified(getattr(request, "work_mode"))
     source_channel = getattr(request, "source_channel").strip() or infer_source_channel(
         getattr(request, "source_url"),
         getattr(request, "source_text"),
@@ -32,11 +34,7 @@ def render_meta(request: object, vacancy_id: str, timestamp: str, infer_source_c
     )
 
 
-def render_source(request: object, vacancy_id: str, infer_source_channel: object, is_unspecified: object) -> str:
-    def display_value(value: str) -> str:
-        cleaned = value.strip()
-        return "\u043d\u0435\u0442 \u0434\u0430\u043d\u043d\u044b\u0445" if is_unspecified(cleaned) else cleaned
-
+def render_source(request: object, vacancy_id: str, infer_source_channel: object) -> str:
     source_channel = getattr(request, "source_channel") or infer_source_channel(
         getattr(request, "source_url"),
         getattr(request, "source_text"),
@@ -46,11 +44,11 @@ def render_source(request: object, vacancy_id: str, infer_source_channel: object
         "",
         "## \u041f\u0430\u0441\u043f\u043e\u0440\u0442",
         "",
-        f"- \u041a\u043e\u043c\u043f\u0430\u043d\u0438\u044f: {display_value(getattr(request, 'company'))}",
-        f"- \u041f\u043e\u0437\u0438\u0446\u0438\u044f: {display_value(getattr(request, 'position'))}",
+        f"- \u041a\u043e\u043c\u043f\u0430\u043d\u0438\u044f: {display_or_no_data(getattr(request, 'company'))}",
+        f"- \u041f\u043e\u0437\u0438\u0446\u0438\u044f: {display_or_no_data(getattr(request, 'position'))}",
         f"- ID \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438: {vacancy_id}",
-        f"- \u0418\u0441\u0445\u043e\u0434\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430: {display_value(getattr(request, 'source_url'))}",
-        f"- \u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a: {display_value(source_channel)}",
+        f"- \u0418\u0441\u0445\u043e\u0434\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430: {display_or_no_data(getattr(request, 'source_url'))}",
+        f"- \u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a: {display_or_no_data(source_channel)}",
         "",
         "## \u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440\u044b \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438",
         "",
@@ -63,7 +61,7 @@ def render_source(request: object, vacancy_id: str, infer_source_channel: object
         ("\u0413\u0440\u0430\u0444\u0438\u043a", getattr(request, "work_schedule")),
         ("\u0424\u043e\u0440\u043c\u0430\u0442 \u0440\u0430\u0431\u043e\u0442\u044b", getattr(request, "work_mode")),
     ]
-    lines.extend([f"- {label}: {display_value(value)}" for label, value in params])
+    lines.extend([f"- {label}: {display_or_no_data(value)}" for label, value in params])
 
     lines.extend(["", "## \u0418\u0441\u0445\u043e\u0434\u043d\u044b\u0439 \u0442\u0435\u043a\u0441\u0442", ""])
     if getattr(request, "source_markdown").strip():

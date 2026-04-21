@@ -6,6 +6,7 @@ from datetime import date, datetime, timezone
 from application_agent.integrations.response_monitoring import ResponseMonitoringIngestRecord, append_ingest_record
 from application_agent.memory.models import WorkflowRun
 from application_agent.memory.store import JsonMemoryStore
+from application_agent.utils.placeholders import is_unspecified
 from application_agent.utils.simple_yaml import load_simple_yaml, write_simple_yaml
 from application_agent.workflows.base import WorkflowResult
 from application_agent.workflows.vacancy_rendering import (
@@ -21,7 +22,6 @@ from application_agent.workflows.vacancy_sources import (
     build_vacancy_id,
     fetch_source_details,
     infer_source_channel,
-    is_unspecified,
     merge_source_details,
     normalize_country_value,
     normalize_language_tag,
@@ -210,7 +210,7 @@ class IngestVacancyWorkflow:
         return render_meta(request, vacancy_id, timestamp, infer_source_channel, excel_row=excel_row)
 
     def _render_source(self, request: IngestVacancyRequest, vacancy_id: str) -> str:
-        return render_source(request, vacancy_id, infer_source_channel, is_unspecified)
+        return render_source(request, vacancy_id, infer_source_channel)
 
     def _render_analysis(self, vacancy_id: str, request: IngestVacancyRequest) -> str:
         return render_analysis(vacancy_id, request)
