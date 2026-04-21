@@ -1405,33 +1405,34 @@ class IngestVacancyWorkflow:
         )
 
     def _render_source(self, request: IngestVacancyRequest, vacancy_id: str) -> str:
+        def display_value(value: str) -> str:
+            cleaned = value.strip()
+            return "нет данных" if is_unspecified(cleaned) else cleaned
+
+        source_channel = request.source_channel or infer_source_channel(request.source_url, request.source_text)
         lines = [
             "# \u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438",
             "",
             "## \u041f\u0430\u0441\u043f\u043e\u0440\u0442",
             "",
-            f"- \u041a\u043e\u043c\u043f\u0430\u043d\u0438\u044f: {request.company}",
-            f"- \u041f\u043e\u0437\u0438\u0446\u0438\u044f: {request.position}",
+            f"- \u041a\u043e\u043c\u043f\u0430\u043d\u0438\u044f: {display_value(request.company)}",
+            f"- \u041f\u043e\u0437\u0438\u0446\u0438\u044f: {display_value(request.position)}",
             f"- ID \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438: {vacancy_id}",
-            f"- \u0418\u0441\u0445\u043e\u0434\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430: {request.source_url or 'n/a'}",
-            f"- \u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a: {request.source_channel or infer_source_channel(request.source_url, request.source_text)}",
+            f"- \u0418\u0441\u0445\u043e\u0434\u043d\u0430\u044f \u0441\u0441\u044b\u043b\u043a\u0430: {display_value(request.source_url)}",
+            f"- \u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a: {display_value(source_channel)}",
             "",
             "## \u041f\u0430\u0440\u0430\u043c\u0435\u0442\u0440\u044b \u0432\u0430\u043a\u0430\u043d\u0441\u0438\u0438",
             "",
         ]
 
         params = [
-            ("\u0421\u0442\u0440\u0430\u043d\u0430", request.country.strip()),
-            ("\u0413\u043e\u0440\u043e\u0434", request.city.strip()),
-            ("\u0417\u0430\u043d\u044f\u0442\u043e\u0441\u0442\u044c", request.employment_type.strip()),
-            ("\u0413\u0440\u0430\u0444\u0438\u043a", request.work_schedule.strip()),
-            ("\u0424\u043e\u0440\u043c\u0430\u0442 \u0440\u0430\u0431\u043e\u0442\u044b", request.work_mode.strip()),
+            ("\u0421\u0442\u0440\u0430\u043d\u0430", request.country),
+            ("\u0413\u043e\u0440\u043e\u0434", request.city),
+            ("\u0417\u0430\u043d\u044f\u0442\u043e\u0441\u0442\u044c", request.employment_type),
+            ("\u0413\u0440\u0430\u0444\u0438\u043a", request.work_schedule),
+            ("\u0424\u043e\u0440\u043c\u0430\u0442 \u0440\u0430\u0431\u043e\u0442\u044b", request.work_mode),
         ]
-        visible_params = [(label, value) for label, value in params if value]
-        if visible_params:
-            lines.extend([f"- {label}: {value}" for label, value in visible_params])
-        else:
-            lines.append("- \u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u043e")
+        lines.extend([f"- {label}: {display_value(value)}" for label, value in params])
 
         lines.extend(["", "## \u0418\u0441\u0445\u043e\u0434\u043d\u044b\u0439 \u0442\u0435\u043a\u0441\u0442", ""])
         if request.source_markdown.strip():
