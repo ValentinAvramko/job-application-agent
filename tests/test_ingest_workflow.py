@@ -19,6 +19,7 @@ from application_agent.workflows.ingest_vacancy import (
     enrich_request,
     infer_source_channel,
     normalize_country_value,
+    normalize_language_tag,
     parse_generic_vacancy_page,
     parse_hh_vacancy_page,
     parse_hh_vacancy_payload,
@@ -170,6 +171,11 @@ class IngestWorkflowTests(unittest.TestCase):
         self.assertEqual(normalize_country_value("DEU"), "Germany")
         self.assertEqual(normalize_country_value("PL"), "Poland")
         self.assertEqual(normalize_country_value("\u041a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d"), "\u041a\u0430\u0437\u0430\u0445\u0441\u0442\u0430\u043d")
+
+    def test_normalize_language_tag_returns_primary_subtag(self) -> None:
+        self.assertEqual(normalize_language_tag("en-US"), "en")
+        self.assertEqual(normalize_language_tag("ru_RU"), "ru")
+        self.assertEqual(normalize_language_tag(""), "")
 
     def test_parse_hh_vacancy_page_extracts_rich_fields(self) -> None:
         html = """
@@ -344,6 +350,81 @@ class IngestWorkflowTests(unittest.TestCase):
         self.assertIn("\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0442\u044c \u043a\u043e\u043c\u0430\u043d\u0434\u043e\u0439 \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0438 \u0438 delivery.", details.source_text)
         self.assertIn("\u0423\u043f\u0440\u0430\u0432\u043b\u044f\u0442\u044c \u043a\u043e\u043c\u0430\u043d\u0434\u043e\u0439 \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0438", details.source_markdown)
         self.assertEqual(details.language, "ru")
+
+    def test_parse_generic_vacancy_page_prefers_body_over_truncated_meta_summary(self) -> None:
+        html = """
+        <html lang="en">
+          <head>
+            <title>TaxDome - VP of Engineering</title>
+            <meta name="description" content="About TaxDome At TaxDome, we’re building the #1 platform across 40+ count..." />
+          </head>
+          <body>
+            <main>
+              <h2>VP of Engineering</h2>
+              <h3>About this role</h3>
+              <p>We're looking for a VP of Engineering to transform TaxDome into an AI-first engineering organization.</p>
+              <h3>What you'll be responsible for</h3>
+              <ul>
+                <li>Lead execution across the engineering organization.</li>
+              </ul>
+            </main>
+          </body>
+        </html>
+        """
+
+        details = parse_generic_vacancy_page(html, "https://careers.taxdome.com/v/189222-vp-of-engineering")
+
+        self.assertEqual(details.language, "en")
+        self.assertIn("We're looking for a VP of Engineering", details.source_text)
+        self.assertIn("### About this role", details.source_markdown)
+        self.assertNotIn("count...", details.source_text)
+
+    def test_parse_generic_vacancy_page_excludes_sidebar_and_footer_ui(self) -> None:
+        html = """
+        <html lang="en">
+          <head>
+            <title>TaxDome - VP of Engineering</title>
+            <meta name="description" content="Short summary..." />
+          </head>
+          <body>
+            <div class="row">
+              <div class="col-lg-8 col-12">
+                <h2>VP of Engineering</h2>
+                <h3>About this role</h3>
+                <p>We're looking for a VP of Engineering to transform TaxDome into an AI-first engineering organization.</p>
+                <h3>What you'll be responsible for</h3>
+                <ul>
+                  <li>Lead execution across the engineering organization.</li>
+                </ul>
+              </div>
+              <div class="col-lg-4 col-12">
+                <a href="/apply">Apply now</a>
+                <button>Share</button>
+                <dl>
+                  <dt>Department</dt>
+                  <dd>Development</dd>
+                </dl>
+              </div>
+            </div>
+            <footer>
+              <div>Powered by PeopleForce</div>
+              <select>
+                <option>English</option>
+                <option>Polski</option>
+                <option>Deutsch</option>
+              </select>
+            </footer>
+          </body>
+        </html>
+        """
+
+        details = parse_generic_vacancy_page(html, "https://careers.taxdome.com/v/189222-vp-of-engineering")
+
+        self.assertIn("We're looking for a VP of Engineering", details.source_text)
+        self.assertNotIn("Apply now", details.source_text)
+        self.assertNotIn("Share", details.source_text)
+        self.assertNotIn("Powered by PeopleForce", details.source_text)
+        self.assertNotIn("Polski", details.source_text)
 
 
 if __name__ == "__main__":

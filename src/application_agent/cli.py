@@ -28,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--source-type", default="")
     ingest.add_argument("--source-text", default="")
     ingest.add_argument("--input-file", default="")
-    ingest.add_argument("--language", default="ru")
+    ingest.add_argument("--language", default="")
     ingest.add_argument("--country", default="")
     ingest.add_argument("--work-mode", default="")
     ingest.add_argument("--target-mode", default="balanced")

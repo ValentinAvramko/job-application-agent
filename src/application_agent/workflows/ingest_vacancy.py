@@ -87,6 +87,29 @@ BLOCK_TAGS = {
     "tr",
 }
 SKIP_TAGS = {"script", "style", "noscript"}
+GENERIC_PRIMARY_TAGS = {"main", "article", "section", "div"}
+GENERIC_SKIP_CONTAINER_TAGS = {"footer", "aside", "nav", "header"}
+GENERIC_POSITIVE_HINTS = ("content", "main", "description", "job", "vacancy", "posting", "article", "details")
+GENERIC_NEGATIVE_HINTS = ("sidebar", "footer", "share", "social", "header", "nav", "menu", "apply", "cta", "locale", "language")
+GENERIC_UI_NOISE_LINES = {
+    "apply now",
+    "share",
+    "share to",
+    "link",
+    "copy",
+    "department",
+    "development",
+    "powered by peopleforce",
+    "english",
+    "polski",
+    "deutsch",
+    "español",
+    "português",
+    "ukrainian",
+    "magyar",
+    "slovenčina",
+    "українська",
+}
 TITLE_PATTERNS = (
     re.compile(
         "\\u0412\\u0430\\u043a\\u0430\\u043d\\u0441\\u0438\\u044f\\s+(?P<position>.+?)\\s+\\u0432\\s+\\u043a\\u043e\\u043c\\u043f\\u0430\\u043d\\u0438\\u0438\\s+(?P<company>.+?)(?:\\s*[\\|\\-\\u2013\\u2014].*)?$",
@@ -397,6 +420,105 @@ class HHDescriptionParser(HTMLParser):
         return "".join(self.parts).strip()
 
 
+class GenericPrimaryContentParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.candidates: list[dict[str, object]] = []
+        self.stack: list[dict[str, object]] = []
+        self.skip_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attrs_dict = {key.lower(): value for key, value in attrs if key}
+        if self.skip_depth:
+            self.skip_depth += 1
+            return
+        if tag in GENERIC_SKIP_CONTAINER_TAGS:
+            self.skip_depth = 1
+            return
+
+        for candidate in self.stack:
+            if candidate["tag"] == tag:
+                candidate["depth"] += 1
+            candidate["parts"].append(self.get_starttag_text())
+            if tag in {"h1", "h2", "h3", "h4"}:
+                candidate["headings"] += 1
+            if tag in {"p", "li"}:
+                candidate["paragraphs"] += 1
+
+        if tag not in GENERIC_PRIMARY_TAGS:
+            return
+
+        attrs_blob = " ".join(value for value in (attrs_dict.get("class"), attrs_dict.get("id")) if value).lower()
+        negative = any(hint in attrs_blob for hint in GENERIC_NEGATIVE_HINTS)
+        positive = any(hint in attrs_blob for hint in GENERIC_POSITIVE_HINTS)
+        candidate = {
+            "tag": tag,
+            "depth": 1,
+            "parts": [self.get_starttag_text()],
+            "text": [],
+            "headings": 1 if tag in {"h1", "h2", "h3", "h4"} else 0,
+            "paragraphs": 1 if tag in {"p", "li"} else 0,
+            "attrs_blob": attrs_blob,
+            "negative": negative,
+            "positive": positive,
+        }
+        self.stack.append(candidate)
+
+    def handle_endtag(self, tag: str) -> None:
+        if self.skip_depth:
+            self.skip_depth -= 1
+            return
+        if not self.stack:
+            return
+
+        for candidate in self.stack:
+            candidate["parts"].append(f"</{tag}>")
+
+        for idx in range(len(self.stack) - 1, -1, -1):
+            candidate = self.stack[idx]
+            if candidate["tag"] != tag:
+                continue
+            candidate["depth"] -= 1
+            if candidate["depth"] <= 0:
+                self.candidates.append(candidate)
+                self.stack.pop(idx)
+            break
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self.skip_depth:
+            return
+        for candidate in self.stack:
+            candidate["parts"].append(self.get_starttag_text())
+
+    def handle_data(self, data: str) -> None:
+        if self.skip_depth:
+            return
+        for candidate in self.stack:
+            candidate["parts"].append(data)
+            candidate["text"].append(data)
+
+    def get_best_html(self) -> str:
+        best_html = ""
+        best_score = 0
+        for candidate in self.candidates:
+            text = clean_multiline_text("".join(candidate["text"]))
+            if len(text) < 300:
+                continue
+            score = len(text)
+            score += int(candidate["headings"]) * 150
+            score += int(candidate["paragraphs"]) * 40
+            if candidate["tag"] in {"main", "article"}:
+                score += 500
+            if candidate["positive"]:
+                score += 300
+            if candidate["negative"]:
+                score -= 1000
+            if score > best_score:
+                best_score = score
+                best_html = "".join(candidate["parts"]).strip()
+        return best_html
+
+
 @dataclass
 class VacancySourceDetails:
     company: str = ""
@@ -541,7 +663,7 @@ def parse_hh_vacancy_payload(payload: str) -> VacancySourceDetails:
         position=clean_text(str(data.get("name", "") or "")),
         source_text=build_enriched_source_text(description, key_skills, "", "", ""),
         source_markdown=build_enriched_source_markdown(description_markdown, key_skills),
-        language=clean_text(str(data.get("language", "") or "")),
+        language=normalize_language_tag(str(data.get("language", "") or "")) or infer_language_from_text(description),
         source_channel="HeadHunter",
         country=country,
         city=city,
@@ -570,6 +692,76 @@ def normalize_country_value(value: str) -> str:
     if not cleaned:
         return ""
     return CANONICAL_COUNTRY_MAP.get(cleaned.lower(), cleaned)
+
+
+def normalize_language_tag(value: str) -> str:
+    cleaned = clean_text(value).lower().replace("_", "-")
+    if not cleaned:
+        return ""
+    return cleaned.split("-", 1)[0]
+
+
+def infer_language_from_text(text: str) -> str:
+    cleaned = clean_multiline_text(text)
+    if not cleaned:
+        return ""
+    if re.search(r"[\u0400-\u04FF]", cleaned):
+        return "ru"
+    if re.search(r"[A-Za-z]", cleaned):
+        return "en"
+    return ""
+
+
+def looks_like_truncated_summary(text: str) -> bool:
+    cleaned = clean_multiline_text(text)
+    if not cleaned:
+        return False
+    lower = cleaned.lower()
+    return (
+        cleaned.endswith("...")
+        or cleaned.endswith("\u2026")
+        or " count..." in lower
+        or " count\u2026" in lower
+    )
+
+
+def choose_preferred_page_text(primary: str, fallback: str) -> str:
+    primary_clean = clean_multiline_text(primary)
+    fallback_clean = clean_multiline_text(fallback)
+    if not primary_clean:
+        return fallback_clean
+    if not fallback_clean:
+        return primary_clean
+    if looks_like_truncated_summary(primary_clean) and len(fallback_clean) > len(primary_clean):
+        return fallback_clean
+    if len(fallback_clean) > max(len(primary_clean) * 2, len(primary_clean) + 400):
+        return fallback_clean
+    return primary_clean
+
+
+def is_generic_ui_noise_line(line: str) -> bool:
+    cleaned = clean_text(line).strip(" -*#:\t").lower()
+    if not cleaned:
+        return False
+    if cleaned in GENERIC_UI_NOISE_LINES:
+        return True
+    if cleaned.startswith("powered by "):
+        return True
+    broken = sum(cleaned.count(marker.lower()) for marker in BROKEN_MARKERS)
+    if broken >= 2 and len(cleaned) <= 40:
+        return True
+    return False
+
+
+def strip_generic_ui_noise(text: str) -> str:
+    cleaned_lines = [line for line in text.splitlines() if not is_generic_ui_noise_line(line)]
+    return collapse_blank_lines("\n".join(cleaned_lines))
+
+
+def extract_primary_content_html(html: str) -> str:
+    parser = GenericPrimaryContentParser()
+    parser.feed(html)
+    return parser.get_best_html()
 
 
 def extract_country_from_country_node(value: object) -> str:
@@ -634,6 +826,7 @@ def parse_structured_job_posting(chunks: list[str]) -> VacancySourceDetails:
                 position=clean_text(str(node.get("title", "") or node.get("name", "") or "")),
                 source_text=description_text,
                 source_markdown=description_markdown,
+                language=infer_language_from_text(description_text),
                 country=country,
                 city=city,
             )
@@ -796,7 +989,7 @@ def parse_hh_vacancy_page(html: str) -> VacancySourceDetails:
         position=page.h1 or structured.position or title_parts.position,
         source_text=build_enriched_source_text(description_text, key_skills, employment_type, work_schedule, work_mode),
         source_markdown=build_enriched_source_markdown(description_markdown, key_skills),
-        language=clean_text(page.html_lang),
+        language=normalize_language_tag(page.html_lang) or structured.language or infer_language_from_text(description_text),
         source_channel="HeadHunter",
         country=country,
         city=structured.city or city_from_meta or title_parts.city,
@@ -824,24 +1017,32 @@ def parse_generic_vacancy_page(html: str, source_url: str = "") -> VacancySource
     structured = parse_structured_job_posting(parser.json_ld_chunks)
     title_parts = derive_title_parts(parser.meta.get("og:title") or parser.title or parser.h1)
 
-    source_markdown = structured.source_markdown
-    if not source_markdown:
-        source_markdown = clean_multiline_text(parser.meta.get("description", "") or parser.meta.get("og:description", ""))
-    if not source_markdown:
-        source_markdown = html_to_markdown(html)
+    meta_summary = clean_multiline_text(parser.meta.get("description", "") or parser.meta.get("og:description", ""))
+    primary_html = extract_primary_content_html(html)
+    extraction_html = primary_html or html
+    body_text = html_to_text(extraction_html)
+    body_markdown = html_to_markdown(extraction_html)
 
     source_text = structured.source_text
     if not source_text:
-        source_text = clean_multiline_text(parser.meta.get("description", "") or parser.meta.get("og:description", ""))
-    if not source_text:
-        source_text = html_to_text(html)
+        source_text = choose_preferred_page_text(meta_summary, body_text)
+    source_text = strip_generic_ui_noise(source_text)
+
+    source_markdown = structured.source_markdown
+    if not source_markdown:
+        preferred_text = choose_preferred_page_text(meta_summary, body_text)
+        if preferred_text == meta_summary:
+            source_markdown = meta_summary
+        else:
+            source_markdown = body_markdown
+    source_markdown = strip_generic_ui_noise(source_markdown)
 
     return VacancySourceDetails(
         company=structured.company or title_parts.company,
         position=structured.position or parser.h1 or title_parts.position,
         source_text=source_text,
         source_markdown=source_markdown,
-        language=clean_text(parser.html_lang),
+        language=normalize_language_tag(parser.html_lang) or structured.language or infer_language_from_text(source_text),
         source_channel=infer_source_channel(source_url, source_text),
         country=structured.country,
         city=structured.city or title_parts.city,
@@ -974,7 +1175,7 @@ class IngestVacancyRequest:
     source_url: str = ""
     source_channel: str = ""
     source_type: str = ""
-    language: str = "ru"
+    language: str = ""
     country: str = ""
     city: str = ""
     work_mode: str = ""
