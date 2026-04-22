@@ -12,6 +12,7 @@
 - workflow `intake-adoptions`, который переносит vacancy-local `adoptions.md` в root review layer (`adoptions/inbox/` + `adoptions/questions/open.md`);
 - workflow `prepare-screening`, который по готовой вакансии собирает vacancy-local `screening.md` для первичного интервью;
 - workflow `rebuild-master`, который синхронизирует managed approved-signals section в `resumes/MASTER.md` из `adoptions/accepted/MASTER.md` и пишет runtime report в `agent_memory/runtime/rebuild-master/latest.md`.
+- workflow `rebuild-role-resume`, который синхронизирует managed canonical block в выбранном `resumes/<role>.md` из уже согласованного `resumes/MASTER.md` и optional `knowledge/roles/<role>.md`.
 
 ## Структура private workspace
 
@@ -33,6 +34,7 @@ python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-e
 python run_agent.py --root ../.. intake-adoptions --vacancy-id 20260420-example-engineering-manager
 python run_agent.py --root ../.. prepare-screening --vacancy-id 20260420-example-engineering-manager
 python run_agent.py --root ../.. rebuild-master
+python run_agent.py --root ../.. rebuild-role-resume --target-role CTO
 python run_agent.py --root ../.. show-memory
 ```
 
@@ -57,6 +59,9 @@ python run_agent.py --root ../.. show-memory
 - `python run_agent.py --root ../.. rebuild-master`
   Читает current-state approved signals из `adoptions/accepted/MASTER.md`, детерминированно синхронизирует managed block в `resumes/MASTER.md` и обновляет runtime report `agent_memory/runtime/rebuild-master/latest.md`.
   Workflow не переписывает narrative sections целиком: baseline-версия управляет только секцией `Approved Permanent Signals`, чтобы downstream `rebuild-role-resume` и `build-linkedin` читали уже согласованный `MASTER`.
+- `python run_agent.py --root ../.. rebuild-role-resume --target-role CTO`
+  Читает managed approved-signals section из `resumes/MASTER.md`, optional shaping bullets из `knowledge/roles/CTO.md` и детерминированно синхронизирует managed block в `resumes/CTO.md`.
+  Baseline-версия не делает full rewrite всего role resume: она обновляет только parseable managed block и пишет per-role runtime report в `agent_memory/runtime/rebuild-role-resume/CTO.md`.
 - `python run_agent.py --root ../.. show-memory`
   Показывает текущее содержимое файловой памяти агента: задачи, артефакты и журнал запусков workflow, а также reconciliation-сводку по отсутствующим vacancy artifacts.
 
@@ -68,7 +73,8 @@ python run_agent.py --root ../.. show-memory
 2. `intake-adoptions` переносит draft в root review stores `adoptions/inbox/` и `adoptions/questions/open.md`.
 3. Agent-guided review stage читает context через helper APIs из `application_agent.adoptions_review` и применяет approved updates в `adoptions/accepted/MASTER.md`.
 4. Только после этого downstream workflow `rebuild-master` должен обновлять `resumes/MASTER.md`.
-5. Только после синхронизации `MASTER` downstream workflow family `rebuild-role-resume` и `build-linkedin` должен читать обновлённый canonical resume, а не raw vacancy corpus или `adoptions/accepted/` напрямую.
+5. Только после синхронизации `MASTER` workflow `rebuild-role-resume` должен обновлять конкретное `resumes/<role>.md` из canonical resume и optional `knowledge/roles/<role>.md`, а не из raw vacancy corpus или `adoptions/accepted/` напрямую.
+6. Только после этого downstream workflow `build-linkedin` должен читать обновлённый canonical resume family.
 
 Подробный пошаговый сценарий первого рабочего прогона в private workspace лежит в [tooling/run-ingest-analyze.md](/C:/Users/avramko/OneDrive/Documents/Career/tooling/run-ingest-analyze.md).
 

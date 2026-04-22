@@ -5,6 +5,7 @@ from application_agent.workflows.ingest_vacancy import IngestVacancyWorkflow
 from application_agent.workflows.intake_adoptions import IntakeAdoptionsWorkflow
 from application_agent.workflows.prepare_screening import PrepareScreeningWorkflow
 from application_agent.workflows.rebuild_master import RebuildMasterWorkflow
+from application_agent.workflows.rebuild_role_resume import RebuildRoleResumeWorkflow
 
 
 class WorkflowRegistry:
@@ -33,4 +34,5 @@ def build_default_registry() -> WorkflowRegistry:
     registry.register(IntakeAdoptionsWorkflow())
     registry.register(PrepareScreeningWorkflow())
     registry.register(RebuildMasterWorkflow())
+    registry.register(RebuildRoleResumeWorkflow())
     return registry

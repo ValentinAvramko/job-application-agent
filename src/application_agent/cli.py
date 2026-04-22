@@ -11,6 +11,7 @@ from application_agent.workflows.ingest_vacancy import IngestVacancyRequest
 from application_agent.workflows.intake_adoptions import IntakeAdoptionsRequest
 from application_agent.workflows.prepare_screening import PrepareScreeningRequest
 from application_agent.workflows.rebuild_master import RebuildMasterRequest
+from application_agent.workflows.rebuild_role_resume import RebuildRoleResumeRequest
 from application_agent.workflows.registry import build_default_registry
 
 
@@ -72,6 +73,11 @@ def build_parser() -> argparse.ArgumentParser:
         "rebuild-master",
         help="Rebuild the MASTER resume managed approved-signals section and runtime report.",
     )
+    rebuild_role = subparsers.add_parser(
+        "rebuild-role-resume",
+        help="Rebuild the managed canonical block for a selected role resume.",
+    )
+    rebuild_role.add_argument("--target-role", default="")
     return parser
 
 
@@ -166,6 +172,13 @@ def main() -> int:
     if args.command == "rebuild-master":
         request = RebuildMasterRequest()
         workflow = build_default_registry().get("rebuild-master")
+        result = workflow.run(layout=layout, store=store, request=request)
+        print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "rebuild-role-resume":
+        request = RebuildRoleResumeRequest(target_role=args.target_role)
+        workflow = build_default_registry().get("rebuild-role-resume")
         result = workflow.run(layout=layout, store=store, request=request)
         print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
         return 0

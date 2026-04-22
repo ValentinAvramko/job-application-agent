@@ -252,12 +252,13 @@
 - `2026-04-22 13:50` — В dedicated plan review/acceptance закрыт M2: interaction shape и file contract теперь закреплены без product ambiguity, включая shared ledger `adoptions/questions/open.md`, separate intake stage и отсутствие role-specific accepted artifacts. — Remaining work внутри M5 теперь сводится не к выбору модели, а к implementation-ready decomposition. — Status: `in_progress`.
 - `2026-04-22 15:53` — Dedicated planning plan review/acceptance завершён полностью: создан execution plan с отдельными milestones для intake workflow, review helper layer, agent-guided review support и rebuild-master handoff. — Ordered workflow backlog внутри M5 снова стал исполнимым без дополнительных product решений. — Status: `in_progress`.
 - `2026-04-22 18:49` — Upstream review/acceptance execution и downstream `rebuild-master` завершены end-to-end: `README.md` и dedicated plan фиксируют final contract, а full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (57 tests)`, `list-workflows`, `show-memory`). — Sequencing ambiguity для `MASTER` снята; следующий remaining-workflow step внутри M5 теперь сводится к открытию dedicated plan для `rebuild-role-resume`. — Status: `in_progress`.
+- `2026-04-22 20:05` — `rebuild-role-resume` завершён end-to-end: helper module, workflow wiring, runtime report, docs sync и full validation baseline подтверждены (`python -m unittest discover -s tests` -> `OK (62 tests)`, `list-workflows`, `show-memory`). — Sequencing для resume family теперь доведён от `accepted` до `MASTER` и выбранного role resume; следующий remaining-workflow step смещается на `build-linkedin`. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M5`
 - Current status: `in_progress`
-- Next step: `Открыть dedicated plan для `rebuild-role-resume`, который будет читать уже стабилизированный `resumes/MASTER.md` после завершения `rebuild-master`.`
+- Next step: `Открыть dedicated plan для `build-linkedin`, который будет читать уже стабилизированные `resumes/MASTER.md` и downstream role-resume family после завершения `rebuild-role-resume`.`
 - Active blockers:
   - none
 - Open questions:

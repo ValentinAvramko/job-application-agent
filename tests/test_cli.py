@@ -56,7 +56,14 @@ class CliTests(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(
             [item["name"] for item in payload],
-            ["analyze-vacancy", "ingest-vacancy", "intake-adoptions", "prepare-screening", "rebuild-master"],
+            [
+                "analyze-vacancy",
+                "ingest-vacancy",
+                "intake-adoptions",
+                "prepare-screening",
+                "rebuild-master",
+                "rebuild-role-resume",
+            ],
         )
 
     def test_ingest_cli_returns_workflow_result_without_git_publication_suffix(self) -> None:
@@ -207,5 +214,40 @@ class CliTests(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload["workflow"], "rebuild-master")
         self.assertIn("MASTER", payload["summary"])
+
+    def test_rebuild_role_resume_cli_routes_to_rebuild_role_workflow(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f"cli-rebuild-role-{uuid.uuid4().hex}"
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+
+        result = WorkflowResult(
+            workflow="rebuild-role-resume",
+            status="completed",
+            summary="Rebuilt CTO role resume managed block.",
+            artifacts=[str(workspace_dir / "resumes" / "CTO.md")],
+        )
+        registry = _FakeRegistry(result)
+        stdout = io.StringIO()
+
+        with patch("application_agent.cli.build_default_registry", return_value=registry), patch.object(
+            sys,
+            "argv",
+            [
+                "run_agent.py",
+                "--root",
+                str(workspace_dir),
+                "rebuild-role-resume",
+                "--target-role",
+                "CTO",
+            ],
+        ), patch("sys.stdout", new=stdout):
+            exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(registry.requested, ["rebuild-role-resume"])
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["workflow"], "rebuild-role-resume")
+        self.assertIn("CTO", payload["summary"])
 if __name__ == "__main__":
     unittest.main()
