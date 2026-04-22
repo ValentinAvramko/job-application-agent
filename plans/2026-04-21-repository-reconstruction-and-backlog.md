@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-22 09:10`
+- Last updated: `2026-04-22 09:17`
 - Overall status: `in_progress`
 
 ## Objective
@@ -212,6 +212,7 @@
 - `2026-04-21 20:33` — M3 output-placement decisions в root-normalization workstream закрыты: `vacancies/<id>/` зафиксирован как working output layer для vacancy-scoped generation, `profile/` — как home для durable profile derivatives, а `archive/`, `resumes/versions/` и `employers/` — как manual-only historical/reference layers вне runtime и agent workflows. — Это снимает blocker по output home/lifecycle policy и оставляет в M3 только legacy corpus distillation. — Master sequencing `M3 -> M4 -> M5` сохраняется.
 - `2026-04-22 09:10` — Legacy prompt/doc corpus дистиллирован в root-normalization workstream plan: `promts/*.md` разнесены по будущим workflow-направлениям, `responses.md` закреплён как historical vacancy corpus, а `adoptions_00.md` — как historical adoption corpus/examples bank. — Это закрывает последний cleanup substep master M3 и позволяет перейти к explicit current workflow completion gate. — Active milestone смещён на M4.
 - `2026-04-22 09:10` — Для master M4 открыт отдельный plan `2026-04-22-current-workflow-completion-gate.md`. — Completion gate требует собственного contradiction ledger и явного решения по blocker-ам текущего стека. — Следующий execution focus переносится в этот новый plan.
+- `2026-04-22 09:17` — В completion-gate plan собран contradiction ledger и draft completion matrix. — Это завершило baseline-сборку и проявило три главных gate-topic: `bootstrap` catalog boundary, `CV/` vs `resumes/` drift и Excel dependency policy. — Master M4 теперь находится в стадии решений, а не разведки.
 
 ## Progress log
 
@@ -224,14 +225,16 @@
 - `2026-04-21 20:33` — M3 output-placement substep в root-normalization workstream закрыт: validation confirmed the current contents of `employers/`, `archive/` и `resumes/versions/`, after which placement and lifecycle rules were fixed in the workstream plan. — Следующий cleanup focus внутри master M3 переместился на legacy prompt/doc distillation (`promts/`, `responses.md`, `adoptions_00.md`). — Status: `in_progress`.
 - `2026-04-22 09:10` — Master M3 закрыт: root-normalization workstream завершён полностью после фиксации distillation map по `promts/*.md`, `responses.md` и `adoptions_00.md`, а также подтверждения, что старые root plan/spec artifacts по-прежнему отсутствуют. — Cleanup больше не является активным этапом; следующий шаг смещён на explicit completion gate текущего workflow-стека. — Status: `done`.
 - `2026-04-22 09:10` — Master M4 стартовал: создан отдельный plan `2026-04-22-current-workflow-completion-gate.md` и зафиксирован initial baseline по CLI, runtime memory и tests. — `list-workflows` показывает только `ingest-vacancy` и `analyze-vacancy`, тогда как `show-memory` и `WORKFLOW_CATALOG` всё ещё включают `bootstrap`; `unittest` остаётся зелёным (`39 tests, OK`). — Status: `in_progress`.
+- `2026-04-22 09:17` — M4 продолжен внутри dedicated plan: baseline доведён до contradiction ledger и candidate completion criteria. — Дополнительная проверка показала реальный runtime blocker по path contract (`resumes/` существует, `CV/` отсутствует, но код всё ещё читает `CV/`) и незакрытый policy question по `response-monitoring.xlsx`. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M4`
 - Current status: `in_progress`
-- Next step: `Продолжить plan `2026-04-22-current-workflow-completion-gate.md`: собрать contradiction ledger и candidate completion criteria для `bootstrap`, `ingest-vacancy` и `analyze-vacancy`.`
+- Next step: `Продолжить plan `2026-04-22-current-workflow-completion-gate.md`: принять gate decisions по `bootstrap` catalog boundary, `CV/` -> `resumes/` drift и Excel dependency policy.`
 - Active blockers:
   - Не зафиксирован отдельный completion gate по текущему workflow-стеку после safety workstream.
+  - Current stack всё ещё имеет runtime/path drift между кодом и реальным root contract (`CV/` vs `resumes/`).
 - Open questions:
   - Какой набор `bootstrap` / `ingest-vacancy` / `analyze-vacancy` нужно считать минимально завершенным до M5?
   - Нужно ли после M3 открывать отдельный plan по completion gate текущих workflow или достаточно checklist внутри master plan?
