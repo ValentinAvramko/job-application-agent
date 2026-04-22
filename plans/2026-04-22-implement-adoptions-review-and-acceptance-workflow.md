@@ -4,8 +4,8 @@
 - Slug: `2026-04-22-implement-adoptions-review-and-acceptance-workflow`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 17:04`
-- Overall status: `in_progress`
+- Last updated: `2026-04-22 17:24`
+- Overall status: `done`
 
 ## Objective
 
@@ -148,7 +148,7 @@
 
 ### M4. Integration Validation And Rebuild-Master Handoff
 
-- Status: `in_progress`
+- Status: `done`
 - Goal:
   - синхронизировать docs/tests/runtime memory и передать стабильный upstream contract в `rebuild-master`.
 - Deliverables:
@@ -172,6 +172,7 @@
 - `2026-04-22 16:33` — Для deterministic intake выбран CLI command `intake-adoptions`, а не review/acceptance-oriented имя. — Причина: runtime step делает только normalizing handoff `vacancies/<id>/adoptions.md -> adoptions/inbox/<vacancy_id>.md + adoptions/questions/open.md` и не должен создавать ложное впечатление, что он уже решает review или acceptance. — Это удерживает контракт M1 узким и совместимым с последующим M2 helper layer.
 - `2026-04-22 16:58` — Review helper state зафиксирован в двух markdown contracts: `questions/open.md` с секциями `Pending / Answered / Closed` и `accepted/MASTER.md` как current-state table approved signals. — Причина: этого достаточно для agent-guided review без отдельного CLI REPL и без перехода к append-only history log. — Это делает M3 про orchestration поверх стабильных helper APIs, а не про повторное проектирование file format.
 - `2026-04-22 17:04` — Agent-guided review surface оставлен вне workflow registry и оформлен как module-level API плюс workflow doc. — Причина: review по-прежнему driven by operator conversation, а не deterministic command invocation. — Это удерживает каталог runtime workflows чистым и даёт downstream `rebuild-master` уже стабильный upstream contract.
+- `2026-04-22 17:24` — Public docs и downstream handoff обновлены после полного validation baseline: `README.md` теперь фиксирует sequencing `analyze -> intake -> review -> rebuild-master`, а `2026-04-22-rebuild-master-workflow.md` переведён из blocked в active planning state. — Причина: upstream workflow family уже реализован и верифицирован end-to-end на уровне runtime contracts и тестов. — Это завершает текущий plan как stable upstream input contract для `rebuild-master`.
 
 ## Progress log
 
@@ -179,12 +180,13 @@
 - `2026-04-22 16:33` — M1 завершён: добавлен workflow `intake-adoptions`, он зарегистрирован в runtime CLI/registry/catalog, детерминированно рендерит `adoptions/inbox/<vacancy_id>.md`, синхронизирует initial unresolved items в `adoptions/questions/open.md` и не трогает `adoptions/accepted/MASTER.md`, `knowledge/roles/` или `resumes/MASTER.md`. — Validation: `python -m unittest tests.test_adoptions_intake_workflow tests.test_cli tests.test_memory_store` -> `OK`, `python run_agent.py --root ../.. list-workflows` показывает `intake-adoptions`. — Status: `in_progress`.
 - `2026-04-22 16:58` — M2 завершён: добавлен reusable helper module `review_state.py`, intake переведён на общий question-ledger API, а новые tests `tests.test_adoptions_review_state` фиксируют merge/idempotency/update semantics для question statuses и accepted current-state store. — Validation: `python -m unittest tests.test_adoptions_review_state` -> `OK`, повторная проверка `python -m unittest tests.test_adoptions_intake_workflow tests.test_cli tests.test_memory_store` -> `OK`. — Status: `in_progress`.
 - `2026-04-22 17:04` — M3 завершён: добавлен review support module `adoptions_review.py`, тесты `tests.test_adoptions_review_session` покрывают загрузку pending context и применение approved updates, а `agent_memory/workflows/adoptions-review.md` фиксирует operator-facing contract без standalone CLI REPL. — Validation: `python -m unittest tests.test_adoptions_review_state tests.test_adoptions_review_session` -> `OK`, `Get-Content ..\..\agent_memory\workflows\adoptions-review.md`, повторная проверка `python -m unittest tests.test_adoptions_intake_workflow tests.test_cli tests.test_memory_store` -> `OK`. — Status: `in_progress`.
+- `2026-04-22 17:24` — M4 завершён: публичный `README.md` синхронизирован с новым sequencing, downstream `rebuild-master` plan переведён из blocked в active planning, а full validation baseline подтверждён. — Validation: `python -m unittest discover -s tests` -> `OK (51 tests)`, `python run_agent.py --root ../.. list-workflows` показывает `analyze-vacancy`, `ingest-vacancy`, `intake-adoptions`, `prepare-screening`, `python run_agent.py --root ../.. show-memory` выполняется успешно. — Status: `done`.
 
 ## Current state
 
-- Current milestone: `M4`
-- Current status: `in_progress`
-- Next step: `Синхронизировать integration/docs/handoff слой: обновить public docs, зафиксировать upstream contract для `rebuild-master` и прогнать full validation baseline.`
+- Current milestone: `none`
+- Current status: `done`
+- Next step: `Вернуться к `2026-04-22-rebuild-master-workflow.md` и разложить `rebuild-master` на code-facing implementation milestones.`
 - Active blockers:
   - none
 - Open questions:
@@ -192,4 +194,8 @@
 
 ## Completion summary
 
-Заполняется после завершения всех milestones.
+- Поставлен stable upstream workflow family для adoptions review/acceptance: deterministic `intake-adoptions`, helper state contracts для `questions/open.md` и `accepted/MASTER.md`, agent-guided review APIs и operator runbook.
+- Провалидировано: `python -m unittest discover -s tests`, `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory`.
+- Follow-up остался один: перейти в `2026-04-22-rebuild-master-workflow.md` и разложить downstream merge workflow на собственные implementation milestones.
+- Остаточный риск не в upstream contract, а в будущем merge policy для самого `rebuild-master`: отдельно ещё нужно решить формат diff/report artifact и batching semantics.
+- Затронуты артефакты корневого репозитория: чтение/проверка `agent_memory/workflows/adoptions-review.md` и runtime memory под `../..`; новых root-level изменений в рамках M4 не добавлено.

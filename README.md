@@ -9,6 +9,7 @@
 - CLI setup-команда `bootstrap` для private workspace;
 - workflow `ingest-vacancy`, который создаёт каркас вакансии и обновляет runtime-память;
 - стартовый workflow `analyze-vacancy`, который выбирает ролевое резюме и собирает первый fit-анализ;
+- workflow `intake-adoptions`, который переносит vacancy-local `adoptions.md` в root review layer (`adoptions/inbox/` + `adoptions/questions/open.md`);
 - workflow `prepare-screening`, который по готовой вакансии собирает vacancy-local `screening.md` для первичного интервью.
 
 ## Структура private workspace
@@ -28,6 +29,7 @@ python run_agent.py --root ../.. bootstrap
 python run_agent.py --root ../.. list-workflows
 python run_agent.py --root ../.. ingest-vacancy --company "Example" --position "Engineering Manager" --source-channel "Manual" --source-text "Short vacancy text"
 python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager
+python run_agent.py --root ../.. intake-adoptions --vacancy-id 20260420-example-engineering-manager
 python run_agent.py --root ../.. prepare-screening --vacancy-id 20260420-example-engineering-manager
 python run_agent.py --root ../.. show-memory
 ```
@@ -44,6 +46,9 @@ python run_agent.py --root ../.. show-memory
   Публикация в git не выполняется автоматически: commit/push остаются отдельным ручным шагом по `tooling/git-workflow.md`.
 - `python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager`
   Выполняет стартовый анализ уже созданной вакансии: подбирает ролевое резюме и формирует начальный fit-анализ.
+- `python run_agent.py --root ../.. intake-adoptions --vacancy-id 20260420-example-engineering-manager`
+  Нормализует vacancy-local `adoptions.md` в root review layer: рендерит `adoptions/inbox/<vacancy_id>.md` и синхронизирует initial unresolved items в `adoptions/questions/open.md`.
+  Это deterministic intake stage, а не review/acceptance session: сама review-сессия остаётся agent-guided и опирается на helper APIs и runbook `agent_memory/workflows/adoptions-review.md`.
 - `python run_agent.py --root ../.. prepare-screening --vacancy-id 20260420-example-engineering-manager`
   По уже ingest/analyze-подготовленной вакансии создаёт `vacancies/<vacancy_id>/screening.md`, обновляет `meta.yml` до статуса `screening_prepared` и пишет runtime memory без Excel или git side effects.
   Обязательные входы: существующий `vacancy_id`, уже собранные `meta.yml`, `source.md`, `analysis.md`; опционально можно передать `--selected-resume`, `--output-language` и `--preparation-depth`.
@@ -51,6 +56,13 @@ python run_agent.py --root ../.. show-memory
   Показывает текущее содержимое файловой памяти агента: задачи, артефакты и журнал запусков workflow, а также reconciliation-сводку по отсутствующим vacancy artifacts.
 
 `analyze-vacancy` также умеет стартовать без готового `vacancy_id`, если передать `--company`, `--position` и текст вакансии.
+
+Текущий sequencing для adoptions workflow family:
+
+1. `analyze-vacancy` создаёт vacancy-local draft `vacancies/<id>/adoptions.md`.
+2. `intake-adoptions` переносит draft в root review stores `adoptions/inbox/` и `adoptions/questions/open.md`.
+3. Agent-guided review stage читает context через helper APIs из `application_agent.adoptions_review` и применяет approved updates в `adoptions/accepted/MASTER.md`.
+4. Только после этого downstream workflow `rebuild-master` должен обновлять `resumes/MASTER.md`.
 
 Подробный пошаговый сценарий первого рабочего прогона в private workspace лежит в [tooling/run-ingest-analyze.md](/C:/Users/avramko/OneDrive/Documents/Career/tooling/run-ingest-analyze.md).
 

@@ -4,8 +4,8 @@
 - Slug: `2026-04-22-rebuild-master-workflow`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 15:53`
-- Overall status: `blocked`
+- Last updated: `2026-04-22 17:21`
+- Overall status: `in_progress`
 
 ## Objective
 
@@ -120,7 +120,7 @@
 
 ### M3. Implementation-Ready Rebuild-Master Plan
 
-- Status: `planned`
+- Status: `in_progress`
 - Goal:
   - после contract decision разбить `rebuild-master` на исполнимые implementation milestones.
 - Deliverables:
@@ -143,6 +143,7 @@
 - `2026-04-22 11:42` — Перед `rebuild-master` выделен отдельный upstream process `inbox/questions -> accepted + knowledge/roles`. — Причина: именно там происходит human/agent review, ответы на вопросы и нормализация постоянных сигналов. — Следовательно, `rebuild-master` остаётся downstream workflow и не является ближайшим implementation step.
 - `2026-04-22 13:50` — Upstream review/acceptance process уточнён до двух explicit stages: deterministic intake prep и отдельная interactive agent-guided Q&A session. — Это делает будущий input contract для `rebuild-master` стабильнее и исключает ожидание, что сам `rebuild-master` будет переносить vacancy drafts или разбирать unresolved questions. — Текущий blocker теперь сводится только к завершению implementation-ready decomposition upstream workflow.
 - `2026-04-22 15:53` — Upstream workflow family получил отдельный execution plan `2026-04-22-implement-adoptions-review-and-acceptance-workflow.md`; initial implementation shape закреплена как `runtime intake` + `agent-guided review support`. — Это снимает planning blocker для `rebuild-master`, но оставляет execution dependency: сначала должен появиться рабочий upstream artifact flow в `inbox/questions/accepted`. — Блокировка `rebuild-master` теперь зависит от выполнения upstream plan, а не от отсутствия decomposition.
+- `2026-04-22 17:21` — Upstream adoptions review/acceptance execution plan завершён до стабильного contract state: runtime `intake-adoptions`, helper state layer, agent-guided review APIs и operator runbook уже реализованы и провалидированы. — Это снимает последний sequencing blocker для `rebuild-master` как planning workstream. — Следующий шаг теперь не ждать upstream readiness, а разложить сам `rebuild-master` на code-facing implementation milestones.
 
 ## Progress log
 
@@ -150,18 +151,19 @@
 - `2026-04-22 11:42` — M2 contract decision закрыт по ответу owner: canonical approved staging layer — `adoptions/accepted/MASTER.md`, а `knowledge/roles/` пересматривается в отдельном review process и не является direct input для `rebuild-master`. — Это снимает product ambiguity внутри самого `rebuild-master`, но переводит блокировку на upstream process planning. — Status: `blocked`.
 - `2026-04-22 13:50` — Upstream plan review/acceptance закрыл session-shape ambiguity: separate intake stage, shared `adoptions/questions/open.md` ledger и interactive Q&A session уже зафиксированы. — `rebuild-master` по-прежнему blocked, но теперь ожидает не product decision, а только implementation-ready decomposition upstream workflow. — Status: `blocked`.
 - `2026-04-22 15:53` — Upstream review/acceptance перешёл из planning в execution: создан отдельный implementation plan с первым активным milestone по deterministic intake workflow. — `rebuild-master` остаётся blocked, но теперь уже на явной execution dependency. — Status: `blocked`.
+- `2026-04-22 17:21` — Upstream workflow family закрыт до стабильного `inbox/questions/accepted` contract и handoff зафиксирован в public/runtime docs. — `rebuild-master` больше не blocked и может переходить в собственный implementation planning milestone M3. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M3`
-- Current status: `blocked`
-- Next step: `Дождаться выполнения upstream execution plan `2026-04-22-implement-adoptions-review-and-acceptance-workflow.md` как минимум до стабильного intake/questions/accepted contract, затем разложить `rebuild-master` на собственные кодовые implementation milestones.`
+- Current status: `in_progress`
+- Next step: `Разложить `rebuild-master` на собственные code-facing implementation milestones, опираясь на уже зафиксированный upstream contract `adoptions/inbox -> questions/open -> accepted/MASTER.md`.`
 - Active blockers:
-  - Upstream review/acceptance process ещё не реализован до стабильного execution contract.
+  - none
 - Open questions:
   - Должен ли `rebuild-master` дополнительно формировать change report/diff artifact рядом с `MASTER.md`, или достаточно обновления самого файла?
   - Нужен ли batching policy для `accepted/MASTER.md`, чтобы merge в `MASTER` работал по срезам, а не по всему файлу целиком?
 
 ## Completion summary
 
-Заполняется после завершения всех milestones. На текущем этапе baseline и product contract уже зафиксированы; текущий blocker для `rebuild-master` теперь чисто sequencing-oriented и связан с тем, что upstream review/acceptance workflow ещё не реализован до стабильного execution contract.
+Заполняется после завершения всех milestones. На текущем этапе baseline и product contract уже зафиксированы, а upstream review/acceptance workflow family доведён до стабильного execution contract; оставшаяся работа для `rebuild-master` — собственная decomposition и последующая реализация.
