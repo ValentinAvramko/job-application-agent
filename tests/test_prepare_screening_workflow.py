@@ -40,7 +40,9 @@ class PrepareScreeningWorkflowTests(unittest.TestCase):
         ingest = IngestVacancyWorkflow()
         prepare = PrepareScreeningWorkflow()
 
-        with patch("application_agent.workflows.ingest_vacancy.append_ingest_record", return_value=7):
+        with patch("application_agent.workflows.ingest_vacancy.validate_response_monitoring_workbook", return_value=None), patch(
+            "application_agent.workflows.ingest_vacancy.append_ingest_record", return_value=7
+        ):
             ingest.run(
                 layout=layout,
                 store=store,
@@ -113,7 +115,9 @@ class PrepareScreeningWorkflowTests(unittest.TestCase):
             ],
         )
 
-        with patch("application_agent.workflows.ingest_vacancy.append_ingest_record", return_value=11):
+        with patch("application_agent.workflows.ingest_vacancy.validate_response_monitoring_workbook", return_value=None), patch(
+            "application_agent.workflows.ingest_vacancy.append_ingest_record", return_value=11
+        ):
             IngestVacancyWorkflow().run(
                 layout=layout,
                 store=store,

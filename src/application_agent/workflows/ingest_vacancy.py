@@ -3,7 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timezone
 
-from application_agent.integrations.response_monitoring import ResponseMonitoringIngestRecord, append_ingest_record
+from application_agent.integrations.response_monitoring import (
+    ResponseMonitoringIngestRecord,
+    append_ingest_record,
+    validate_response_monitoring_workbook,
+)
 from application_agent.memory.models import WorkflowRun
 from application_agent.memory.store import JsonMemoryStore
 from application_agent.utils.placeholders import is_unspecified
@@ -168,6 +172,8 @@ class IngestVacancyWorkflow:
 
         base_id = build_vacancy_id(request.ingest_date, request.company, request.position)
         vacancy_id = resolve_vacancy_id(layout, base_id)
+        response_monitoring_path = layout.root / "response-monitoring.xlsx"
+        validate_response_monitoring_workbook(response_monitoring_path)
         vacancy_dir = layout.vacancy_dir(vacancy_id)
         vacancy_dir.mkdir(parents=True, exist_ok=True)
 
@@ -181,7 +187,6 @@ class IngestVacancyWorkflow:
         source_path.write_text(self._render_source(request, vacancy_id), encoding="utf-8", newline="\n")
         analysis_path.write_text(self._render_analysis(vacancy_id, request), encoding="utf-8", newline="\n")
         adoptions_path.write_text(self._render_adoptions(vacancy_id), encoding="utf-8", newline="\n")
-        response_monitoring_path = layout.root / "response-monitoring.xlsx"
         excel_row = append_ingest_record(response_monitoring_path, build_response_monitoring_record(request, vacancy_id))
         meta_payload = load_simple_yaml(meta_path)
         meta_payload["excel_row"] = excel_row

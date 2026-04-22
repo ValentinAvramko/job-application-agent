@@ -38,6 +38,7 @@ python run_agent.py --root ../.. show-memory
   Показывает доступные runtime workflow, которые можно запускать через CLI. Setup-команда `bootstrap` в этот список не входит.
 - `python run_agent.py --root ../.. ingest-vacancy --company "Example" --position "Engineering Manager" --source-channel "Manual" --source-text "Short vacancy text"`
   Создаёт карточку вакансии, заполняет `meta.yml`, `source.md`, `analysis.md`, `adoptions.md`, добавляет строку в `response-monitoring.xlsx` и обновляет runtime memory.
+  Перед запуском в root workspace должен существовать валидный `response-monitoring.xlsx`; без него `ingest-vacancy` завершится ошибкой и не создаст vacancy scaffold.
   Публикация в git не выполняется автоматически: commit/push остаются отдельным ручным шагом по `tooling/git-workflow.md`.
 - `python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager`
   Выполняет стартовый анализ уже созданной вакансии: подбирает ролевое резюме и формирует начальный fit-анализ.
@@ -59,7 +60,7 @@ python run_agent.py --root ../.. show-memory
 - `src/application_agent/workflows/vacancy_rendering.py`
   rendering-слой: генерация `meta.yml`, `source.md`, `analysis.md`, `adoptions.md`.
 - `src/application_agent/integrations/response_monitoring.py`
-  доменная интеграция с `response-monitoring.xlsx`: добавление строки ingest и возврат `excel_row`.
+  доменная интеграция с `response-monitoring.xlsx`: проверка mandatory workbook prerequisite, добавление строки ingest и возврат `excel_row`.
 - `src/application_agent/integrations/playwright_renderer.py`
   isolated browser fallback для сайтов, где обычный HTML-fetch не даёт полного содержимого вакансии.
 - `src/application_agent/normalization/`

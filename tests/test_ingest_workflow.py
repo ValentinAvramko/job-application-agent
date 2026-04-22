@@ -130,7 +130,9 @@ class IngestWorkflowTests(unittest.TestCase):
         store.bootstrap()
         workflow = build_default_registry().get("ingest-vacancy")
 
-        with patch("application_agent.workflows.ingest_vacancy.append_ingest_record", return_value=3):
+        with patch("application_agent.workflows.ingest_vacancy.validate_response_monitoring_workbook", return_value=None), patch(
+            "application_agent.workflows.ingest_vacancy.append_ingest_record", return_value=3
+        ):
             result = workflow.run(
                 layout=layout,
                 store=store,
@@ -190,7 +192,9 @@ class IngestWorkflowTests(unittest.TestCase):
                 work_schedule="5/2",
                 key_skills=["DevSecOps", "CI/CD"],
             ),
-        ), patch("application_agent.workflows.ingest_vacancy.append_ingest_record", return_value=42):
+        ), patch("application_agent.workflows.ingest_vacancy.validate_response_monitoring_workbook", return_value=None), patch(
+            "application_agent.workflows.ingest_vacancy.append_ingest_record", return_value=42
+        ):
             result = workflow.run(
                 layout=layout,
                 store=store,
@@ -243,6 +247,55 @@ class IngestWorkflowTests(unittest.TestCase):
                 ingest_date=date(2026, 4, 21),
             ),
         )
+
+    def test_ingest_requires_existing_response_monitoring_workbook(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f"ingest-workflow-missing-workbook-{uuid.uuid4().hex}"
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+
+        layout = WorkspaceLayout(workspace_dir)
+        layout.bootstrap()
+        store = JsonMemoryStore(layout)
+        store.bootstrap()
+        workflow = build_default_registry().get("ingest-vacancy")
+        request = IngestVacancyRequest(
+            company="Citix",
+            position="CIO",
+            source_text="Platform strategy and team leadership.",
+            ingest_date=date(2026, 4, 22),
+        )
+
+        with self.assertRaisesRegex(FileNotFoundError, "response-monitoring.xlsx"):
+            workflow.run(layout=layout, store=store, request=request)
+
+        vacancy_id = build_vacancy_id(request.ingest_date, request.company, request.position)
+        self.assertFalse(layout.vacancy_dir(vacancy_id).exists())
+
+    def test_ingest_requires_valid_response_monitoring_workbook(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f"ingest-workflow-invalid-workbook-{uuid.uuid4().hex}"
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+
+        layout = WorkspaceLayout(workspace_dir)
+        layout.bootstrap()
+        store = JsonMemoryStore(layout)
+        store.bootstrap()
+        (workspace_dir / "response-monitoring.xlsx").write_text("not a workbook", encoding="utf-8")
+        workflow = build_default_registry().get("ingest-vacancy")
+        request = IngestVacancyRequest(
+            company="Citix",
+            position="CIO",
+            source_text="Platform strategy and team leadership.",
+            ingest_date=date(2026, 4, 22),
+        )
+
+        with self.assertRaisesRegex(ValueError, "valid .xlsx file"):
+            workflow.run(layout=layout, store=store, request=request)
+
+        vacancy_id = build_vacancy_id(request.ingest_date, request.company, request.position)
+        self.assertFalse(layout.vacancy_dir(vacancy_id).exists())
 
     def test_append_ingest_record_writes_columns_a_to_k(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"

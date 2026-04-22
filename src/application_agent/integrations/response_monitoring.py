@@ -5,7 +5,7 @@ from datetime import date
 from io import BytesIO
 from pathlib import Path
 from xml.etree import ElementTree as ET
-from zipfile import ZIP_DEFLATED, ZipFile
+from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 from application_agent.normalization.source_channels import normalize_response_method
 from application_agent.utils.placeholders import display_or_unspecified
@@ -35,12 +35,49 @@ class ResponseMonitoringIngestRecord:
     ingest_date: date
 
 
+def validate_response_monitoring_workbook(workbook_path: Path) -> None:
+    if not workbook_path.exists():
+        raise FileNotFoundError(
+            f"Missing required workbook '{workbook_path}'. "
+            "Current ingest-vacancy flow requires response-monitoring.xlsx before it can create vacancy artifacts."
+        )
+
+    try:
+        with ZipFile(workbook_path) as workbook:
+            workbook_xml = ET.fromstring(workbook.read("xl/workbook.xml"))
+            relationships_xml = ET.fromstring(workbook.read("xl/_rels/workbook.xml.rels"))
+            sheet_path = find_response_monitoring_sheet_path(workbook_xml, relationships_xml)
+            sheet_xml = ET.fromstring(workbook.read(sheet_path))
+        collect_sheet_rows(sheet_xml)
+    except BadZipFile as exc:
+        raise ValueError(
+            f"Workbook '{workbook_path}' is not a valid .xlsx file. "
+            "Restore a working response-monitoring.xlsx before running ingest-vacancy."
+        ) from exc
+    except KeyError as exc:
+        raise ValueError(
+            f"Workbook '{workbook_path}' is missing required Excel parts. "
+            "Restore a valid response-monitoring.xlsx before running ingest-vacancy."
+        ) from exc
+    except ET.ParseError as exc:
+        raise ValueError(
+            f"Workbook '{workbook_path}' contains invalid XML. "
+            "Restore a valid response-monitoring.xlsx before running ingest-vacancy."
+        ) from exc
+    except ValueError as exc:
+        raise ValueError(
+            f"Workbook '{workbook_path}' does not match the expected Response Monitoring format: {exc}"
+        ) from exc
+
+
 def append_ingest_record(
     workbook_path: Path,
     record: ResponseMonitoringIngestRecord,
     *,
     row_index: int | None = None,
 ) -> int:
+    validate_response_monitoring_workbook(workbook_path)
+
     with ZipFile(workbook_path) as workbook:
         workbook_xml = ET.fromstring(workbook.read("xl/workbook.xml"))
         relationships_xml = ET.fromstring(workbook.read("xl/_rels/workbook.xml.rels"))
