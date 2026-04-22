@@ -25,6 +25,10 @@ class WorkspaceLayout:
         return self.root / "profile"
 
     @property
+    def resumes_dir(self) -> Path:
+        return self.root / "resumes"
+
+    @property
     def agent_memory_dir(self) -> Path:
         return self.root / "agent_memory"
 

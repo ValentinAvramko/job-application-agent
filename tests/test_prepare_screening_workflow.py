@@ -175,9 +175,9 @@ def build_workspace(prefix: str) -> tuple[Path, WorkspaceLayout, JsonMemoryStore
 
 
 def write_resume(workspace_dir: Path, role: str, lines: list[str]) -> None:
-    cv_dir = workspace_dir / "CV"
-    cv_dir.mkdir(parents=True, exist_ok=True)
-    (cv_dir / f"{role}.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    resumes_dir = workspace_dir / "resumes"
+    resumes_dir.mkdir(parents=True, exist_ok=True)
+    (resumes_dir / f"{role}.md").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

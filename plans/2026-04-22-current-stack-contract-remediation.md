@@ -4,7 +4,7 @@
 - Slug: `2026-04-22-current-stack-contract-remediation`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 10:14`
+- Last updated: `2026-04-22 10:17`
 - Overall status: `in_progress`
 
 ## Objective
@@ -86,7 +86,7 @@ Completion gate из `2026-04-22-current-workflow-completion-gate.md` зафик
 
 ### M2. Resume Path Alignment
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - убрать runtime/path drift между `CV/` и `resumes/`.
 - Deliverables:
@@ -97,10 +97,11 @@ Completion gate из `2026-04-22-current-workflow-completion-gate.md` зафик
   - current stack does not require `CV/` to exist;
   - tests and runbook reflect `resumes/` as the only supported path.
 - Validation commands:
-  - `rg -n "\bCV\b|CV/|CV\\\\" src tests README.md "C:\Users\avramko\OneDrive\Documents\Career\tooling\run-ingest-analyze.md"`
+  - `rg -n -e 'CV/' -e 'CV\\\\' -e '"CV"' src/application_agent/workflows tests/test_analyze_workflow.py tests/test_prepare_screening_workflow.py README.md "C:\Users\avramko\OneDrive\Documents\Career\tooling\run-ingest-analyze.md"`
   - `python -m unittest tests.test_analyze_workflow tests.test_prepare_screening_workflow`
 - Notes / discoveries:
-  - none yet
+  - `analyze-vacancy` и adjacent `prepare-screening` разделяют один и тот же contract выбора ролевого резюме, поэтому path remediation выполнен для обеих точек, а не только для active workflow.
+  - Для устранения повторяющегося drift добавлен `WorkspaceLayout.resumes_dir`, чтобы выбор resume-root больше не дублировался строковыми литералами.
 
 ### M3. Explicit Excel Prerequisite Contract
 
@@ -144,22 +145,23 @@ Completion gate из `2026-04-22-current-workflow-completion-gate.md` зафик
 
 - `2026-04-22 10:03` — Remediation выделен в отдельный execution plan после завершения completion gate. — Gate уже определил blocker-ы и не должен смешиваться с их реализацией. — Это делает следующий шаг конкретным и проверяемым.
 - `2026-04-22 10:03` — `bootstrap` трактуется как setup-only command, `resumes/` как единственный resume root, а `response-monitoring.xlsx` как mandatory dependency текущего ingest path. — Эти решения уже приняты gate-планом и теперь требуют кодовой/документационной реализации. — Scope remediation ограничен только этим.
+- `2026-04-22 10:17` — Для M2 path remediation в scope включён и adjacent `prepare-screening.py`. — Он использует тот же contract выбора resume-root, что и `analyze-vacancy`, поэтому частичная правка оставила бы новый drift в соседнем workflow surface. — Это расширяет remediation не по feature scope, а по границе одного и того же path contract.
 
 ## Progress log
 
 - `2026-04-22 10:03` — Plan создан как follow-up после завершения completion gate. — На старте workstream-а blockers уже локализованы: catalog drift, resume path drift и implicit Excel prerequisite. — Status: `in_progress`.
 - `2026-04-22 10:14` — M1 закрыт: `bootstrap` удалён из canonical workflow catalog, а sync project memory теперь переписывает legacy catalog к точному runtime-списку. — `python run_agent.py --root ../.. list-workflows` показывает только `analyze-vacancy` и `ingest-vacancy`; `python -m unittest tests.test_memory_store tests.test_cli` -> `5 tests, OK`. — Status: `done`.
+- `2026-04-22 10:17` — M2 закрыт: active и adjacent resume code paths переведены с `CV/` на `resumes/`, operator-facing runbook синхронизирован, а тестовые fixtures теперь создают ролевые резюме только в `resumes/`. — Targeted search по workflow/tests/runbook не находит `CV` path references, `python -m unittest tests.test_analyze_workflow tests.test_prepare_screening_workflow` -> `5 tests, OK`. — Status: `done`.
 
 ## Current state
 
-- Current milestone: `M2`
+- Current milestone: `M3`
 - Current status: `in_progress`
-- Next step: `Выровнять активные и adjacent code paths с canonical root `resumes/`, начиная с `analyze-vacancy`, tests и operator-facing runbook.`
+- Next step: `Сделать contract `response-monitoring.xlsx` явным в коде, tests, README и operator-facing docs как mandatory prerequisite ingest path.`
 - Active blockers:
-  - `CV/` -> `resumes/` path drift
   - implicit Excel prerequisite
 - Open questions:
-  - Стоит ли в M2 ограничиться current stack (`analyze-vacancy` + docs/tests) или сразу синхронизировать и adjacent `prepare_screening.py`, чтобы не оставлять новый drift рядом с активным стеком?
+  - Какой failure message и operator guidance должны считаться canonical, если `response-monitoring.xlsx` отсутствует или невалиден?
 
 ## Completion summary
 

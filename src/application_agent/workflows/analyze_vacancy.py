@@ -210,7 +210,7 @@ class AnalyzeVacancyWorkflow:
         include_employer_channels = request.include_employer_channels or bool(meta.get("include_employer_channels", False))
         selected_resume = request.selected_resume.strip() or choose_resume(position=position, source_text=raw_source)
 
-        resume_path = layout.root / "CV" / f"{selected_resume}.md"
+        resume_path = layout.resumes_dir / f"{selected_resume}.md"
         resume_text = resume_path.read_text(encoding="utf-8") if resume_path.exists() else ""
 
         requirements = extract_requirements(position=position, source_text=raw_source)

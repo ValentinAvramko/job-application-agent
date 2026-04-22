@@ -28,9 +28,9 @@ class AnalyzeWorkflowTests(unittest.TestCase):
         store = JsonMemoryStore(layout)
         store.bootstrap()
 
-        cv_dir = workspace_dir / "CV"
-        cv_dir.mkdir(parents=True, exist_ok=True)
-        (cv_dir / "HoD.md").write_text(
+        resumes_dir = workspace_dir / "resumes"
+        resumes_dir.mkdir(parents=True, exist_ok=True)
+        (resumes_dir / "HoD.md").write_text(
             "\n".join(
                 [
                     "# HoD Resume",

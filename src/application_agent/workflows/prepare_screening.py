@@ -73,10 +73,10 @@ class PrepareScreeningWorkflow:
             raw_source=raw_source,
         )
 
-        resume_path = layout.root / "CV" / f"{selected_resume}.md"
+        resume_path = layout.resumes_dir / f"{selected_resume}.md"
         if not resume_path.exists():
             raise FileNotFoundError(
-                f"Selected resume '{selected_resume}' is missing from CV/. "
+                f"Selected resume '{selected_resume}' is missing from resumes/. "
                 "Add the resume file or pass --selected-resume with an existing role resume."
             )
 
