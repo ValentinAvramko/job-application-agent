@@ -4,8 +4,8 @@
 - Slug: `2026-04-21-prepare-screening-workflow`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-22 10:58`
-- Overall status: `in_progress`
+- Last updated: `2026-04-22 11:08`
+- Overall status: `done`
 
 ## Objective
 
@@ -111,7 +111,7 @@ M1 этого плана уже реализовал ядро `prepare-screening
 
 ### M3. Full Validation And Real-Scenario Smoke Check
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - прогнать end-to-end validation на полном наборе тестов и одном реальном vacancy-local сценарии, затем зафиксировать итоговый контракт.
 - Deliverables:
@@ -137,6 +137,7 @@ M1 этого плана уже реализовал ядро `prepare-screening
 - `2026-04-22 10:26` — Master M4 завершён, поэтому dependency gate для продолжения `prepare-screening` снят. — Это не делает план автоматически следующим шагом без переоценки очередности remaining workflows, но переводит его из `blocked` обратно в `planned`. — Дальше план должен рассматриваться уже внутри master M5.
 - `2026-04-22 10:41` — После revalidation внутри master M5 этот plan подтверждён как следующий remaining-workflow execution step. — Основание: `prepare-screening` уже имеет реализованное ядро и unit coverage, а остальные planned workflows всё ещё зависят от незакрытых root/product contracts. — M2 можно возобновлять без изменения scope.
 - `2026-04-22 10:58` — M2 закрыт: `prepare-screening` добавлен в runtime registry, CLI parser и `WORKFLOW_CATALOG`, а operator-facing surface синхронизирован через `README.md` и `agent_memory/workflows/prepare-screening.md`. — Это делает workflow видимым через `list-workflows` и доступным через `run_agent.py --root ../.. prepare-screening ...` без расширения side-effect boundary. — Следующий шаг смещён на полную validation и реальный smoke run.
+- `2026-04-22 11:08` — M3 закрыт: full `unittest` baseline прошёл (`43 tests, OK`), а реальный smoke run на `20260421-fintehrobot-head-of-development-rukovoditel-razrabotki` создал новый `screening.md`, обновил `meta.yml` до `screening_prepared` и записал запуск в runtime memory. — Это подтверждает, что workflow работоспособен не только в isolated tests, но и на реальном vacancy-local контуре без Excel/git side effects. — План целиком можно переводить в `done` и возвращать в master M5.
 
 ## Progress log
 
@@ -147,12 +148,13 @@ M1 этого плана уже реализовал ядро `prepare-screening
 - `2026-04-22 10:26` — План переведён из `blocked` в `planned` после закрытия master M4 и remediation по current stack. — Следующий шаг теперь не ждать completion gate, а переоценить, остается ли `prepare-screening` первым кандидатом в M5 ordered planning. — Status: `planned`.
 - `2026-04-22 10:41` — Переоценка в master M5 завершена: `prepare-screening` остаётся первым исполнимым workflow в очереди, поэтому M2 переведён в активную реализацию. — Дополнительной продуктовой развилки на этом шаге не обнаружено; работа продолжается через CLI/catalog/operator integration. — Status: `in_progress`.
 - `2026-04-22 10:58` — M2 завершён: targeted validation (`python -m unittest tests.test_cli tests.test_memory_store tests.test_prepare_screening_workflow`) прошла, а `python run_agent.py --root ../.. list-workflows` теперь показывает `prepare-screening` рядом с остальными runtime workflows. — План переводится на M3 full validation и real-scenario smoke check. — Status: `in_progress`.
+- `2026-04-22 11:08` — M3 завершён: `python -m unittest discover -s tests` остаётся зелёным, а реальный `prepare-screening` smoke run отработал на существующей вакансии и создал `vacancies/20260421-fintehrobot-head-of-development-rukovoditel-razrabotki/screening.md`. — План завершён полностью; следующий execution step должен вернуться в master M5 и открыть следующий remaining-workflow plan. — Status: `done`.
 
 ## Current state
 
 - Current milestone: `M3`
-- Current status: `in_progress`
-- Next step: `Прогнать `python -m unittest discover -s tests` и выполнить реальный smoke run `python run_agent.py --root ../.. prepare-screening --vacancy-id 20260421-fintehrobot-head-of-development-rukovoditel-razrabotki`, затем зафиксировать итоговый contract M3.`
+- Current status: `done`
+- Next step: `Вернуться в master plan M5 и открыть dedicated plan для следующего workflow-кандидата `rebuild-master`, начиная с contract/source-of-truth clarification по permanent signals и accepted adoptions.`
 - Active blockers:
   - none
 - Open questions:
@@ -160,4 +162,20 @@ M1 этого плана уже реализовал ядро `prepare-screening
 
 ## Completion summary
 
-Заполняется после завершения всех milestones. На текущем этапе M1 и M2 закрыты; downstream contract для структуры `screening.md` остаётся возможным follow-up после полного M3 smoke-check на реальной вакансии.
+- Поставлено:
+  - ядро `prepare-screening` с vacancy-local `screening.md` и runtime updates;
+  - runtime wiring в CLI, registry и `WORKFLOW_CATALOG`;
+  - operator-facing documentation в `README.md` и `agent_memory/workflows/prepare-screening.md`.
+- Провалидировано:
+  - `python -m unittest tests.test_prepare_screening_workflow`
+  - `python -m unittest tests.test_cli tests.test_memory_store tests.test_prepare_screening_workflow`
+  - `python -m unittest discover -s tests`
+  - `python run_agent.py --root ../.. list-workflows`
+  - `python run_agent.py --root ../.. prepare-screening --vacancy-id 20260421-fintehrobot-head-of-development-rukovoditel-razrabotki`
+- Оставшиеся follow-up задачи:
+  - при необходимости формализовать downstream contract для структуры `screening.md`, если на него начнут опираться следующие workflow;
+  - решить, нужен ли отдельный review/normalization слой для ручной доработки screening-пакета.
+- Остаточные риски:
+  - реальный `screening.md` по-прежнему строится от текущего формата `analysis.md`, поэтому крупная перестройка анализа потребует синхронного обновления этого workflow.
+- Были ли затронуты артефакты корневого репозитория:
+  - да: создан `vacancies/20260421-fintehrobot-head-of-development-rukovoditel-razrabotki/screening.md`, обновлены `meta.yml`, runtime memory и private workflow contract в `agent_memory/workflows/prepare-screening.md`.

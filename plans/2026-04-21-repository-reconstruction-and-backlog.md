@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-22 10:58`
+- Last updated: `2026-04-22 11:08`
 - Overall status: `in_progress`
 
 ## Objective
@@ -221,6 +221,7 @@
 - `2026-04-22 10:26` — Remediation plan завершён полностью: финальная validation подтвердила согласованность `list-workflows` и runtime memory, допустимость report-first stale history и зелёный full `unittest` baseline (`42 tests, OK`). — Master M4 можно считать закрытым; dependency gate перед M5 снят. — Следующий execution focus переносится на ordered planning remaining workflows.
 - `2026-04-22 10:41` — M5 переведён в исполнение: после повторной сверки ordered backlog и существующих планов первым remaining workflow выбран `prepare-screening`. — У него уже есть реализованное ядро и test coverage, а остальные workflow по-прежнему упираются в незакрытые root/product contracts. — Следующий execution focus смещён на M2 плана `2026-04-21-prepare-screening-workflow.md`.
 - `2026-04-22 10:58` — Первый execution milestone внутри M5 закрыт: `prepare-screening` встроен в runtime CLI/catalog surface и подтверждён targeted validation. — Это превращает plan из latent implementation branch в реально доступный workflow текущего стека. — Следующий execution focus смещён на M3 того же плана: full suite и real-scenario smoke run.
+- `2026-04-22 11:08` — `prepare-screening` завершён как первый remaining workflow: full suite остаётся зелёным, а smoke run на реальной вакансии подтвердил создание `screening.md`, update `meta.yml` и runtime-memory trail без выхода за vacancy-local boundary. — Это закрывает первый execution branch внутри M5. — Следующий execution focus смещён на открытие dedicated plan для `rebuild-master`, где пока не определены permanent-signal/accepted-adoption contracts.
 
 ## Progress log
 
@@ -241,12 +242,13 @@
 - `2026-04-22 10:26` — Master M4 закрыт: `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory` и `python -m unittest discover -s tests` подтверждают, что current stack больше не имеет скрытых contract blocker-ов для feature planning. — Следующий этап master sequencing смещён на M5 ordered planning for remaining workflows. — Status: `done`.
 - `2026-04-22 10:41` — M5 revalidation завершена: evidence из safety/root plans и текущего кода подтверждает, что `prepare-screening` остаётся первым исполнимым кандидатом, потому что уже имеет runtime core, тогда как `rebuild-master`, `rebuild-role-resume`, `build-linkedin` и `export-resume-pdf` всё ещё зависят от отдельных downstream contracts. — Кодовая реализация M5 начинается с CLI/catalog/operator integration для `prepare-screening`. — Status: `in_progress`.
 - `2026-04-22 10:58` — CLI/catalog/operator integration для `prepare-screening` завершена: targeted tests и `list-workflows` подтверждают, что workflow теперь зарегистрирован и доступен через public entrypoint. — Master M5 остаётся активным, потому что для полного handoff этого первого remaining workflow ещё нужен M3 smoke-check на реальном vacancy scenario. — Status: `in_progress`.
+- `2026-04-22 11:08` — Первый remaining workflow закрыт end-to-end: `prepare-screening` теперь реализован, провалидирован и опробован на реальной вакансии. — Master M5 продолжается уже не вокруг этого workflow, а вокруг следующего dependency-gated этапа `rebuild-master`. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M5`
 - Current status: `in_progress`
-- Next step: `Закрыть M3 в `2026-04-21-prepare-screening-workflow.md`: прогнать full `unittest` baseline и выполнить реальный smoke run `prepare-screening` на существующей вакансии.`
+- Next step: `Открыть dedicated plan для `rebuild-master` и сначала зафиксировать contract/source-of-truth для permanent signals, accepted adoptions и destination layer перед любой реализацией workflow.`
 - Active blockers:
   - none
 - Open questions:
