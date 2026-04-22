@@ -8,6 +8,7 @@ from application_agent.memory.store import JsonMemoryStore
 from application_agent.workspace import WorkspaceLayout
 from application_agent.workflows.analyze_vacancy import AnalyzeVacancyRequest
 from application_agent.workflows.ingest_vacancy import IngestVacancyRequest
+from application_agent.workflows.prepare_screening import PrepareScreeningRequest
 from application_agent.workflows.registry import build_default_registry
 
 
@@ -49,6 +50,15 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--target-mode", default="")
     analyze.add_argument("--selected-resume", default="")
     analyze.add_argument("--include-employer-channels", action="store_true")
+
+    prepare = subparsers.add_parser(
+        "prepare-screening",
+        help="Build screening.md for an already ingested and analyzed vacancy.",
+    )
+    prepare.add_argument("--vacancy-id", default="")
+    prepare.add_argument("--selected-resume", default="")
+    prepare.add_argument("--output-language", default="")
+    prepare.add_argument("--preparation-depth", default="")
     return parser
 
 
@@ -117,6 +127,18 @@ def main() -> int:
             include_employer_channels=args.include_employer_channels,
         )
         workflow = build_default_registry().get("analyze-vacancy")
+        result = workflow.run(layout=layout, store=store, request=request)
+        print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "prepare-screening":
+        request = PrepareScreeningRequest(
+            vacancy_id=args.vacancy_id,
+            selected_resume=args.selected_resume,
+            output_language=args.output_language,
+            preparation_depth=args.preparation_depth,
+        )
+        workflow = build_default_registry().get("prepare-screening")
         result = workflow.run(layout=layout, store=store, request=request)
         print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
         return 0

@@ -4,8 +4,8 @@
 - Slug: `2026-04-21-prepare-screening-workflow`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-22 10:26`
-- Overall status: `planned`
+- Last updated: `2026-04-22 10:58`
+- Overall status: `in_progress`
 
 ## Objective
 
@@ -92,7 +92,7 @@ M1 этого плана уже реализовал ядро `prepare-screening
 
 ### M2. CLI, Catalog, And Operator Surface
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - встроить новый workflow в registry/catalog/CLI и синхронизировать operator-facing contract.
 - Deliverables:
@@ -135,6 +135,8 @@ M1 этого плана уже реализовал ядро `prepare-screening
 - `2026-04-21 19:15` — После завершения M1 выполнение плана поставлено на паузу по запросу пользователя. — План переведен в `blocked`, чтобы пауза была отражена в source of truth. — M2 не продолжается без явного возобновления.
 - `2026-04-21 19:51` — После обновления master plan `prepare-screening` больше не считается следующим execution step. — До его продолжения должны быть завершены repository cleanup и current workflow completion gate. — План остается `blocked` уже не только из-за паузы, но и из-за новой последовательности реализации.
 - `2026-04-22 10:26` — Master M4 завершён, поэтому dependency gate для продолжения `prepare-screening` снят. — Это не делает план автоматически следующим шагом без переоценки очередности remaining workflows, но переводит его из `blocked` обратно в `planned`. — Дальше план должен рассматриваться уже внутри master M5.
+- `2026-04-22 10:41` — После revalidation внутри master M5 этот plan подтверждён как следующий remaining-workflow execution step. — Основание: `prepare-screening` уже имеет реализованное ядро и unit coverage, а остальные planned workflows всё ещё зависят от незакрытых root/product contracts. — M2 можно возобновлять без изменения scope.
+- `2026-04-22 10:58` — M2 закрыт: `prepare-screening` добавлен в runtime registry, CLI parser и `WORKFLOW_CATALOG`, а operator-facing surface синхронизирован через `README.md` и `agent_memory/workflows/prepare-screening.md`. — Это делает workflow видимым через `list-workflows` и доступным через `run_agent.py --root ../.. prepare-screening ...` без расширения side-effect boundary. — Следующий шаг смещён на полную validation и реальный smoke run.
 
 ## Progress log
 
@@ -143,18 +145,19 @@ M1 этого плана уже реализовал ядро `prepare-screening
 - `2026-04-21 19:15` — После успешного завершения M1 план переведен в паузу по запросу пользователя. — Дополнительная валидация не требовалась, так как код и план уже были в зеленом состоянии перед паузой. — Status: `blocked`.
 - `2026-04-21 19:51` — План синхронизирован с новой master-plan последовательностью. — Дополнительной кодовой валидации не проводилось, так как менялась только очередность реализации. — Status: `blocked`.
 - `2026-04-22 10:26` — План переведён из `blocked` в `planned` после закрытия master M4 и remediation по current stack. — Следующий шаг теперь не ждать completion gate, а переоценить, остается ли `prepare-screening` первым кандидатом в M5 ordered planning. — Status: `planned`.
+- `2026-04-22 10:41` — Переоценка в master M5 завершена: `prepare-screening` остаётся первым исполнимым workflow в очереди, поэтому M2 переведён в активную реализацию. — Дополнительной продуктовой развилки на этом шаге не обнаружено; работа продолжается через CLI/catalog/operator integration. — Status: `in_progress`.
+- `2026-04-22 10:58` — M2 завершён: targeted validation (`python -m unittest tests.test_cli tests.test_memory_store tests.test_prepare_screening_workflow`) прошла, а `python run_agent.py --root ../.. list-workflows` теперь показывает `prepare-screening` рядом с остальными runtime workflows. — План переводится на M3 full validation и real-scenario smoke check. — Status: `in_progress`.
 
 ## Current state
 
-- Current milestone: `M2`
-- Current status: `planned`
-- Next step: `В рамках master M5 переоценить этот plan после закрытия current-stack remediation и решить, возобновляется ли он следующим remaining workflow без изменения scope.`
+- Current milestone: `M3`
+- Current status: `in_progress`
+- Next step: `Прогнать `python -m unittest discover -s tests` и выполнить реальный smoke run `python run_agent.py --root ../.. prepare-screening --vacancy-id 20260421-fintehrobot-head-of-development-rukovoditel-razrabotki`, затем зафиксировать итоговый contract M3.`
 - Active blockers:
-  - Master M5 ещё не подтвердил итоговый порядок remaining workflow plans.
+  - none
 - Open questions:
-  - Нужно ли после M3/M4 продолжать именно этот implementation plan или переоткрыть `prepare-screening` уже в новой очереди remaining workflows?
   - Нужен ли более формальный downstream contract для структуры `screening.md`, если от него будут зависеть следующие workflow?
 
 ## Completion summary
 
-Заполняется после завершения всех milestones. На текущем этапе M1 закрыт, а дальнейшее продолжение плана заблокировано новой master-plan последовательностью.
+Заполняется после завершения всех milestones. На текущем этапе M1 и M2 закрыты; downstream contract для структуры `screening.md` остаётся возможным follow-up после полного M3 smoke-check на реальной вакансии.

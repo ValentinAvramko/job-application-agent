@@ -54,7 +54,7 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual([item["name"] for item in payload], ["analyze-vacancy", "ingest-vacancy"])
+        self.assertEqual([item["name"] for item in payload], ["analyze-vacancy", "ingest-vacancy", "prepare-screening"])
 
     def test_ingest_cli_returns_workflow_result_without_git_publication_suffix(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
@@ -96,6 +96,45 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("git commit", payload["summary"])
         self.assertNotIn("git push", payload["summary"])
 
+    def test_prepare_screening_cli_routes_to_prepare_workflow(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f"cli-prepare-{uuid.uuid4().hex}"
+        workspace_dir.mkdir(parents=True, exist_ok=True)
 
+        result = WorkflowResult(
+            workflow="prepare-screening",
+            status="completed",
+            summary="Prepared screening package for vacancy 20260421-example-role.",
+            artifacts=[str(workspace_dir / "vacancies" / "20260421-example-role" / "screening.md")],
+        )
+        registry = _FakeRegistry(result)
+        stdout = io.StringIO()
+
+        with patch("application_agent.cli.build_default_registry", return_value=registry), patch.object(
+            sys,
+            "argv",
+            [
+                "run_agent.py",
+                "--root",
+                str(workspace_dir),
+                "prepare-screening",
+                "--vacancy-id",
+                "20260421-example-role",
+                "--selected-resume",
+                "CTO",
+                "--output-language",
+                "ru",
+                "--preparation-depth",
+                "deep",
+            ],
+        ), patch("sys.stdout", new=stdout):
+            exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(registry.requested, ["prepare-screening"])
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["workflow"], "prepare-screening")
+        self.assertIn("screening", payload["summary"])
 if __name__ == "__main__":
     unittest.main()

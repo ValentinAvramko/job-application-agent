@@ -8,7 +8,8 @@
 - registry workflow;
 - CLI setup-команда `bootstrap` для private workspace;
 - workflow `ingest-vacancy`, который создаёт каркас вакансии и обновляет runtime-память;
-- стартовый workflow `analyze-vacancy`, который выбирает ролевое резюме и собирает первый fit-анализ.
+- стартовый workflow `analyze-vacancy`, который выбирает ролевое резюме и собирает первый fit-анализ;
+- workflow `prepare-screening`, который по готовой вакансии собирает vacancy-local `screening.md` для первичного интервью.
 
 ## Структура private workspace
 
@@ -27,6 +28,7 @@ python run_agent.py --root ../.. bootstrap
 python run_agent.py --root ../.. list-workflows
 python run_agent.py --root ../.. ingest-vacancy --company "Example" --position "Engineering Manager" --source-channel "Manual" --source-text "Short vacancy text"
 python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager
+python run_agent.py --root ../.. prepare-screening --vacancy-id 20260420-example-engineering-manager
 python run_agent.py --root ../.. show-memory
 ```
 
@@ -42,6 +44,9 @@ python run_agent.py --root ../.. show-memory
   Публикация в git не выполняется автоматически: commit/push остаются отдельным ручным шагом по `tooling/git-workflow.md`.
 - `python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager`
   Выполняет стартовый анализ уже созданной вакансии: подбирает ролевое резюме и формирует начальный fit-анализ.
+- `python run_agent.py --root ../.. prepare-screening --vacancy-id 20260420-example-engineering-manager`
+  По уже ingest/analyze-подготовленной вакансии создаёт `vacancies/<vacancy_id>/screening.md`, обновляет `meta.yml` до статуса `screening_prepared` и пишет runtime memory без Excel или git side effects.
+  Обязательные входы: существующий `vacancy_id`, уже собранные `meta.yml`, `source.md`, `analysis.md`; опционально можно передать `--selected-resume`, `--output-language` и `--preparation-depth`.
 - `python run_agent.py --root ../.. show-memory`
   Показывает текущее содержимое файловой памяти агента: задачи, артефакты и журнал запусков workflow, а также reconciliation-сводку по отсутствующим vacancy artifacts.
 
