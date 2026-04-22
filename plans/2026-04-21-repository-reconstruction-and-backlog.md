@@ -1,10 +1,10 @@
-# Repository Reconstruction And Backlog
+﻿# Repository Reconstruction And Backlog
 
 - Title: `Repository reconstruction and backlog`
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-21 20:35`
+- Last updated: `2026-04-21 20:33`
 - Overall status: `in_progress`
 
 ## Objective
@@ -93,16 +93,16 @@
 
 - Status: `done`
 - Goal:
-  - зафиксировать подтверждённую карту репозитория, текущих подсистем и основных противоречий;
+  - зафиксировать подтвержденную карту репозитория, текущих подсистем и основных противоречий;
   - определить самостоятельные workstreams и опорный master plan для продолжения.
 - Deliverables:
   - этот master plan;
-  - список подтверждённых фактов, contradictions, assumptions, blockers и open questions;
+  - список подтвержденных фактов, contradictions, assumptions, blockers и open questions;
   - разбиение дальнейшей работы на отдельные планы.
 - Acceptance criteria:
   - master plan описывает текущую картину проекта без опоры на устные пояснения;
-  - перечислены ключевые подсистемы, external touchpoints и подтверждённые несоответствия;
-  - определён один конкретный `Next step` для следующей сессии.
+  - перечислены ключевые подсистемы, external touchpoints и подтвержденные несоответствия;
+  - определен один конкретный `Next step` для следующей сессии.
 - Validation commands:
   - `Get-ChildItem vacancies -Directory`
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\vacancies\20260421-dinamichno-razvivayuschayasya-sudohodnaya-kompaniya-direktor-po-tsifrovomu-razvitiyu-i-tehnologiyam-cto-02"`
@@ -130,7 +130,7 @@
   - `python run_agent.py --root ../.. show-memory`
   - `python -m unittest discover -s tests`
 - Notes / discoveries:
-  - workstream завершён отдельным планом и больше не должен трактоваться как автоматический trigger для немедленного старта нового workflow.
+  - workstream завершен отдельным планом и больше не должен трактоваться как автоматический trigger для немедленного старта нового workflow.
 
 ### M3. Repository Cleanup, Root Normalization, And Plan Artifact Migration
 
@@ -141,7 +141,7 @@
   - удалить старые plan/spec files после миграции.
 - Deliverables:
   - workstream plan: `2026-04-21-root-artifacts-and-output-normalization.md`;
-  - source-of-truth map для root-слоёв и historical artifacts;
+  - source-of-truth map для root-слоев и historical artifacts;
   - migration map для `plans/resume-agent-spec.md`, `plans/repository-topology.md`, `tooling/application-agent/plans/ingest-refactor-plan.md`;
   - удаление superseded planning artifacts после переноса содержательных решений.
 - Acceptance criteria:
@@ -155,18 +155,19 @@
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\ingest-refactor-plan.md"`
 - Notes / discoveries:
   - cleanup включает не только root data/output layer, но и migration/removal старых planning artifacts;
-  - M1 workstream-шаг по inventory/migration map закрыт; M2 canonical root contracts тоже закрыт; следующий фокус M3 — output-placement decisions.
+  - M1 workstream-шаг по inventory/migration map закрыт; M2 canonical root contracts тоже закрыт; M3 output-placement decisions тоже закрыты;
+  - оставшийся focus inside master M3 — legacy prompt/doc distillation как последний cleanup substep root-normalization workstream-а.
 
 ### M4. Current Workflow Completion Gate
 
 - Status: `planned`
 - Goal:
-  - после M3 явно определить, что именно ещё не доведено в `bootstrap`, `ingest-vacancy`, `analyze-vacancy`;
-  - отделить незавершённости текущего стека от planning remaining workflows.
+  - после M3 явно определить, что именно еще не доведено в `bootstrap`, `ingest-vacancy`, `analyze-vacancy`;
+  - отделить незавершенности текущего стека от planning remaining workflows.
 - Deliverables:
   - completion gate для текущего workflow-стека;
   - отдельный plan/checklist по незакрытым задачам current workflow stack;
-  - обновлённый `Current state` в master plan.
+  - обновленный `Current state` в master plan.
 - Acceptance criteria:
   - однозначно зафиксировано, что считается "доделанным" для текущего workflow-стека;
   - у remaining workflows есть явный dependency gate;
@@ -176,7 +177,7 @@
   - `Get-Content -Raw plans\2026-04-21-workflow-contract-alignment-and-safety.md`
   - `python run_agent.py --root ../.. list-workflows`
 - Notes / discoveries:
-  - safety-план закрыл boundary и guardrails, но не дал ответа на вопрос, что считать минимально завершённым состоянием current workflow stack.
+  - safety-план закрыл boundary и guardrails, но не дал ответа на вопрос, что считать минимально завершенным состоянием current workflow stack.
 
 ### M5. Ordered Planning For Remaining Workflows
 
@@ -186,27 +187,28 @@
 - Deliverables:
   - ordered planning backlog для remaining workflows;
   - feature plans, которые допустимо открывать после completion gate;
-  - обновлённая последовательность реализации без опоры на superseded docs.
+  - обновленная последовательность реализации без опоры на superseded docs.
 - Acceptance criteria:
   - planning remaining workflows начинается только после repository cleanup и current workflow completion gate;
   - `prepare-screening` и остальные future workflows не стартуют раньше времени;
-  - queue remaining workflows опирается на актуальные plans, а не на удалённые артефакты.
+  - queue remaining workflows опирается на актуальные plans, а не на удаленные артефакты.
 - Validation commands:
   - `Get-Content -Raw plans\2026-04-21-repository-reconstruction-and-backlog.md`
   - `Get-Content -Raw plans\2026-04-21-root-artifacts-and-output-normalization.md`
   - `Get-Content -Raw plans\2026-04-21-prepare-screening-workflow.md`
 - Notes / discoveries:
-  - без M3 и M4 feature wave снова смешает roadmap, cleanup и текущие незавершённости.
+  - без M3 и M4 feature wave снова смешает roadmap, cleanup и текущие незавершенности.
 
 ## Decision log
 
-- `2026-04-21 16:43` — Главный план ведётся в `tooling/application-agent/plans/`, потому что основная логика изменений относится к submodule-коду и его контрактам. — Это соответствует `AGENTS.md` в корне и в submodule. — Все root artifacts рассматриваются как external touchpoints.
+- `2026-04-21 16:43` — Главный план ведется в `tooling/application-agent/plans/`, потому что основная логика изменений относится к submodule-коду и его контрактам. — Это соответствует `AGENTS.md` в корне и в submodule. — Все root artifacts рассматриваются как external touchpoints.
 - `2026-04-21 16:43` — Работа разбита на самостоятельные workstreams по safety и root normalization. — Это уменьшает риск смешать cleanup, contract alignment и future features. — Master plan фиксирует их зависимость и порядок.
 - `2026-04-21 19:51` — Следующим активным этапом выбран repository cleanup через `2026-04-21-root-artifacts-and-output-normalization.md`. — Причина: сначала нужно навести порядок в репозитории и мигрировать superseded plan artifacts. — `prepare-screening` больше не считается следующим execution step.
 - `2026-04-21 19:51` — Старые плановые артефакты (`plans/resume-agent-spec.md`, `plans/repository-topology.md`, `tooling/application-agent/plans/ingest-refactor-plan.md`) должны быть не просто помечены, а содержательно перенесены в новые active plans и затем удалены. — Это убирает конкурирующие источники истины. — Migration/removal включены в M3.
-- `2026-04-21 19:51` — Planning remaining workflows отложен за completion gate по текущему workflow-стеку. — Safety findings недостаточно, чтобы считать `ingest-vacancy` и `analyze-vacancy` полностью доведёнными. — До завершения M4 feature expansion не является следующим шагом.
-- `2026-04-21 20:35` — M1 в workstream-плане root normalization завершён: добавлены inventory matrix и migration map, зафиксировано, какие root artifacts реально участвуют в runtime сегодня. — Это сместило активный шаг M3 с инвентаризации на canonical root contract decisions. — Master plan синхронизирован с новым состоянием workstream-а.
-- `2026-04-21 21:02` — M2 в workstream-плане root normalization завершён: canonical contracts закреплены для `CV`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel, templates и legacy corpus. — Это снимает часть source-of-truth конфликтов и переводит активный шаг M3 на output pipeline migration path. — Master plan обновлён без изменения общей очередности `M3 -> M4 -> M5`.
+- `2026-04-21 19:51` — Planning remaining workflows отложен за completion gate по текущему workflow-стеку. — Safety findings недостаточно, чтобы считать `ingest-vacancy` и `analyze-vacancy` полностью доведенными. — До завершения M4 feature expansion не является следующим шагом.
+- `2026-04-21 20:35` — M1 в workstream-плане root normalization завершен: добавлены inventory matrix и migration map, зафиксировано, какие root artifacts реально участвуют в runtime сегодня. — Это сместило активный шаг M3 с инвентаризации на canonical root contract decisions. — Master plan синхронизирован с новым состоянием workstream-а.
+- `2026-04-21 21:02` — M2 в workstream-плане root normalization завершен: canonical contracts закреплены для `CV`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel, templates и legacy corpus. — Это снимает часть source-of-truth конфликтов и переводит активный шаг M3 на output pipeline migration path. — Master plan обновлен без изменения общей очередности `M3 -> M4 -> M5`.
+- `2026-04-21 20:33` — M3 output-placement decisions в root-normalization workstream закрыты: `vacancies/<id>/` зафиксирован как working output layer для vacancy-scoped generation, `profile/` — как home для durable profile derivatives, `archive/` — как finalized-export sink, `Employers/` — как manual-only reference workspace. — Это снимает blocker по output home/lifecycle policy и оставляет в M3 только legacy corpus distillation. — Master sequencing `M3 -> M4 -> M5` сохраняется.
 
 ## Progress log
 
@@ -214,22 +216,24 @@
 - `2026-04-21 16:43` — Создан master plan и выделены самостоятельные workstreams для дальнейшей работы без повторного обследования. — Валидация опирается на файловую структуру, `unittest` и документированные команды CLI. — Status: `in_progress`.
 - `2026-04-21 19:51` — Master plan пересобран после повторного review всех plans и superseded artifacts. — Последовательность зафиксирована как `M3 cleanup -> M4 completion gate -> M5 planning remaining workflows`. — Status: `in_progress`.
 - `2026-04-21 19:51` — Superseded plan/spec artifacts мигрированы в active plans и удалены из репозитория. — Валидация migration/removal теперь опирается на `Test-Path = False` для старых файлов и на содержимое новых plan files. — Status: `in_progress`.
-- `2026-04-21 20:35` — M1 в workstream-плане root normalization завершён: добавлены inventory matrix и migration map, подтверждено, что runtime реально живёт на `CV/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores. — M1 validation passed with `root/plans = False`, `profile/contact-regions.yml = False` and 3 current vacancy directories; активный шаг M3 смещён на canonical root contracts. — Status: `in_progress`.
-- `2026-04-21 21:02` — M2 в workstream-плане root normalization завершён: canonical contract map зафиксировал разделение между durable root stores, generated vacancy-local artifacts и historical/reference layers. — Ключевой результат: root `adoptions/` признан long-lived review layer, а `vacancies/<id>/adoptions.md` — staging artifact текущего runtime. — Status: `in_progress`.
+- `2026-04-21 20:35` — M1 в workstream-плане root normalization завершен: добавлены inventory matrix и migration map, подтверждено, что runtime реально живет на `CV/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores. — M1 validation passed with `root/plans = False`, `profile/contact-regions.yml = False` and 3 current vacancy directories; активный шаг M3 смещен на canonical root contracts. — Status: `in_progress`.
+- `2026-04-21 21:02` — M2 в workstream-плане root normalization завершен: canonical contract map зафиксировал разделение между durable root stores, generated vacancy-local artifacts и historical/reference layers. — Ключевой результат: root `adoptions/` признан long-lived review layer, а `vacancies/<id>/adoptions.md` — staging artifact текущего runtime. — Status: `in_progress`.
+- `2026-04-21 20:33` — M3 output-placement substep в root-normalization workstream закрыт: validation confirmed the current contents of `Employers/`, `archive/` и `CV/versions/`, after which placement and lifecycle rules were fixed in the workstream plan. — Следующий cleanup focus внутри master M3 переместился на legacy prompt/doc distillation (`promts/`, `responses.md`, `adoptions_00.md`). — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M3`
 - Current status: `in_progress`
-- Next step: `Продолжить M3 через M3 плана 2026-04-21-root-artifacts-and-output-normalization.md: определить target placement rules для output pipeline, manual renderers, `Employers/`, `archive/` и `CV/versions/`.`
+- Next step: `Продолжить master M3 через M4 workstream-плана 2026-04-21-root-artifacts-and-output-normalization.md: дистиллировать `promts/`, `responses.md` и `adoptions_00.md` в управляемый reference/spec layer.`
 - Active blockers:
-  - Не определён target home и lifecycle policy для output pipeline, manual renderers и historical export traces.
   - Не зафиксирован отдельный completion gate по текущему workflow-стеку после safety workstream.
+  - Legacy prompt/doc corpus все еще не дистиллирован в active plans, templates или tests, so cleanup workstream еще не закрыт.
 - Open questions:
-  - Какой набор `bootstrap` / `ingest-vacancy` / `analyze-vacancy` нужно считать минимально завершённым до M5?
+  - Какой набор `bootstrap` / `ingest-vacancy` / `analyze-vacancy` нужно считать минимально завершенным до M5?
   - Нужно ли после M3 открывать отдельный plan по completion gate текущих workflow или достаточно checklist внутри master plan?
-  - Какие output traces должны остаться examples/reference, а какие purely historical?
+  - Какие части legacy corpus нужно перенести в tests, templates или specs, а какие оставить purely historical?
 
 ## Completion summary
 
 Заполняется после завершения M1-M5. На текущем этапе master plan находится в фазе repository cleanup и migration/removal superseded planning artifacts.
+

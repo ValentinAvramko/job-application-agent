@@ -1,10 +1,10 @@
-# Root Artifacts And Output Normalization
+﻿# Root Artifacts And Output Normalization
 
 - Title: `Root artifacts and output normalization`
 - Slug: `2026-04-21-root-artifacts-and-output-normalization`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-21 20:35`
+- Last updated: `2026-04-21 20:33`
 - Overall status: `in_progress`
 
 ## Objective
@@ -128,6 +128,28 @@
 | `promts/`, `responses.md`, `adoptions_00.md` | Legacy reference corpus only | Any attempt to treat them as current spec or runtime input | Read-only mining input for future distillation | Legacy corpus is explicitly non-canonical after M2 |
 | `Employers/`, `archive/` | Historical/manual output and one-off tailoring traces | None | Manual-only; future classification continues in M3 | These paths are not sources of truth for pipeline behavior |
 
+## M3 Output Placement Rules
+
+| Output family | Canonical placement | Lifecycle / status | Producer | Consumer | Decision |
+| --- | --- | --- | --- | --- | --- |
+| `vacancies/<id>/analysis.md`, `screening.md` and future vacancy-scoped generated artifacts | `vacancies/<id>/` | Generated working state for one vacancy | Current and future vacancy workflows | Operator review, downstream vacancy workflows | Vacancy-scoped outputs stay vacancy-local and must not be promoted into `CV/`, `Employers/` or `archive/` by default |
+| Future vacancy-specific tailored resume/export staging artifacts | `vacancies/<id>/` or a vacancy-local subfolder introduced later by code | Temporary/generated until explicit promotion | Future tailoring and export workflows | Operator review before publication | Productized pipeline should stage per-vacancy deliverables near the vacancy record, not inside employer-specific manual folders |
+| `CV/versions/*.md` and existing historical master snapshots | `CV/versions/` | Historical snapshot archive for durable resume texts | Manual snapshotting or future explicit versioning workflow | Human audit / rollback only | `CV/versions/` stores version history of durable resume text and is not a target for transient per-vacancy outputs or final PDF exports |
+| `archive/*.pdf`, `archive/*.docx` | `archive/` | Immutable historical export store after explicit publish/finalize step | Manual export today; future export workflow only at promotion time | Human archive / final handoff lookup | `archive/` is a sink for finalized exported artifacts, not a working directory and not the default destination during generation |
+| `profile/linkedin.md` or equivalent durable profile artifact | `profile/` | Durable generated or edited profile representation | Future `build-linkedin` workflow | Human review and profile publishing | LinkedIn-style outputs belong with profile overlays, because they are durable profile derivatives rather than vacancy-local notes |
+| Employer-specific notes, tailored one-off resumes, local helper scripts and previews under `Employers/<company>/` | `Employers/` | Manual-only workspace and historical reference examples | Human/manual experiments | Human/operator only | `Employers/` remains outside the supported runtime pipeline and must never be the default write target for reusable workflows |
+| Manual render helpers such as `Employers/TaxDome/render_resume_pdf.py` and `tmp_pdf_preview/*.png` | `Employers/<company>/` until replaced | Reference-only prototype artifacts | Manual one-off rendering | Human/operator only | Keep as reverse-engineering/reference material for future renderer design, but do not treat them as productized pipeline entrypoints |
+
+## M3 Migration Path For Manual Output Traces
+
+| Existing trace | Current classification | Future role after migration | Retention rule |
+| --- | --- | --- | --- |
+| `Employers/TaxDome/render_resume_pdf.py` | Manual prototype renderer tied to one employer case | Reference input for a later rendering contract and test cases, not executable runtime contract | Keep as manual example until reusable export workflow exists |
+| `Employers/*/*.md` employer notes and tailored resume drafts | One-off manual tailoring workspace | Optional example corpus for prompt/spec distillation; never default pipeline output target | Keep as employer-local historical/reference material |
+| `Employers/*/*.pdf` and preview PNGs | Manual case-specific exports and render previews | Historical evidence of one-off outputs only | Keep, but classify as unsupported by runtime |
+| `archive/*.pdf`, `archive/*.docx` | Final historical exports | Promotion target for future finalized exports after explicit review or publish step | Keep as immutable archive; avoid overwriting in place |
+| `CV/versions/*.md` historical snapshots | Resume text history | Durable text-version archive for master or role resume evolution | Keep as snapshot history; do not mix with binary exports |
+
 ## Milestones
 
 ### M1. Root Artifact Inventory And Migration Map
@@ -183,7 +205,7 @@
 
 ### M3. Output Pipeline Migration Path
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - определить, как manual employer-specific и historical outputs переводятся в поддерживаемый pipeline для resume export, LinkedIn, screening prep и related artifacts.
 - Deliverables:
@@ -199,7 +221,11 @@
   - `Get-ChildItem C:\Users\avramko\OneDrive\Documents\Career\archive -File`
   - `Get-ChildItem C:\Users\avramko\OneDrive\Documents\Career\CV\versions -File`
 - Notes / discoveries:
-  - `Employers/TaxDome/render_resume_pdf.py` — явный пример manual-only export path.
+  - `Employers/TaxDome/render_resume_pdf.py` is a manual-only export path.
+  - `CV/versions/` is a historical text-version archive, not a working export directory.
+  - `archive/` is an immutable finalized-export sink.
+  - `Employers/` is a manual workspace/reference layer, not a reusable pipeline target.
+  - Productized outputs should stage in workflow-owned directories (`vacancies/<id>/...` for vacancy-scoped artifacts, `profile/` for durable profile derivatives) and move into `archive/` only after an explicit publish/finalize step.
 
 ### M4. Legacy Prompt And Superseded Plan Distillation
 
@@ -228,32 +254,32 @@
 - `2026-04-21 16:43` — Root data/template/output layer выделен в отдельный workstream. — Найденные проблемы относятся к source-of-truth и artifact ownership, а не только к логике workflow. — Это уменьшает риск смешать cleanup и feature implementation.
 - `2026-04-21 16:43` — Legacy prompt corpus рассматривается как valuable input, но не как финальная форма хранения бизнес-правил. — Он уже пересекается со спецификациями и частично дублирует их. — Нужна управляемая distillation.
 - `2026-04-21 19:51` — Superseded root plan/spec artifacts должны быть не просто помечены, а полностью мигрированы в актуальные plans и затем удалены. — Это убирает параллельные источники истины в root `plans/`. — Migration/removal встроены в milestones M1-M4.
-- `2026-04-21 20:35` — `vacancies/<id>/adoptions.md` зафиксирован как текущий generated vacancy-local artifact, а не как long-lived canonical adoptions store. — Root `adoptions/` существует как целевая структура, но ещё не подключён к runtime. — M2 должен решить, остаётся ли vacancy-local слой, мигрируется ли он в inbox или живут оба слоя с разными ролями.
+- `2026-04-21 20:35` — `vacancies/<id>/adoptions.md` зафиксирован как текущий generated vacancy-local artifact, а не как long-lived canonical adoptions store. — Root `adoptions/` существует как целевая структура, но еще не подключен к runtime. — M2 должен был зафиксировать separation between vacancy-local staging and long-lived review storage.
 - `2026-04-21 20:35` — Текущий runtime root-контракт фактически опирается на `CV/`, `vacancies/`, `agent_memory/` и `response-monitoring.xlsx`; `templates/` и legacy prompt corpus пока не являются runtime inputs. — Это подтверждено поиском по коду и фактической файловой структурой. — Дальнейшие решения нужно принимать относительно реального producer/consumer graph.
 - `2026-04-21 21:02` — Root canonical contracts разделены на три слоя: durable source-of-truth stores, vacancy-local generated execution artifacts и historical/reference layers. — Это позволило снять конфликт между root `adoptions/` и vacancy-local `adoptions.md`, а также между workbook-контрактом и template docs. — После M2 следующий фокус смещается на output pipeline migration path.
+- `2026-04-21 20:33` — Output placement зафиксирован как три разных жизненных цикла: vacancy-local generated artifacts, durable profile/resume derivatives и finalized archive outputs. — Это снимает конфликт между `CV/versions/`, `archive/` и `Employers/` и не требует новый root output family до отдельного productized export design. — M3 считается закрытым, следующий фокус смещается на legacy corpus distillation.
 
 ## Progress log
 
 - `2026-04-21 16:43` — Подтверждено, что `CV/` насыщен версиями, а `profile/`, `knowledge/`, `adoptions/` остаются в основном скелетными. — Проверка файловой структуры выявила отсутствие `profile/contact-regions.yml` и пустые long-lived stores. — Status: `planned`.
-- `2026-04-21 16:43` — Найдены manual output traces в `Employers/` и `archive/`, а также крупный legacy prompt corpus в `promts/`, `responses.md`, `adoptions_00.md`. — Это указывает на незавершённую миграцию от prompt-first/manual workflows к tool-driven pipeline. — Status: `planned`.
+- `2026-04-21 16:43` — Найдены manual output traces в `Employers/` и `archive/`, а также крупный legacy prompt corpus в `promts/`, `responses.md`, `adoptions_00.md`. — Это указывает на незавершенную миграцию от prompt-first/manual workflows к tool-driven pipeline. — Status: `planned`.
 - `2026-04-21 19:51` — План переприоритизирован в следующий активный этап master plan и расширен migration/removal задачей для superseded root planning artifacts. — Следующий фокус: inventory + migration map, а не feature work. — Status: `in_progress`.
 - `2026-04-21 19:51` — Содержательные решения superseded root planning artifacts перенесены в active plans, а сами root files удалены. — Дальнейший focus смещается с migration/removal на оставшиеся root contracts и producer/consumer inventory. — Status: `in_progress`.
-- `2026-04-21 20:35` — В план добавлены M1 inventory matrix и migration map по реальным root artifacts, включая `response-monitoring.xlsx`, `agent_memory/`, legacy corpus и уже удалённый root `plans/`. — Проверка кода показала, что runtime сегодня реально работает через `CV/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores; validation confirmed `Test-Path root/plans = False`, `Test-Path profile/contact-regions.yml = False`, `vacancies/` currently contains 3 directories. — Status: `done`.
-- `2026-04-21 21:02` — M2 canonical contract map добавлен в workstream-план и зафиксировал роли для `CV`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel, templates, legacy corpus и manual output traces. — Ключевые решения: `CV/MASTER.md` остаётся единственным durable facts source, root `adoptions/` — long-lived review layer, а vacancy-local `adoptions.md` — generated staging artifact. — Status: `done`.
+- `2026-04-21 20:35` — В план добавлены M1 inventory matrix и migration map по реальным root artifacts, включая `response-monitoring.xlsx`, `agent_memory/`, legacy corpus и уже удаленный root `plans/`. — Проверка кода показала, что runtime сегодня реально работает через `CV/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores; validation confirmed `Test-Path root/plans = False`, `Test-Path profile/contact-regions.yml = False`, `vacancies/` currently contains 3 directories. — Status: `done`.
+- `2026-04-21 21:02` — M2 canonical contract map добавлен в workstream-план и зафиксировал роли для `CV`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel, templates, legacy corpus и manual output traces. — Ключевые решения: `CV/MASTER.md` остается единственным durable facts source, root `adoptions/` — long-lived review layer, а vacancy-local `adoptions.md` — generated staging artifact. — Status: `done`.
+- `2026-04-21 20:33` — M3 output placement rules добавлены в workstream plan и закрепили, что vacancy-scoped generation живет в `vacancies/<id>/`, durable profile derivatives живут в `profile/`, `archive/` является finalized-export sink, а `Employers/` остается manual-only workspace. — Валидация подтвердила фактическое contents `Employers/`, `archive/` и `CV/versions/`, включая one-off renderer script и historical PDF/DOCX outputs. — Status: `done`.
 
 ## Current state
 
-- Current milestone: `M3`
+- Current milestone: `M4`
 - Current status: `in_progress`
-- Next step: `Определить target placement rules для output pipeline: как классифицировать `Employers/`, `archive/`, `CV/versions/`, manual PDF/DOCX traces и будущие export outputs между reusable pipeline, historical archive и one-off employer artifacts.`
+- Next step: `Начать M4: дистиллировать `promts/`, `responses.md` и `adoptions_00.md` в управляемый reference/spec layer и добрать final cleanup decisions по legacy corpus.`
 - Active blockers:
-  - Не определён target home для PDF/LinkedIn/export pipeline и employer-specific traces.
-  - Не определены retention/status rules для `Employers/`, `archive/` и `CV/versions/` как части будущего output pipeline.
-  - Current runtime всё ещё не синхронизирован с root `adoptions/` и `profile/contact-regions.yml`, даже после фиксации canonical contracts.
+  - Current runtime все еще не синхронизирован с root `adoptions/` и `profile/contact-regions.yml`, даже после фиксации canonical contracts.
+  - Не дистиллирован legacy prompt/doc corpus, поэтому часть business intent еще живет в historical materials.
 - Open questions:
-  - Какие employer-specific traces нужно сохранить как examples/tests/reference, а какие оставить purely historical?
-  - Должен ли будущий export pipeline писать в `archive/`, в vacancy-local directories или в отдельный dedicated output family?
-  - Как связать manual renderers вроде `Employers/TaxDome/render_resume_pdf.py` с reusable export path без смешения one-off и productized outputs?
+  - Какие части `promts/`, `responses.md` и `adoptions_00.md` нужно перенести в plans, templates или tests, а какие оставить historical-only?
+  - Нужно ли для legacy corpus отдельно помечать material suitable for future eval cases versus pure archive?
 
 ## Completion summary
 
