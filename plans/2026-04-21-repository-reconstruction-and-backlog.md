@@ -222,6 +222,7 @@
 - `2026-04-22 10:41` — M5 переведён в исполнение: после повторной сверки ordered backlog и существующих планов первым remaining workflow выбран `prepare-screening`. — У него уже есть реализованное ядро и test coverage, а остальные workflow по-прежнему упираются в незакрытые root/product contracts. — Следующий execution focus смещён на M2 плана `2026-04-21-prepare-screening-workflow.md`.
 - `2026-04-22 10:58` — Первый execution milestone внутри M5 закрыт: `prepare-screening` встроен в runtime CLI/catalog surface и подтверждён targeted validation. — Это превращает plan из latent implementation branch в реально доступный workflow текущего стека. — Следующий execution focus смещён на M3 того же плана: full suite и real-scenario smoke run.
 - `2026-04-22 11:08` — `prepare-screening` завершён как первый remaining workflow: full suite остаётся зелёным, а smoke run на реальной вакансии подтвердил создание `screening.md`, update `meta.yml` и runtime-memory trail без выхода за vacancy-local boundary. — Это закрывает первый execution branch внутри M5. — Следующий execution focus смещён на открытие dedicated plan для `rebuild-master`, где пока не определены permanent-signal/accepted-adoption contracts.
+- `2026-04-22 11:18` — Для следующего workflow открыт dedicated plan `2026-04-22-rebuild-master-workflow.md`. — Базовая разведка показала, что `resumes/MASTER.md`, `adoptions/accepted/` и `knowledge/roles/` уже существуют, но canonical merge contract между ними не закреплён. — Следующий execution focus теперь сводится к одному owner-level решению по permanent-signal destination.
 
 ## Progress log
 
@@ -243,12 +244,13 @@
 - `2026-04-22 10:41` — M5 revalidation завершена: evidence из safety/root plans и текущего кода подтверждает, что `prepare-screening` остаётся первым исполнимым кандидатом, потому что уже имеет runtime core, тогда как `rebuild-master`, `rebuild-role-resume`, `build-linkedin` и `export-resume-pdf` всё ещё зависят от отдельных downstream contracts. — Кодовая реализация M5 начинается с CLI/catalog/operator integration для `prepare-screening`. — Status: `in_progress`.
 - `2026-04-22 10:58` — CLI/catalog/operator integration для `prepare-screening` завершена: targeted tests и `list-workflows` подтверждают, что workflow теперь зарегистрирован и доступен через public entrypoint. — Master M5 остаётся активным, потому что для полного handoff этого первого remaining workflow ещё нужен M3 smoke-check на реальном vacancy scenario. — Status: `in_progress`.
 - `2026-04-22 11:08` — Первый remaining workflow закрыт end-to-end: `prepare-screening` теперь реализован, провалидирован и опробован на реальной вакансии. — Master M5 продолжается уже не вокруг этого workflow, а вокруг следующего dependency-gated этапа `rebuild-master`. — Status: `in_progress`.
+- `2026-04-22 11:18` — M5 продолжен через dedicated plan для `rebuild-master`: baseline contract inventory собран, а активный blocker сведён к product decision по permanent signals и accepted adoptions. — Это отделяет реальную нехватку решения от технической неопределённости и не даёт prematurely стартовать risky resume-editing workflow. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M5`
 - Current status: `in_progress`
-- Next step: `Открыть dedicated plan для `rebuild-master` и сначала зафиксировать contract/source-of-truth для permanent signals, accepted adoptions и destination layer перед любой реализацией workflow.`
+- Next step: `Внутри `2026-04-22-rebuild-master-workflow.md` принять owner-level решение по permanent-signal destination между `adoptions/accepted/`, `knowledge/roles/` и `resumes/MASTER.md`, прежде чем планировать реализацию workflow.`
 - Active blockers:
   - none
 - Open questions:
