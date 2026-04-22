@@ -4,8 +4,8 @@
 - Slug: `2026-04-22-adoptions-review-and-acceptance-workflow`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 13:50`
-- Overall status: `in_progress`
+- Last updated: `2026-04-22 15:53`
+- Overall status: `done`
 
 ## Objective
 
@@ -127,20 +127,22 @@
 
 ### M3. Implementation-Ready Acceptance Workflow Plan
 
-- Status: `in_progress`
+- Status: `done`
 - Goal:
   - разложить review/acceptance process на исполнимые implementation milestones.
 - Deliverables:
   - code-facing milestone decomposition;
   - validation baseline;
+  - dedicated execution plan `2026-04-22-implement-adoptions-review-and-acceptance-workflow.md`;
   - handoff в execution cycle перед `rebuild-master`.
 - Acceptance criteria:
   - следующий инженер сможет начать реализацию review/acceptance workflow только по этому plan;
   - downstream handoff в `rebuild-master` будет описан без дополнительных устных пояснений.
 - Validation commands:
   - `Get-Content -Raw plans\2026-04-22-adoptions-review-and-acceptance-workflow.md`
+  - `Get-Content -Raw plans\2026-04-22-implement-adoptions-review-and-acceptance-workflow.md`
 - Notes / discoveries:
-  - implementation decomposition теперь должна опираться на подтверждённый split между deterministic intake и interactive review.
+  - initial implementation path зафиксирован как hybrid model: deterministic intake становится runtime workflow, а interactive review остаётся agent-guided session, поддержанной кодовыми helper-модулями, тестами и workflow docs, без обязательного standalone interactive CLI REPL.
 
 ## Interaction and file contract
 
@@ -159,16 +161,13 @@
   - готовит `adoptions/inbox/<vacancy_id>.md`;
   - обновляет `adoptions/questions/open.md` initial unresolved items;
   - не трогает `accepted/` и `resumes/`.
-- `A2 Review session workflow`:
-  - interactive agent-guided command/session;
-  - показывает pending inbox items;
-  - ведёт Q&A по unresolved items;
-  - переводит approved signals в `adoptions/accepted/MASTER.md`;
-  - закрывает или обновляет записи в `adoptions/questions/open.md`;
-  - при необходимости корректирует `knowledge/roles/`.
+- `A2 Review support layer`:
+  - helper-модули и форматы для загрузки pending inbox items, question ledger и `accepted/MASTER.md`;
+  - подготовка данных для agent-guided Q&A session;
+  - применение approved updates к `accepted/MASTER.md`, `questions/open.md` и при необходимости `knowledge/roles/`.
 - `A3 Runtime/docs/tests alignment`:
-  - registry/CLI/docs/tests описывают intake и review как отдельные workflow stages;
-  - явно разделяются generated drafts, unresolved questions и approved signals;
+  - registry/CLI/docs/tests явно описывают intake как runtime workflow, а review как отдельную agent-guided stage;
+  - generated drafts, unresolved questions и approved signals разделены и валидируются по тестам/докам;
   - runtime memory и operator docs отражают новый sequencing.
 - `A4 Rebuild-master handoff`:
   - `2026-04-22-rebuild-master-workflow.md` читает этот upstream workflow как стабильный input contract;
@@ -181,17 +180,19 @@
 - `2026-04-22 13:50` — Interaction model зафиксирован как два explicit stages: deterministic intake prep и отдельная interactive agent-guided review session. — Это разводит generated vacancy drafts и human/agent adjudication. — Implementation decomposition должна опираться именно на эту границу.
 - `2026-04-22 13:50` — `adoptions/questions/open.md` остаётся initial shared ledger, а ответы на вопросы получаются в interactive agent Q&A session. — Это совместимо с текущим root baseline и не требует сразу вводить per-vacancy question files. — Initial implementation можно делать без миграции формата `questions/`.
 - `2026-04-22 13:50` — Role-specific accepted artifacts не вводятся на acceptance stage. — Причина: role resumes должны строиться только downstream от согласованного `resumes/MASTER.md`. — `accepted/` на этом этапе остаётся master-only approved staging layer.
+- `2026-04-22 15:53` — Initial implementation shape выбрана как hybrid: deterministic intake productized в runtime CLI, а interactive review остаётся agent-guided session, поддержанной helper-кодом и workflow docs. — Причина: owner описал review как ручной Q&A process, а текущая архитектура CLI ориентирована на deterministic runs, а не на встроенный REPL. — Это позволяет идти в код без ложной сложности и не смешивать operator conversation с runtime catalog.
 
 ## Progress log
 
 - `2026-04-22 11:42` — Создан dedicated plan для review/acceptance workflow и закрыт baseline milestone M1 на основе owner-approved process. — Блокировка на уровне product sequencing снята, но interaction model acceptance session ещё не был выбран. — Status: `in_progress`.
 - `2026-04-22 13:50` — M2 closed: interaction shape и file contract зафиксированы на основе owner confirmation и реального root baseline (`adoptions/questions/open.md`, existing `adoptions/`/`knowledge/roles/` layout). — Следующий шаг теперь чисто implementation-facing: разложить кодовые milestones и handoff. — Status: `in_progress`.
+- `2026-04-22 15:53` — M3 closed: создан dedicated execution plan `2026-04-22-implement-adoptions-review-and-acceptance-workflow.md`, где intake и review support разложены на отдельные code-facing milestones с validation baseline и handoff в `rebuild-master`. — Planning ambiguity для этого workflow family снята; следующий шаг уже execution-oriented. — Status: `done`.
 
 ## Current state
 
-- Current milestone: `M3`
-- Current status: `in_progress`
-- Next step: `Разложить implementation на конкретные code-facing milestones для separate intake workflow, interactive review session, tests/docs alignment и downstream handoff в rebuild-master.`
+- Current milestone: `done`
+- Current status: `done`
+- Next step: `Перейти к `2026-04-22-implement-adoptions-review-and-acceptance-workflow.md` и начать M1 по deterministic intake workflow.`
 - Active blockers:
   - none
 - Open questions:
@@ -199,4 +200,22 @@
 
 ## Completion summary
 
-Заполняется после завершения всех milestones. На текущем этапе baseline, sequencing и session/file contract уже зафиксированы; остаётся превратить это в исполнимую implementation decomposition.
+Поставлено:
+
+- owner-approved sequencing для `inbox/`, `questions/`, `accepted/`, `knowledge/roles/`;
+- session/file contract с отдельными deterministic intake и interactive review stages;
+- dedicated execution plan `2026-04-22-implement-adoptions-review-and-acceptance-workflow.md`.
+
+Провалидировано:
+
+- обновлённые plan files читаются без двусмысленности;
+- текущий root baseline соответствует принятому контракту: `adoptions/questions/open.md` существует, `adoptions/` уже содержит `inbox/`, `accepted/`, `questions/`, а `knowledge/roles/` пока остаётся mostly-empty shaping layer.
+
+Follow-up:
+
+- реализовать `M1` deterministic intake workflow в новом execution plan;
+- затем добавить review support helpers, docs/tests alignment и handoff в `rebuild-master`.
+
+Остаточные риски:
+
+- interactive review остаётся agent-guided stage и потребует аккуратного helper/API дизайна, чтобы не превратиться в ad-hoc file editing без верифицируемого контракта.

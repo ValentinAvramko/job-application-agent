@@ -4,7 +4,7 @@
 - Slug: `2026-04-22-rebuild-master-workflow`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 13:50`
+- Last updated: `2026-04-22 15:53`
 - Overall status: `blocked`
 
 ## Objective
@@ -142,24 +142,26 @@
 - `2026-04-22 11:42` — Принят owner-level contract: approved permanent signals сначала живут в `adoptions/accepted/MASTER.md`, а попадание в `resumes/MASTER.md` является отдельным, более редким шагом. — Это жёстко разделяет review/approval layer и canonical resume mutation layer. — `rebuild-master` больше не должен напрямую зависеть от raw vacancy drafts или от `knowledge/roles/` как competing source of truth.
 - `2026-04-22 11:42` — Перед `rebuild-master` выделен отдельный upstream process `inbox/questions -> accepted + knowledge/roles`. — Причина: именно там происходит human/agent review, ответы на вопросы и нормализация постоянных сигналов. — Следовательно, `rebuild-master` остаётся downstream workflow и не является ближайшим implementation step.
 - `2026-04-22 13:50` — Upstream review/acceptance process уточнён до двух explicit stages: deterministic intake prep и отдельная interactive agent-guided Q&A session. — Это делает будущий input contract для `rebuild-master` стабильнее и исключает ожидание, что сам `rebuild-master` будет переносить vacancy drafts или разбирать unresolved questions. — Текущий blocker теперь сводится только к завершению implementation-ready decomposition upstream workflow.
+- `2026-04-22 15:53` — Upstream workflow family получил отдельный execution plan `2026-04-22-implement-adoptions-review-and-acceptance-workflow.md`; initial implementation shape закреплена как `runtime intake` + `agent-guided review support`. — Это снимает planning blocker для `rebuild-master`, но оставляет execution dependency: сначала должен появиться рабочий upstream artifact flow в `inbox/questions/accepted`. — Блокировка `rebuild-master` теперь зависит от выполнения upstream plan, а не от отсутствия decomposition.
 
 ## Progress log
 
 - `2026-04-22 11:18` — Создан dedicated plan для `rebuild-master` и закрыт baseline milestone M1 на основе текущего состояния `resumes/MASTER.md`, `adoptions/` и `knowledge/`. — Root inspection подтвердил наличие intended review/knowledge layers, но не дал безопасного ответа, кто именно является canonical input для merge в `MASTER`. — Status: `blocked`.
 - `2026-04-22 11:42` — M2 contract decision закрыт по ответу owner: canonical approved staging layer — `adoptions/accepted/MASTER.md`, а `knowledge/roles/` пересматривается в отдельном review process и не является direct input для `rebuild-master`. — Это снимает product ambiguity внутри самого `rebuild-master`, но переводит блокировку на upstream process planning. — Status: `blocked`.
 - `2026-04-22 13:50` — Upstream plan review/acceptance закрыл session-shape ambiguity: separate intake stage, shared `adoptions/questions/open.md` ledger и interactive Q&A session уже зафиксированы. — `rebuild-master` по-прежнему blocked, но теперь ожидает не product decision, а только implementation-ready decomposition upstream workflow. — Status: `blocked`.
+- `2026-04-22 15:53` — Upstream review/acceptance перешёл из planning в execution: создан отдельный implementation plan с первым активным milestone по deterministic intake workflow. — `rebuild-master` остаётся blocked, но теперь уже на явной execution dependency. — Status: `blocked`.
 
 ## Current state
 
 - Current milestone: `M3`
 - Current status: `blocked`
-- Next step: `Дождаться implementation-ready decomposition отдельного upstream workflow plan для review/acceptance process, затем разложить `rebuild-master` на собственные кодовые implementation milestones.`
+- Next step: `Дождаться выполнения upstream execution plan `2026-04-22-implement-adoptions-review-and-acceptance-workflow.md` как минимум до стабильного intake/questions/accepted contract, затем разложить `rebuild-master` на собственные кодовые implementation milestones.`
 - Active blockers:
-  - Upstream review/acceptance process ещё не доведён до implementation-ready decomposition.
+  - Upstream review/acceptance process ещё не реализован до стабильного execution contract.
 - Open questions:
   - Должен ли `rebuild-master` дополнительно формировать change report/diff artifact рядом с `MASTER.md`, или достаточно обновления самого файла?
   - Нужен ли batching policy для `accepted/MASTER.md`, чтобы merge в `MASTER` работал по срезам, а не по всему файлу целиком?
 
 ## Completion summary
 
-Заполняется после завершения всех milestones. На текущем этапе baseline и product contract уже зафиксированы; текущий blocker для `rebuild-master` теперь чисто sequencing-oriented и связан с отсутствием отдельного implementation plan для upstream review/acceptance process.
+Заполняется после завершения всех milestones. На текущем этапе baseline и product contract уже зафиксированы; текущий blocker для `rebuild-master` теперь чисто sequencing-oriented и связан с тем, что upstream review/acceptance workflow ещё не реализован до стабильного execution contract.
