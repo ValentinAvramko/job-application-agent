@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 import re
 
 from application_agent.memory.models import WorkflowRun
 from application_agent.memory.store import JsonMemoryStore
+from application_agent.review_state import QuestionEntry, QuestionLedger
 from application_agent.utils.simple_yaml import load_simple_yaml
 from application_agent.workflows.analyze_vacancy import dedupe_paths
 from application_agent.workflows.base import WorkflowResult
@@ -16,7 +16,6 @@ VACANCY_HEADING = "## Vacancy"
 TEMP_HEADING = "## TEMP"
 PERM_HEADING = "## PERM"
 NEW_DATA_HEADING = "## NEW DATA NEEDED"
-PENDING_HEADING = "## Pending"
 
 SOURCE_TEMP_HEADING = "## Временные сигналы"
 SOURCE_PERM_HEADING = "## Кандидаты в постоянные сигналы"
@@ -44,15 +43,6 @@ class InboxRow:
 @dataclass(frozen=True)
 class NewDataRow:
     missing_data: str
-    why_it_matters: str
-    suggested_question: str
-    status: str
-
-
-@dataclass(frozen=True)
-class PendingQuestionRow:
-    topic: str
-    related_to: str
     why_it_matters: str
     suggested_question: str
     status: str
@@ -101,7 +91,7 @@ class IntakeAdoptionsWorkflow:
         perm_rows = build_perm_rows(vacancy_id=vacancy_id, draft_text=draft_text)
         question_items = extract_section_bullets(draft_text, SOURCE_QUESTIONS_HEADING)
         new_data_rows = build_new_data_rows(vacancy_id=vacancy_id, question_items=question_items)
-        pending_rows = build_pending_question_rows(vacancy_id=vacancy_id, question_items=question_items)
+        pending_entries = build_pending_question_entries(vacancy_id=vacancy_id, question_items=question_items)
 
         inbox_path.write_text(
             render_inbox(
@@ -117,18 +107,11 @@ class IntakeAdoptionsWorkflow:
             newline="\n",
         )
 
-        existing_questions = parse_pending_question_rows(questions_path)
-        retained_questions = [row for row in existing_questions if row.related_to != vacancy_id]
-        merged_questions = sorted(
-            retained_questions + pending_rows,
-            key=lambda row: (row.related_to.lower(), row.topic.lower(), row.suggested_question.lower()),
-        )
-        existing_questions_text = questions_path.read_text(encoding="utf-8") if questions_path.exists() else ""
-        questions_path.write_text(
-            update_pending_questions_markdown(existing_questions_text, merged_questions),
-            encoding="utf-8",
-            newline="\n",
-        )
+        question_ledger = QuestionLedger.load(questions_path)
+        question_ledger.entries = [entry for entry in question_ledger.records() if entry.related_to != vacancy_id]
+        for entry in pending_entries:
+            question_ledger.upsert(entry)
+        question_ledger.write(questions_path)
 
         artifacts = dedupe_paths([str(inbox_path), str(questions_path)])
         store.remember_task(self.name, vacancy_id, artifacts)
@@ -259,9 +242,9 @@ def build_new_data_rows(*, vacancy_id: str, question_items: list[str]) -> list[N
     ]
 
 
-def build_pending_question_rows(*, vacancy_id: str, question_items: list[str]) -> list[PendingQuestionRow]:
+def build_pending_question_entries(*, vacancy_id: str, question_items: list[str]) -> list[QuestionEntry]:
     return [
-        PendingQuestionRow(
+        QuestionEntry(
             topic=item,
             related_to=vacancy_id,
             why_it_matters="Initial unresolved item imported during adoptions intake.",
@@ -351,101 +334,6 @@ def render_new_data_rows(rows: list[NewDataRow]) -> list[str]:
     ]
 
 
-def parse_pending_question_rows(path: Path) -> list[PendingQuestionRow]:
-    if not path.exists():
-        return []
-
-    text = path.read_text(encoding="utf-8")
-    pending_block = extract_pending_block(text)
-    if not pending_block:
-        return []
-
-    table_lines = [line.strip() for line in pending_block.splitlines() if line.strip().startswith("|")]
-    rows: list[PendingQuestionRow] = []
-    for line in table_lines[2:]:
-        cells = split_markdown_row(line)
-        if len(cells) != 5:
-            continue
-        if not any(cell.strip() for cell in cells):
-            continue
-        rows.append(
-            PendingQuestionRow(
-                topic=cells[0].strip(),
-                related_to=cells[1].strip(),
-                why_it_matters=cells[2].strip(),
-                suggested_question=cells[3].strip(),
-                status=cells[4].strip(),
-            )
-        )
-    return rows
-
-
-def update_pending_questions_markdown(existing_text: str, rows: list[PendingQuestionRow]) -> str:
-    fresh_pending = render_pending_questions_section(rows)
-    if not existing_text.strip():
-        return "# Open Questions\n\n" + fresh_pending
-
-    heading_index = existing_text.find(PENDING_HEADING)
-    if heading_index == -1:
-        base = existing_text.rstrip()
-        if not base:
-            base = "# Open Questions"
-        return base + "\n\n" + fresh_pending
-
-    section = existing_text[heading_index:]
-    match = re.search(r"\n##\s", section[len(PENDING_HEADING) :])
-    if match:
-        suffix_index = heading_index + len(PENDING_HEADING) + match.start()
-        prefix = existing_text[:heading_index].rstrip()
-        suffix = existing_text[suffix_index:].lstrip("\n")
-        return prefix + "\n\n" + fresh_pending + ("\n\n" + suffix if suffix else "")
-
-    prefix = existing_text[:heading_index].rstrip()
-    return prefix + "\n\n" + fresh_pending
-
-
-def render_pending_questions_markdown(rows: list[PendingQuestionRow]) -> str:
-    return "# Open Questions\n\n" + render_pending_questions_section(rows)
-
-
-def render_pending_questions_section(rows: list[PendingQuestionRow]) -> str:
-    lines = [
-        PENDING_HEADING,
-        "",
-        "| Topic | Related To | Why It Matters | Suggested Question | Status |",
-        "| --- | --- | --- | --- | --- |",
-    ]
-    if rows:
-        lines.extend(
-            "| "
-            + " | ".join(
-                [
-                    escape_table(row.topic),
-                    escape_table(row.related_to),
-                    escape_table(row.why_it_matters),
-                    escape_table(row.suggested_question),
-                    escape_table(row.status),
-                ]
-            )
-            + " |"
-            for row in rows
-        )
-    lines.append("")
-    return "\n".join(lines)
-
-
-def extract_pending_block(markdown: str) -> str:
-    heading_index = markdown.find(PENDING_HEADING)
-    if heading_index == -1:
-        return ""
-
-    section = markdown[heading_index:]
-    match = re.search(r"\n##\s", section[len(PENDING_HEADING) :])
-    if not match:
-        return section
-    return section[: len(PENDING_HEADING) + match.start()]
-
-
 def extract_section_bullets(markdown: str, heading: str) -> list[str]:
     if heading not in markdown:
         return []
@@ -498,15 +386,6 @@ def dedupe_preserve_order(items: list[str]) -> list[str]:
         seen.add(key)
         result.append(item)
     return result
-
-
-def split_markdown_row(line: str) -> list[str]:
-    stripped = line.strip()
-    if stripped.startswith("|"):
-        stripped = stripped[1:]
-    if stripped.endswith("|"):
-        stripped = stripped[:-1]
-    return [cell.replace("\\|", "|") for cell in stripped.split(" | ")]
 
 
 def escape_table(value: str) -> str:
