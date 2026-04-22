@@ -137,7 +137,7 @@
 
 ### M4. Managed Signals Projection For MASTER
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - реализовать deterministic helper layer, который читает `resumes/MASTER.md` и `adoptions/accepted/MASTER.md`, синхронизирует managed approved-signals section и считает change set.
 - Deliverables:
@@ -152,7 +152,8 @@
   - `python -m unittest tests.test_rebuild_master_helpers`
 - Notes / discoveries:
   - managed block должен иметь явные begin/end markers;
-  - report должен явно перечислять `added`, `updated`, `removed`, `unchanged` signals и общий outcome `changed` / `no-op`.
+  - report должен явно перечислять `added`, `updated`, `removed`, `unchanged` signals и общий outcome `changed` / `no-op`;
+  - helper implementation оформлен отдельным модулем `application_agent.master_rebuild`, чтобы M5 обернул уже готовую merge/report logic без дублирования.
 
 ### M5. Workflow, CLI And Runtime Wiring
 
@@ -211,12 +212,13 @@
 - `2026-04-22 13:50` — Upstream plan review/acceptance снял session-shape ambiguity; `rebuild-master` остаётся blocked только на upstream completion. — Status: `blocked`.
 - `2026-04-22 17:21` — Upstream workflow family закрыт до стабильного `inbox/questions/accepted` contract и handoff зафиксирован в public/runtime docs. — `rebuild-master` больше не blocked. — Status: `in_progress`.
 - `2026-04-22 18:02` — M3 planning milestone закрыт: plan получил explicit milestones M4-M6, managed-section merge contract, runtime report location и baseline no-batching semantics. — Следующий шаг уже чисто implementation-oriented. — Status: `in_progress`.
+- `2026-04-22 18:18` — M4 helper milestone закрыт: добавлен модуль `application_agent.master_rebuild` с deterministic managed-section projection, begin/end markers и runtime report generation; новые tests `tests.test_rebuild_master_helpers` закрывают empty-store, insert+idempotency и update/remove diff semantics. — Validation: `python -m unittest tests.test_rebuild_master_helpers` -> `OK`. — Status: `in_progress`.
 
 ## Current state
 
-- Current milestone: `M4`
+- Current milestone: `M5`
 - Current status: `in_progress`
-- Next step: `Реализовать helper layer для deterministic managed-section rebuild `resumes/MASTER.md` и runtime change report under `agent_memory/runtime/rebuild-master/`.`
+- Next step: `Добавить workflow `rebuild-master` в registry/cli/runtime catalog и обернуть им helper layer из `application_agent.master_rebuild`.`
 - Active blockers:
   - none
 - Open questions:
