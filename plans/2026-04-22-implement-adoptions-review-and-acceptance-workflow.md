@@ -4,7 +4,7 @@
 - Slug: `2026-04-22-implement-adoptions-review-and-acceptance-workflow`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 16:58`
+- Last updated: `2026-04-22 17:04`
 - Overall status: `in_progress`
 
 ## Objective
@@ -128,7 +128,7 @@
 
 ### M3. Agent-Guided Review Support Surface
 
-- Status: `in_progress`
+- Status: `done`
 - Goal:
   - оформить interactive review как воспроизводимую agent-guided stage с явным workflow contract.
 - Deliverables:
@@ -143,11 +143,12 @@
   - `python -m unittest tests.test_adoptions_review_state tests.test_adoptions_review_session`
   - `Get-Content -Raw ..\..\agent_memory\workflows\adoptions-review.md`
 - Notes / discoveries:
-  - review остаётся operator-driven stage, поэтому docs и helper APIs важнее, чем попытка эмулировать чат внутри CLI.
+  - review остаётся operator-driven stage, поэтому docs и helper APIs важнее, чем попытка эмулировать чат внутри CLI;
+  - минимальный code path оформлен как `load_review_session_context(...)` + `apply_review_decision(...)` без ввода отдельной CLI-команды, чтобы не смешивать review conversation и deterministic runtime catalog.
 
 ### M4. Integration Validation And Rebuild-Master Handoff
 
-- Status: `planned`
+- Status: `in_progress`
 - Goal:
   - синхронизировать docs/tests/runtime memory и передать стабильный upstream contract в `rebuild-master`.
 - Deliverables:
@@ -170,18 +171,20 @@
 - `2026-04-22 15:53` — Initial implementation split выбран как `runtime intake` + `agent-guided review support`, а не как два fully productized CLI workflows. — Причина: user описал review как ручную Q&A session, а текущая архитектура инструмента уже хорошо поддерживает deterministic stages и плохо подходит для встроенного conversational REPL. — Это уменьшает implementation risk и не мешает позже productize review stage отдельно.
 - `2026-04-22 16:33` — Для deterministic intake выбран CLI command `intake-adoptions`, а не review/acceptance-oriented имя. — Причина: runtime step делает только normalizing handoff `vacancies/<id>/adoptions.md -> adoptions/inbox/<vacancy_id>.md + adoptions/questions/open.md` и не должен создавать ложное впечатление, что он уже решает review или acceptance. — Это удерживает контракт M1 узким и совместимым с последующим M2 helper layer.
 - `2026-04-22 16:58` — Review helper state зафиксирован в двух markdown contracts: `questions/open.md` с секциями `Pending / Answered / Closed` и `accepted/MASTER.md` как current-state table approved signals. — Причина: этого достаточно для agent-guided review без отдельного CLI REPL и без перехода к append-only history log. — Это делает M3 про orchestration поверх стабильных helper APIs, а не про повторное проектирование file format.
+- `2026-04-22 17:04` — Agent-guided review surface оставлен вне workflow registry и оформлен как module-level API плюс workflow doc. — Причина: review по-прежнему driven by operator conversation, а не deterministic command invocation. — Это удерживает каталог runtime workflows чистым и даёт downstream `rebuild-master` уже стабильный upstream contract.
 
 ## Progress log
 
 - `2026-04-22 15:53` — Создан execution plan на основе завершённого planning plan `2026-04-22-adoptions-review-and-acceptance-workflow.md`. — Следующий шаг уже не про product ambiguity, а про код: начать deterministic intake workflow. — Status: `in_progress`.
 - `2026-04-22 16:33` — M1 завершён: добавлен workflow `intake-adoptions`, он зарегистрирован в runtime CLI/registry/catalog, детерминированно рендерит `adoptions/inbox/<vacancy_id>.md`, синхронизирует initial unresolved items в `adoptions/questions/open.md` и не трогает `adoptions/accepted/MASTER.md`, `knowledge/roles/` или `resumes/MASTER.md`. — Validation: `python -m unittest tests.test_adoptions_intake_workflow tests.test_cli tests.test_memory_store` -> `OK`, `python run_agent.py --root ../.. list-workflows` показывает `intake-adoptions`. — Status: `in_progress`.
 - `2026-04-22 16:58` — M2 завершён: добавлен reusable helper module `review_state.py`, intake переведён на общий question-ledger API, а новые tests `tests.test_adoptions_review_state` фиксируют merge/idempotency/update semantics для question statuses и accepted current-state store. — Validation: `python -m unittest tests.test_adoptions_review_state` -> `OK`, повторная проверка `python -m unittest tests.test_adoptions_intake_workflow tests.test_cli tests.test_memory_store` -> `OK`. — Status: `in_progress`.
+- `2026-04-22 17:04` — M3 завершён: добавлен review support module `adoptions_review.py`, тесты `tests.test_adoptions_review_session` покрывают загрузку pending context и применение approved updates, а `agent_memory/workflows/adoptions-review.md` фиксирует operator-facing contract без standalone CLI REPL. — Validation: `python -m unittest tests.test_adoptions_review_state tests.test_adoptions_review_session` -> `OK`, `Get-Content ..\..\agent_memory\workflows\adoptions-review.md`, повторная проверка `python -m unittest tests.test_adoptions_intake_workflow tests.test_cli tests.test_memory_store` -> `OK`. — Status: `in_progress`.
 
 ## Current state
 
-- Current milestone: `M3`
+- Current milestone: `M4`
 - Current status: `in_progress`
-- Next step: `Оформить agent-guided review support surface: code path/helper entrypoints для загрузки pending context и применения approved updates к `questions/open.md` и `accepted/MASTER.md`.`
+- Next step: `Синхронизировать integration/docs/handoff слой: обновить public docs, зафиксировать upstream contract для `rebuild-master` и прогнать full validation baseline.`
 - Active blockers:
   - none
 - Open questions:
