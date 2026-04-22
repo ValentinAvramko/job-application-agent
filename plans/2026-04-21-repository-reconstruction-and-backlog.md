@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-22 11:08`
+- Last updated: `2026-04-22 11:42`
 - Overall status: `in_progress`
 
 ## Objective
@@ -223,6 +223,7 @@
 - `2026-04-22 10:58` — Первый execution milestone внутри M5 закрыт: `prepare-screening` встроен в runtime CLI/catalog surface и подтверждён targeted validation. — Это превращает plan из latent implementation branch в реально доступный workflow текущего стека. — Следующий execution focus смещён на M3 того же плана: full suite и real-scenario smoke run.
 - `2026-04-22 11:08` — `prepare-screening` завершён как первый remaining workflow: full suite остаётся зелёным, а smoke run на реальной вакансии подтвердил создание `screening.md`, update `meta.yml` и runtime-memory trail без выхода за vacancy-local boundary. — Это закрывает первый execution branch внутри M5. — Следующий execution focus смещён на открытие dedicated plan для `rebuild-master`, где пока не определены permanent-signal/accepted-adoption contracts.
 - `2026-04-22 11:18` — Для следующего workflow открыт dedicated plan `2026-04-22-rebuild-master-workflow.md`. — Базовая разведка показала, что `resumes/MASTER.md`, `adoptions/accepted/` и `knowledge/roles/` уже существуют, но canonical merge contract между ними не закреплён. — Следующий execution focus теперь сводится к одному owner-level решению по permanent-signal destination.
+- `2026-04-22 11:42` — Owner-level sequencing уточнён: перед `rebuild-master` появился отдельный upstream process для review/acceptance signals (`inbox/` + `questions/` -> `accepted/` + `knowledge/roles`). — Это меняет не только contract, но и очередь remaining workflows внутри M5. — Для нового upstream process открыт dedicated plan `2026-04-22-adoptions-review-and-acceptance-workflow.md`.
 
 ## Progress log
 
@@ -245,12 +246,13 @@
 - `2026-04-22 10:58` — CLI/catalog/operator integration для `prepare-screening` завершена: targeted tests и `list-workflows` подтверждают, что workflow теперь зарегистрирован и доступен через public entrypoint. — Master M5 остаётся активным, потому что для полного handoff этого первого remaining workflow ещё нужен M3 smoke-check на реальном vacancy scenario. — Status: `in_progress`.
 - `2026-04-22 11:08` — Первый remaining workflow закрыт end-to-end: `prepare-screening` теперь реализован, провалидирован и опробован на реальной вакансии. — Master M5 продолжается уже не вокруг этого workflow, а вокруг следующего dependency-gated этапа `rebuild-master`. — Status: `in_progress`.
 - `2026-04-22 11:18` — M5 продолжен через dedicated plan для `rebuild-master`: baseline contract inventory собран, а активный blocker сведён к product decision по permanent signals и accepted adoptions. — Это отделяет реальную нехватку решения от технической неопределённости и не даёт prematurely стартовать risky resume-editing workflow. — Status: `in_progress`.
+- `2026-04-22 11:42` — M5 перепоследован после owner clarification: ближайшим planning/execution step теперь является отдельный review/acceptance workflow, а `rebuild-master` переведён в downstream-зависимость от него. — Это повышает качество sequencing: сначала approval/normalization, потом master mutation, потом role rebuild. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M5`
 - Current status: `in_progress`
-- Next step: `Внутри `2026-04-22-rebuild-master-workflow.md` принять owner-level решение по permanent-signal destination между `adoptions/accepted/`, `knowledge/roles/` и `resumes/MASTER.md`, прежде чем планировать реализацию workflow.`
+- Next step: `Внутри `2026-04-22-adoptions-review-and-acceptance-workflow.md` зафиксировать interaction shape для acceptance session и file contract для `inbox/`, `questions/` и `accepted/MASTER.md`.`
 - Active blockers:
   - none
 - Open questions:

@@ -4,7 +4,7 @@
 - Slug: `2026-04-22-rebuild-master-workflow`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 11:18`
+- Last updated: `2026-04-22 11:42`
 - Overall status: `blocked`
 
 ## Objective
@@ -28,11 +28,12 @@
 - root-normalization workstream закрепил `adoptions/` как long-lived review layer, а `vacancies/<id>/adoptions.md` — как generated staging artifact;
 - safety backlog уже зафиксировал, что `rebuild-master` нельзя начинать без explicit permanent-signal store и accepted-signal destination.
 
-Главная неопределённость сейчас не в коде, а в продуктовом контракте:
+Главная неопределённость теперь сместилась из product contract в sequencing:
 
-- что именно считается accepted permanent signal;
-- где он живёт до merge в `resumes/MASTER.md`;
-- должен ли `knowledge/roles/` участвовать как отдельный normalized store или оставаться downstream derivative.
+- accepted permanent signals уже закреплены как approved staging items в `adoptions/accepted/MASTER.md`;
+- `resumes/MASTER.md` должен обновляться отдельным, более редким шагом;
+- `knowledge/roles/` пересматривается в review-процессе, но не является canonical input для `rebuild-master`;
+- перед `rebuild-master` появился отдельный upstream process: vacancy-specific proposals должны сначала пройти через `inbox/` и `questions/`, затем превратиться в `accepted/`.
 
 ## Scope
 
@@ -53,16 +54,15 @@
 ## Assumptions
 
 - `resumes/MASTER.md` должен оставаться единственным durable factual source для профиля кандидата;
-- `adoptions/accepted/` может выступать review/approval layer, но это ещё не равнозначно окончательному merge destination;
-- `knowledge/roles/` нужен для normalized role signals, но его точная роль относительно `MASTER` пока не закреплена;
-- без явной policy нельзя безопасно автоматизировать merge permanent signals в `MASTER`.
+- `adoptions/accepted/MASTER.md` является canonical approved staging layer для future merge в `resumes/MASTER.md`;
+- `knowledge/roles/` обновляется в review-процессе и нужен downstream для role resume rebuild, но не как direct source-of-truth для `rebuild-master`;
+- роль-резюме всегда должны строиться только после обновлённого и согласованного `resumes/MASTER.md`.
 
 ## Risks and unknowns
 
-- если accepted signals будут жить сразу в нескольких местах, появятся конкурирующие источники истины;
 - если merge policy окажется слишком жёсткой, workflow превратится в опасный auto-editor для `MASTER.md`;
-- если оставить `knowledge/roles/` и `adoptions/accepted/` без разделения ролей, последующие workflows снова упрётся в drift;
-- неясно, должен ли workflow собирать сигналы только из `adoptions/accepted/MASTER.md` или ещё и из runtime/vacancy history.
+- если upstream review process не будет формализован отдельно, `rebuild-master` снова начнёт смешивать raw vacancy drafts и approved signals;
+- если не развести cadence между `accepted/ -> MASTER` и `MASTER -> role resumes`, появится drift между canonical master и ролевыми версиями.
 
 ## External touchpoints
 
@@ -97,7 +97,7 @@
 
 ### M2. Permanent Signal Contract Decision
 
-- Status: `blocked`
+- Status: `done`
 - Goal:
   - закрепить, где живут accepted permanent signals и как они переходят в `resumes/MASTER.md`.
 - Deliverables:
@@ -111,7 +111,12 @@
 - Validation commands:
   - `Get-Content -Raw plans\2026-04-22-rebuild-master-workflow.md`
 - Notes / discoveries:
-  - этот milestone зависит от owner/product clarification и не должен закрываться молчаливым предположением.
+  - Решение зафиксировано:
+    - raw vacancy-specific proposals сначала живут в `adoptions/inbox/<vacancy_id>.md`;
+    - unresolved questions накапливаются параллельно в `adoptions/questions/`;
+    - review/acceptance process формирует `adoptions/accepted/MASTER.md` и при необходимости обновляет `knowledge/roles/`;
+    - `rebuild-master` читает approved signals из `adoptions/accepted/MASTER.md` и отдельно редактирует `resumes/MASTER.md`;
+    - role resumes обновляются только отдельным downstream process после согласованного `MASTER`.
 
 ### M3. Implementation-Ready Rebuild-Master Plan
 
@@ -128,29 +133,31 @@
 - Validation commands:
   - `Get-Content -Raw plans\2026-04-22-rebuild-master-workflow.md`
 - Notes / discoveries:
-  - implementation decomposition имеет смысл только после закрытия M2.
+  - implementation decomposition теперь зависит не от product ambiguity, а от отдельного upstream workflow plan для review/acceptance process.
 
 ## Decision log
 
 - `2026-04-22 11:18` — Следующим workflow после `prepare-screening` выбран `rebuild-master`, но стартовать его реализацию без отдельного plan нельзя. — Причина: ordered backlog уже фиксирует dependency gate по permanent-signal store. — Поэтому сначала открыт dedicated planning artifact, а не implementation branch.
 - `2026-04-22 11:18` — `adoptions/accepted/` и `knowledge/roles/` рассматриваются как реальные candidate stores, а не как hypothetical future paths. — Они уже существуют в root repo и должны быть учтены в contract decision. — Это сужает вопрос с абстрактного “где хранить сигналы” до конкретного выбора ролей между существующими слоями.
+- `2026-04-22 11:42` — Принят owner-level contract: approved permanent signals сначала живут в `adoptions/accepted/MASTER.md`, а попадание в `resumes/MASTER.md` является отдельным, более редким шагом. — Это жёстко разделяет review/approval layer и canonical resume mutation layer. — `rebuild-master` больше не должен напрямую зависеть от raw vacancy drafts или от `knowledge/roles/` как competing source of truth.
+- `2026-04-22 11:42` — Перед `rebuild-master` выделен отдельный upstream process `inbox/questions -> accepted + knowledge/roles`. — Причина: именно там происходит human/agent review, ответы на вопросы и нормализация постоянных сигналов. — Следовательно, `rebuild-master` остаётся downstream workflow и не является ближайшим implementation step.
 
 ## Progress log
 
 - `2026-04-22 11:18` — Создан dedicated plan для `rebuild-master` и закрыт baseline milestone M1 на основе текущего состояния `resumes/MASTER.md`, `adoptions/` и `knowledge/`. — Root inspection подтвердил наличие intended review/knowledge layers, но не дал безопасного ответа, кто именно является canonical input для merge в `MASTER`. — Status: `blocked`.
+- `2026-04-22 11:42` — M2 contract decision закрыт по ответу owner: canonical approved staging layer — `adoptions/accepted/MASTER.md`, а `knowledge/roles/` пересматривается в отдельном review process и не является direct input для `rebuild-master`. — Это снимает product ambiguity внутри самого `rebuild-master`, но переводит блокировку на upstream process planning. — Status: `blocked`.
 
 ## Current state
 
-- Current milestone: `M2`
+- Current milestone: `M3`
 - Current status: `blocked`
-- Next step: `Получить owner-level решение: accepted permanent signals должны сначала жить в `adoptions/accepted/MASTER.md`, в `knowledge/roles/`, или сразу редактировать `resumes/MASTER.md` как единственный staging destination перед rebuild.`
+- Next step: `Дождаться стабилизации отдельного upstream plan для review/acceptance process (`inbox/` -> `questions/` -> `accepted/` + `knowledge/roles`), затем разложить `rebuild-master` на кодовые implementation milestones.`
 - Active blockers:
-  - Не зафиксирован canonical destination для accepted permanent signals.
-  - Не разделены роли review layer (`adoptions/accepted/`) и normalized knowledge layer (`knowledge/roles/`) относительно `MASTER`.
+  - Upstream review/acceptance process ещё не оформлен отдельным implementation plan.
 - Open questions:
-  - Что считать canonical input для `rebuild-master`: только `adoptions/accepted/MASTER.md` или смесь accepted signals + normalized role knowledge?
-  - Нужен ли `knowledge/roles/` как обязательный промежуточный слой до обновления `MASTER`, или он должен быть downstream derivative уже после `rebuild-master`?
+  - Должен ли `rebuild-master` дополнительно формировать change report/diff artifact рядом с `MASTER.md`, или достаточно обновления самого файла?
+  - Нужен ли batching policy для `accepted/MASTER.md`, чтобы merge в `MASTER` работал по срезам, а не по всему файлу целиком?
 
 ## Completion summary
 
-Заполняется после завершения всех milestones. На текущем этапе baseline создан, главный blocker явно сформулирован, и дальнейшее движение зависит от owner-level contract decision, а не от нехватки технической разведки.
+Заполняется после завершения всех milestones. На текущем этапе baseline и product contract уже зафиксированы; текущий blocker для `rebuild-master` теперь чисто sequencing-oriented и связан с отсутствием отдельного implementation plan для upstream review/acceptance process.
