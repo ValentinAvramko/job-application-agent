@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-22 08:55`
+- Last updated: `2026-04-22 09:10`
 - Overall status: `in_progress`
 
 ## Objective
@@ -134,7 +134,7 @@
 
 ### M3. Repository Cleanup, Root Normalization, And Plan Artifact Migration
 
-- Status: `in_progress`
+- Status: `done`
 - Goal:
   - навести порядок в root data/template/output layer;
   - перенести содержимое superseded planning artifacts в актуальные plan files;
@@ -156,7 +156,7 @@
 - Notes / discoveries:
   - cleanup включает не только root data/output layer, но и migration/removal старых planning artifacts;
   - M1 workstream-шаг по inventory/migration map закрыт; M2 canonical root contracts тоже закрыт; M3 output-placement decisions тоже закрыты;
-  - оставшийся focus inside master M3 — legacy prompt/doc distillation как последний cleanup substep root-normalization workstream-а.
+  - финальный cleanup substep по legacy prompt/doc distillation тоже закрыт, поэтому master M3 завершён полностью.
 
 ### M4. Current Workflow Completion Gate
 
@@ -166,7 +166,7 @@
   - отделить незавершенности текущего стека от planning remaining workflows.
 - Deliverables:
   - completion gate для текущего workflow-стека;
-  - отдельный plan/checklist по незакрытым задачам current workflow stack;
+  - отдельный plan/checklist по незакрытым задачам current workflow stack (`2026-04-22-current-workflow-completion-gate.md`);
   - обновленный `Current state` в master plan.
 - Acceptance criteria:
   - однозначно зафиксировано, что считается "доделанным" для текущего workflow-стека;
@@ -178,6 +178,7 @@
   - `python run_agent.py --root ../.. list-workflows`
 - Notes / discoveries:
   - safety-план закрыл boundary и guardrails, но не дал ответа на вопрос, что считать минимально завершенным состоянием current workflow stack.
+  - dedicated plan `2026-04-22-current-workflow-completion-gate.md` открыт как рабочий артефакт для этого milestone.
 
 ### M5. Ordered Planning For Remaining Workflows
 
@@ -209,6 +210,8 @@
 - `2026-04-21 20:35` — M1 в workstream-плане root normalization завершен: добавлены inventory matrix и migration map, зафиксировано, какие root artifacts реально участвуют в runtime сегодня. — Это сместило активный шаг M3 с инвентаризации на canonical root contract decisions. — Master plan синхронизирован с новым состоянием workstream-а.
 - `2026-04-21 21:02` — M2 в workstream-плане root normalization завершен: canonical contracts закреплены для `resumes`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel, templates и legacy corpus. — Это снимает часть source-of-truth конфликтов и переводит активный шаг M3 на output placement clarification. — Master plan обновлен без изменения общей очередности `M3 -> M4 -> M5`.
 - `2026-04-21 20:33` — M3 output-placement decisions в root-normalization workstream закрыты: `vacancies/<id>/` зафиксирован как working output layer для vacancy-scoped generation, `profile/` — как home для durable profile derivatives, а `archive/`, `resumes/versions/` и `employers/` — как manual-only historical/reference layers вне runtime и agent workflows. — Это снимает blocker по output home/lifecycle policy и оставляет в M3 только legacy corpus distillation. — Master sequencing `M3 -> M4 -> M5` сохраняется.
+- `2026-04-22 09:10` — Legacy prompt/doc corpus дистиллирован в root-normalization workstream plan: `promts/*.md` разнесены по будущим workflow-направлениям, `responses.md` закреплён как historical vacancy corpus, а `adoptions_00.md` — как historical adoption corpus/examples bank. — Это закрывает последний cleanup substep master M3 и позволяет перейти к explicit current workflow completion gate. — Active milestone смещён на M4.
+- `2026-04-22 09:10` — Для master M4 открыт отдельный plan `2026-04-22-current-workflow-completion-gate.md`. — Completion gate требует собственного contradiction ledger и явного решения по blocker-ам текущего стека. — Следующий execution focus переносится в этот новый plan.
 
 ## Progress log
 
@@ -219,21 +222,21 @@
 - `2026-04-21 20:35` — M1 в workstream-плане root normalization завершен: добавлены inventory matrix и migration map, подтверждено, что runtime реально живет на `resumes/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores. — M1 validation passed with `root/plans = False`, `profile/contact-regions.yml = False` and 3 current vacancy directories; активный шаг M3 смещен на canonical root contracts. — Status: `in_progress`.
 - `2026-04-21 21:02` — M2 в workstream-плане root normalization завершен: canonical contract map зафиксировал разделение между durable root stores, generated vacancy-local artifacts и historical/reference layers. — Ключевой результат: root `adoptions/` признан long-lived review layer, а `vacancies/<id>/adoptions.md` — staging artifact текущего runtime. — Status: `in_progress`.
 - `2026-04-21 20:33` — M3 output-placement substep в root-normalization workstream закрыт: validation confirmed the current contents of `employers/`, `archive/` и `resumes/versions/`, after which placement and lifecycle rules were fixed in the workstream plan. — Следующий cleanup focus внутри master M3 переместился на legacy prompt/doc distillation (`promts/`, `responses.md`, `adoptions_00.md`). — Status: `in_progress`.
+- `2026-04-22 09:10` — Master M3 закрыт: root-normalization workstream завершён полностью после фиксации distillation map по `promts/*.md`, `responses.md` и `adoptions_00.md`, а также подтверждения, что старые root plan/spec artifacts по-прежнему отсутствуют. — Cleanup больше не является активным этапом; следующий шаг смещён на explicit completion gate текущего workflow-стека. — Status: `done`.
+- `2026-04-22 09:10` — Master M4 стартовал: создан отдельный plan `2026-04-22-current-workflow-completion-gate.md` и зафиксирован initial baseline по CLI, runtime memory и tests. — `list-workflows` показывает только `ingest-vacancy` и `analyze-vacancy`, тогда как `show-memory` и `WORKFLOW_CATALOG` всё ещё включают `bootstrap`; `unittest` остаётся зелёным (`39 tests, OK`). — Status: `in_progress`.
 
 ## Current state
 
-- Current milestone: `M3`
+- Current milestone: `M4`
 - Current status: `in_progress`
-- Next step: `Продолжить master M3 через M4 workstream-плана 2026-04-21-root-artifacts-and-output-normalization.md: дистиллировать `promts/`, `responses.md` и `adoptions_00.md` в управляемый reference/spec layer.`
+- Next step: `Продолжить plan `2026-04-22-current-workflow-completion-gate.md`: собрать contradiction ledger и candidate completion criteria для `bootstrap`, `ingest-vacancy` и `analyze-vacancy`.`
 - Active blockers:
   - Не зафиксирован отдельный completion gate по текущему workflow-стеку после safety workstream.
-  - Legacy prompt/doc corpus все еще не дистиллирован в active plans, templates или tests, so cleanup workstream еще не закрыт.
 - Open questions:
   - Какой набор `bootstrap` / `ingest-vacancy` / `analyze-vacancy` нужно считать минимально завершенным до M5?
   - Нужно ли после M3 открывать отдельный plan по completion gate текущих workflow или достаточно checklist внутри master plan?
-  - Какие части legacy corpus нужно перенести в tests, templates или specs, а какие оставить purely historical?
 
 ## Completion summary
 
-Заполняется после завершения M1-M5. На текущем этапе master plan находится в фазе repository cleanup и migration/removal superseded planning artifacts.
+Заполняется после завершения M1-M5. На текущем этапе cleanup и migration/removal superseded planning artifacts завершены; активная фаза смещена на M4 current workflow completion gate.
 

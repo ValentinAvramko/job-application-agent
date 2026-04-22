@@ -4,8 +4,8 @@
 - Slug: `2026-04-21-root-artifacts-and-output-normalization`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-22 08:55`
-- Overall status: `in_progress`
+- Last updated: `2026-04-22 09:10`
+- Overall status: `done`
 
 ## Objective
 
@@ -150,6 +150,25 @@
 | `archive/*` | Historical specialized exports and related artifacts | Historical archive only | Keep as manual archive; do not model as runtime output sink |
 | `resumes/versions/*.md` historical snapshots | Resume text history | Manual snapshot archive for master or role resume evolution | Keep as manual snapshot history; do not mix with runtime artifacts |
 
+## M4 Legacy Corpus Distillation Map
+
+| Legacy artifact | Observed role in corpus | Managed status after distillation | Target destination for reusable content | Notes |
+| --- | --- | --- | --- | --- |
+| `promts/promt-analyze-vacancies-and-respond.md` | Monolithic manual playbook for vacancy analysis, fit scoring, resume adaptation, cover letter, contact handling and interview prep | Historical reference only; explicitly non-canonical | Reusable parts should inform active workflow plans: fit/adaptation rules for current stack, interview/storyline material for `plans/2026-04-21-prepare-screening-workflow.md`, and any future response/correspondence workflow spec | The file still contains valuable business intent, but bundles too many concerns and legacy file assumptions to remain a live contract |
+| `promts/promt-create-master-resume.md` | Manual prompt for synthesizing a master resume from a candidate resume plus vacancy corpus | Historical reference only; explicitly non-canonical | Future `rebuild-master` workflow plan/spec, checklists and example fixtures | Useful as a requirements seed for desired roles extraction, fit consolidation, gap questions and modular adaptation logic |
+| `promts/promt-create-custom-resumes.md` | Manual batch playbook for generating five role resumes from `MASTER` | Historical reference only; explicitly non-canonical | Future `rebuild-role-resume` workflow plan/spec, role-positioning rules and example fixtures | Valuable for role differentiation logic, but the monolithic batch-generation prompt should not become the runtime contract |
+| `promts/promt-create-linkedin-profile.md` | Manual guide for building bilingual LinkedIn profile content from the master resume | Historical reference only; explicitly non-canonical | Future `build-linkedin` workflow plan/spec, templates and output checklist | Useful as a deliverable map and section checklist, not as a current source of truth |
+| `promts/OPTIONAL_RULES.yml` | Lightweight formatting/localization preferences for manual resume generation | Legacy/manual-only helper | Future template or workflow-owned formatting policy if productized later | Not consumed by current runtime; keep outside canonical contracts until code explicitly adopts it |
+| `responses.md` | Large manual vacancy corpus with 160+ role descriptions and one-off role decompositions | Historical corpus and potential eval/example bank; explicitly non-canonical | Future planning inputs, eval cases and example fixtures for vacancy analysis and screening workflows | Treat as mined evidence and sample data only; do not use as runtime input or current spec |
+| `adoptions_00.md` | Large role-oriented bank of resume adaptation suggestions with `TEMP` / `PERM` statuses across CIO/CTO/HoE/HoD/EM | Historical corpus and potential example/rules bank; explicitly non-canonical | Future adoptions-review contracts, role-resume rebuild specs, examples and eval fixtures | Valuable for reusable suggestion patterns, but root `adoptions/` remains the canonical long-lived review layer after M2 |
+
+## M4 Final Cleanup Decisions
+
+- Superseded root planning artifacts were already removed before M4 and no additional plan/spec deletions remain open.
+- `promts/`, `responses.md` and `adoptions_00.md` stay in the repository as read-only historical/reference corpus until successor workflow specs and examples fully absorb the reusable parts.
+- Active plans and runtime stores remain the only current sources of truth; the legacy corpus must not be edited to represent live workflow behavior.
+- Reusable rules mined from the legacy corpus should move into one of three destinations only: active plans, future templates/spec artifacts, or eval/example fixtures.
+
 ## Milestones
 
 ### M1. Root Artifact Inventory And Migration Map
@@ -229,7 +248,7 @@
 
 ### M4. Legacy Prompt And Superseded Plan Distillation
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - превратить накопленные prompt/doc/plan materials в управляемый knowledge/spec layer;
   - удалить superseded plan artifacts после переноса их содержательных решений.
@@ -247,7 +266,10 @@
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\plans\resume-agent-spec.md"`
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\plans\repository-topology.md"`
 - Notes / discoveries:
-  - задача этого milestone не в архивной пометке, а в полном переносе содержания и последующем удалении superseded files.
+  - `promts/*.md` распались на четыре будущих workflow направления: analyze/respond, rebuild-master, rebuild-role-resume и build-linkedin.
+  - `responses.md` — это исторический vacancy corpus/manual evidence bank, полезный для future eval/spec work, но не runtime input.
+  - `adoptions_00.md` — это исторический банк role-specific adoption suggestions; он не конкурирует с canonical root `adoptions/`, а может служить только reference/examples corpus.
+  - Superseded root plan/spec artifacts уже удалены; M4 зафиксировал, что дальнейшая работа состоит не в дополнительных удалениях, а в controlled reuse legacy corpus.
 
 ## Decision log
 
@@ -258,6 +280,7 @@
 - `2026-04-21 20:35` — Текущий runtime root-контракт фактически опирается на `resumes/`, `vacancies/`, `agent_memory/` и `response-monitoring.xlsx`; `templates/`, `resumes/versions/`, `archive/`, `employers/` и legacy prompt corpus пока не являются runtime inputs. — Это подтверждено поиском по коду и фактической файловой структурой. — Дальнейшие решения нужно принимать относительно реального producer/consumer graph.
 - `2026-04-21 21:02` — Root canonical contracts разделены на три слоя: durable source-of-truth stores, vacancy-local generated execution artifacts и historical/reference layers. — Это позволило снять конфликт между root `adoptions/` и vacancy-local `adoptions.md`, а также между workbook-контрактом и template docs. — После M2 следующий фокус смещается на output pipeline migration path.
 - `2026-04-21 20:33` — Output placement зафиксирован как разделение между runtime-owned vacancy-local artifacts и manual-only historical/reference layers. — Это снимает конфликт между `resumes/versions/`, `archive/` и `employers/`: все три пути остаются ручными архивными слоями вне productized pipeline. — M3 считается закрытым, следующий фокус смещается на legacy corpus distillation.
+- `2026-04-22 09:10` — Legacy corpus зафиксирован как read-only historical/reference layer с явным distillation map по будущим workflow-направлениям. — Это снимает неопределённость вокруг `promts/`, `responses.md` и `adoptions_00.md`: полезное содержимое можно переиспользовать только через active plans, templates/specs или eval/examples, но не как live contract. — Workstream root normalization считается завершённым.
 
 ## Progress log
 
@@ -268,19 +291,21 @@
 - `2026-04-21 20:35` — В план добавлены M1 inventory matrix и migration map по реальным root artifacts, включая `response-monitoring.xlsx`, `agent_memory/`, legacy corpus и уже удаленный root `plans/`. — Проверка кода показала, что runtime сегодня реально работает через `resumes/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores; validation confirmed `Test-Path root/plans = False`, `Test-Path profile/contact-regions.yml = False`, `vacancies/` currently contains 3 directories. — Status: `done`.
 - `2026-04-21 21:02` — M2 canonical contract map добавлен в workstream-план и зафиксировал роли для `resumes`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel, templates, legacy corpus и manual output traces. — Ключевые решения: `resumes/MASTER.md` остается единственным durable facts source, root `adoptions/` — long-lived review layer, а vacancy-local `adoptions.md` — generated staging artifact. — Status: `done`.
 - `2026-04-21 20:33` — M3 output placement rules добавлены в workstream plan и закрепили, что vacancy-scoped generation живет в `vacancies/<id>/`, а `resumes/versions/`, `archive/` и `employers/` остаются manual-only historical/reference layers вне runtime и agent workflows. — Валидация подтвердила фактическое contents `employers/`, `archive/` и `resumes/versions/`, включая one-off renderer script и historical artifacts. — Status: `done`.
+- `2026-04-22 09:10` — M4 закрыт: добавлена distillation map для `promts/*.md`, `responses.md` и `adoptions_00.md`, а legacy corpus закреплён как historical/reference layer без права конкурировать с active plans и runtime stores. — Review структуры файлов показал четыре будущих workflow направления в `promts/`, исторический vacancy corpus в `responses.md` и historical adoption bank в `adoptions_00.md`; старые root plan/spec files по-прежнему отсутствуют. — Status: `done`.
 
 ## Current state
 
 - Current milestone: `M4`
-- Current status: `in_progress`
-- Next step: `Начать M4: дистиллировать `promts/`, `responses.md` и `adoptions_00.md` в управляемый reference/spec layer и добрать final cleanup decisions по legacy corpus.`
+- Current status: `done`
+- Next step: `Перейти к master milestone M4 и зафиксировать current workflow completion gate для `bootstrap`, `ingest-vacancy` и `analyze-vacancy`.`
 - Active blockers:
-  - Current runtime все еще не синхронизирован с root `adoptions/` и `profile/contact-regions.yml`, даже после фиксации canonical contracts.
-  - Не дистиллирован legacy prompt/doc corpus, поэтому часть business intent еще живет в historical materials.
+  - none
 - Open questions:
-  - Какие части `promts/`, `responses.md` и `adoptions_00.md` нужно перенести в plans, templates или tests, а какие оставить historical-only?
-  - Нужно ли для legacy corpus отдельно помечать material suitable for future eval cases versus pure archive?
+  - none
 
 ## Completion summary
 
-Заполняется после завершения workstream-а по нормализации root artifacts, migration prompt/doc corpus и удалению superseded root planning artifacts.
+- Поставлена полная карта root artifact contracts: active runtime stores, target long-lived stores, manual historical layers и legacy reference corpus.
+- Провалидированы и закрыты M1-M4: inventory/migration map, canonical contracts, output placement и distillation legacy corpus.
+- Подтверждено, что superseded root plan/spec artifacts удалены, а `promts/`, `responses.md` и `adoptions_00.md` остаются только historical/reference слоями.
+- Следующий follow-up — не продолжение cleanup, а master-level completion gate по текущему workflow-стеку.
