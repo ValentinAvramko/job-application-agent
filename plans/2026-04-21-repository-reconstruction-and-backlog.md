@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-22 10:23`
+- Last updated: `2026-04-22 10:26`
 - Overall status: `in_progress`
 
 ## Objective
@@ -160,7 +160,7 @@
 
 ### M4. Current Workflow Completion Gate
 
-- Status: `in_progress`
+- Status: `done`
 - Goal:
   - после M3 явно определить, что именно еще не доведено в `bootstrap`, `ingest-vacancy`, `analyze-vacancy`;
   - отделить незавершенности текущего стека от planning remaining workflows.
@@ -218,6 +218,7 @@
 - `2026-04-22 10:14` — В remediation plan закрыт M1 по `bootstrap` catalog boundary: `WORKFLOW_CATALOG` и runtime memory синхронизированы под setup-only semantics, а `README.md` больше не описывает `bootstrap` как runtime workflow. — Это снимает первый blocker внутри master M4 и переводит execution focus на path remediation `CV/` -> `resumes/`. — Master plan остаётся в M4 до закрытия remaining blocker-ов.
 - `2026-04-22 10:17` — В remediation plan закрыт M2 по resume path alignment: `analyze-vacancy`, adjacent `prepare-screening`, их tests и operator-facing runbook переведены с `CV/` на `resumes/`. — Это снимает path drift между кодом и фактическим root contract; в master M4 остаётся только явная реализация Excel prerequisite policy. — Следующий execution focus смещён на M3 remediation.
 - `2026-04-22 10:23` — В remediation plan закрыт M3 по Excel prerequisite contract: `ingest-vacancy` теперь fail-fast валидирует `response-monitoring.xlsx`, а tests и operator-facing docs описывают workbook как обязательный prerequisite. — Это снимает последний содержательный blocker master M4; остаётся только финальная валидация и handback в completion gate/master sequencing. — Следующий execution focus смещён на M4 remediation validation.
+- `2026-04-22 10:26` — Remediation plan завершён полностью: финальная validation подтвердила согласованность `list-workflows` и runtime memory, допустимость report-first stale history и зелёный full `unittest` baseline (`42 tests, OK`). — Master M4 можно считать закрытым; dependency gate перед M5 снят. — Следующий execution focus переносится на ordered planning remaining workflows.
 
 ## Progress log
 
@@ -235,12 +236,13 @@
 - `2026-04-22 10:14` — Первый remediation substep завершён: `python run_agent.py --root ../.. list-workflows` теперь согласован с `project_memory.workflow_catalog`, а `python -m unittest tests.test_memory_store tests.test_cli` проходит (`5 tests, OK`). — Bootstrap catalog drift снят; remaining focus внутри M4 смещён на `CV/` -> `resumes/` и explicit Excel prerequisite. — Status: `in_progress`.
 - `2026-04-22 10:17` — Второй remediation substep завершён: targeted search по workflow/tests/runbook больше не находит `CV` path references, а `python -m unittest tests.test_analyze_workflow tests.test_prepare_screening_workflow` проходит (`5 tests, OK`). — Resume path drift снят; активным blocker-ом внутри master M4 остаётся только explicit Excel prerequisite contract. — Status: `in_progress`.
 - `2026-04-22 10:23` — Третий remediation substep завершён: `ingest-vacancy` больше не создаёт partial vacancy scaffold без workbook, а `python -m unittest tests.test_ingest_workflow tests.test_analyze_workflow tests.test_prepare_screening_workflow` проходит (`29 tests, OK`). — Все содержательные blocker-ы M4 сняты; master plan переходит к финальной remediation validation и handback. — Status: `in_progress`.
+- `2026-04-22 10:26` — Master M4 закрыт: `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory` и `python -m unittest discover -s tests` подтверждают, что current stack больше не имеет скрытых contract blocker-ов для feature planning. — Следующий этап master sequencing смещён на M5 ordered planning for remaining workflows. — Status: `done`.
 
 ## Current state
 
-- Current milestone: `M4`
-- Current status: `in_progress`
-- Next step: `Завершить `2026-04-22-current-stack-contract-remediation.md` через M4 validation/handback и затем закрыть master M4.`
+- Current milestone: `M5`
+- Current status: `planned`
+- Next step: `Вернуться к `2026-04-21-prepare-screening-workflow.md`, снять stale blocked-state после закрытия M4 и переоценить порядок remaining workflow plans.`
 - Active blockers:
   - none
 - Open questions:

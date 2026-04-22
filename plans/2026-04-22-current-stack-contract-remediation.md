@@ -4,8 +4,8 @@
 - Slug: `2026-04-22-current-stack-contract-remediation`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 10:23`
-- Overall status: `in_progress`
+- Last updated: `2026-04-22 10:26`
+- Overall status: `done`
 
 ## Objective
 
@@ -125,7 +125,7 @@ Completion gate из `2026-04-22-current-workflow-completion-gate.md` зафик
 
 ### M4. Validation And Handback To Completion Gate
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - подтвердить, что remediation снял gate blocker-ы и можно вернуться к master sequencing.
 - Deliverables:
@@ -140,7 +140,8 @@ Completion gate из `2026-04-22-current-workflow-completion-gate.md` зафик
   - `python -m unittest discover -s tests`
   - `Get-Content -Raw plans\2026-04-22-current-workflow-completion-gate.md`
 - Notes / discoveries:
-  - none yet
+  - `show-memory` по-прежнему репортит большой stale historical trail, но это уже соответствует принятому report-first reconciliation contract и не блокирует handback.
+  - После remediation master sequencing можно безопасно вернуть к M5 ordered planning без повторного gate-review по тем же drift-темам.
 
 ## Decision log
 
@@ -155,12 +156,13 @@ Completion gate из `2026-04-22-current-workflow-completion-gate.md` зафик
 - `2026-04-22 10:14` — M1 закрыт: `bootstrap` удалён из canonical workflow catalog, а sync project memory теперь переписывает legacy catalog к точному runtime-списку. — `python run_agent.py --root ../.. list-workflows` показывает только `analyze-vacancy` и `ingest-vacancy`; `python -m unittest tests.test_memory_store tests.test_cli` -> `5 tests, OK`. — Status: `done`.
 - `2026-04-22 10:17` — M2 закрыт: active и adjacent resume code paths переведены с `CV/` на `resumes/`, operator-facing runbook синхронизирован, а тестовые fixtures теперь создают ролевые резюме только в `resumes/`. — Targeted search по workflow/tests/runbook не находит `CV` path references, `python -m unittest tests.test_analyze_workflow tests.test_prepare_screening_workflow` -> `5 tests, OK`. — Status: `done`.
 - `2026-04-22 10:23` — M3 закрыт: `response-monitoring.xlsx` оформлен как явный mandatory prerequisite с fail-fast validation до создания vacancy scaffold, добавлены tests на missing/invalid workbook и обновлены README/runbook. — `python -m unittest tests.test_ingest_workflow tests.test_analyze_workflow tests.test_prepare_screening_workflow` -> `29 tests, OK`; operator-facing docs явно описывают prerequisite и failure mode. — Status: `done`.
+- `2026-04-22 10:26` — M4 закрыт: финальная remediation validation подтверждает, что `list-workflows` и `project_memory.workflow_catalog` согласованы, `show-memory` оставляет только допустимый stale historical trail, а `python -m unittest discover -s tests` -> `42 tests, OK`. — Completion-gate и master plan синхронизированы, workstream можно считать завершённым. — Status: `done`.
 
 ## Current state
 
 - Current milestone: `M4`
-- Current status: `in_progress`
-- Next step: `Провести финальную валидацию remediation, обновить completion-gate/master plans и закрыть workstream.`
+- Current status: `done`
+- Next step: `Вернуться в master plan и начать M5 ordered planning for remaining workflows, начиная с revalidation плана `2026-04-21-prepare-screening-workflow.md`.`
 - Active blockers:
   - none
 - Open questions:
@@ -168,4 +170,7 @@ Completion gate из `2026-04-22-current-workflow-completion-gate.md` зафик
 
 ## Completion summary
 
-Заполняется после завершения remediation workstream-а.
+- Публичный current stack приведён к одной модели: `bootstrap` остался setup-only command вне workflow catalog, runtime resume root унифицирован на `resumes/`, а `response-monitoring.xlsx` оформлен как явный hard prerequisite ingest path.
+- Валидация подтверждена реальными CLI checks и полным test baseline: `list-workflows` согласован с runtime memory, `show-memory` честно диагностирует только допустимый historical trail, `python -m unittest discover -s tests` проходит (`42 tests, OK`).
+- Operator-facing docs синхронизированы через public `README.md` и private runbook `tooling/run-ingest-analyze.md`.
+- Следующий этап возвращается в master sequencing: ordered planning remaining workflows (`M5`) больше не заблокирован drift-темами current stack.

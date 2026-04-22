@@ -4,7 +4,7 @@
 - Slug: `2026-04-22-current-workflow-completion-gate`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 10:03`
+- Last updated: `2026-04-22 10:26`
 - Overall status: `done`
 
 ## Objective
@@ -187,18 +187,20 @@
 - `2026-04-22 09:10` — Completion gate вынесен в отдельный plan, а не оставлен абзацем внутри master plan. — Здесь нужен самостоятельный contradiction ledger и gate checklist по текущему стеку. — Это снижает риск снова смешать cleanup, safety findings и future feature planning.
 - `2026-04-22 09:17` — Для completion gate собран первый contradiction ledger и draft completion matrix. — Это перевело workstream из стадии baseline collection в стадию gate decisions: теперь спор идёт не о том, где доказательства, а о том, что считать blocker-ом для feature expansion. — M1 можно считать завершённым.
 - `2026-04-22 10:03` — Gate decisions приняты и упакованы в отдельный remediation plan. — Это снимает двусмысленность по текущему стеку: `bootstrap` больше не должен жить в workflow catalog, `resumes/` признан единственным валидным resume root, а `response-monitoring.xlsx` закреплён как обязательный prerequisite текущего ingest path. — Completion gate как planning/workstream можно считать завершённым.
+- `2026-04-22 10:26` — Remediation plan завершён и подтвердил, что все gate blocker-ы сняты: `bootstrap` убран из runtime catalog, `resumes/` закреплён в active/adjacent workflow surface, а Excel prerequisite стал explicit fail-fast contract. — Это закрывает execution handback по completion gate и возвращает управление в master M5 sequencing. — Completion gate остаётся завершённым без открытых blocker-ов.
 
 ## Progress log
 
 - `2026-04-22 09:10` — Workstream открыт на основании master M4 и первичного baseline по CLI, runtime memory и tests. — `python run_agent.py --root ../.. list-workflows` показывает 2 workflow, `show-memory` показывает registry/catalog mismatch и stale historical trail, `python -m unittest discover -s tests` -> `39 tests, OK`. — Status: `in_progress`.
 - `2026-04-22 09:17` — M1 закрыт: в план добавлены contradiction ledger, draft completion matrix и gate questions по текущему стеку. — Дополнительная верификация показала, что `bootstrap` расходится между registry и memory catalog, `ingest-vacancy` не имеет зафиксированной Excel failure policy, а `analyze-vacancy` всё ещё читает `CV/`, хотя реальный workspace уже использует `resumes/`. — Status: `done`.
 - `2026-04-22 10:03` — M2 и M3 закрыты: gate decisions зафиксированы, а remediation path вынесен в отдельный execution plan. — Non-blocking items (`vacancy-local adoptions.md`, stale runtime history) оформлены как допустимые interim contracts/follow-ups; blocking items (`bootstrap` catalog drift, `CV/` -> `resumes/`, explicit Excel prerequisite) переданы в remediation plan. — Status: `done`.
+- `2026-04-22 10:26` — Execution handback завершён: remediation plan закрыл три blocking темы, а финальная validation подтвердила `list-workflows`/memory alignment и зелёный `unittest` baseline (`42 tests, OK`). — Current stack больше не требует отдельного completion gate перед переходом к planning remaining workflows. — Status: `done`.
 
 ## Current state
 
 - Current milestone: `M2`
 - Current status: `done`
-- Next step: `Исполнить remediation plan `2026-04-22-current-stack-contract-remediation.md` и снять blocker-ы current workflow stack перед возвратом в master plan.` 
+- Next step: `Вернуться в master plan и продолжить M5 ordered planning remaining workflows без повторного gate-review по current stack.` 
 - Active blockers:
   - none
 - Open questions:

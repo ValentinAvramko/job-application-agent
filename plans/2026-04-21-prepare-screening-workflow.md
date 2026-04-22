@@ -4,8 +4,8 @@
 - Slug: `2026-04-21-prepare-screening-workflow`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-22 08:55`
-- Overall status: `blocked`
+- Last updated: `2026-04-22 10:26`
+- Overall status: `planned`
 
 ## Objective
 
@@ -92,7 +92,7 @@ M1 этого плана уже реализовал ядро `prepare-screening
 
 ### M2. CLI, Catalog, And Operator Surface
 
-- Status: `blocked`
+- Status: `planned`
 - Goal:
   - встроить новый workflow в registry/catalog/CLI и синхронизировать operator-facing contract.
 - Deliverables:
@@ -111,7 +111,7 @@ M1 этого плана уже реализовал ядро `prepare-screening
 
 ### M3. Full Validation And Real-Scenario Smoke Check
 
-- Status: `blocked`
+- Status: `planned`
 - Goal:
   - прогнать end-to-end validation на полном наборе тестов и одном реальном vacancy-local сценарии, затем зафиксировать итоговый контракт.
 - Deliverables:
@@ -134,6 +134,7 @@ M1 этого плана уже реализовал ядро `prepare-screening
 - `2026-04-21 19:10` — Для M1 выбран vacancy-local markdown artifact `screening.md` с deterministic fallback-логикой вместо жесткой зависимости от полностью заполненного `analysis.md`. — Это делает workflow полезным даже на historical/placeholder-analysis данных. — M1 удалось закрыть без Excel/git side effects.
 - `2026-04-21 19:15` — После завершения M1 выполнение плана поставлено на паузу по запросу пользователя. — План переведен в `blocked`, чтобы пауза была отражена в source of truth. — M2 не продолжается без явного возобновления.
 - `2026-04-21 19:51` — После обновления master plan `prepare-screening` больше не считается следующим execution step. — До его продолжения должны быть завершены repository cleanup и current workflow completion gate. — План остается `blocked` уже не только из-за паузы, но и из-за новой последовательности реализации.
+- `2026-04-22 10:26` — Master M4 завершён, поэтому dependency gate для продолжения `prepare-screening` снят. — Это не делает план автоматически следующим шагом без переоценки очередности remaining workflows, но переводит его из `blocked` обратно в `planned`. — Дальше план должен рассматриваться уже внутри master M5.
 
 ## Progress log
 
@@ -141,16 +142,15 @@ M1 этого плана уже реализовал ядро `prepare-screening
 - `2026-04-21 19:10` — M1 реализовал `PrepareScreeningWorkflow`, прямые runtime/meta updates и отдельный test module с happy path, placeholder-analysis fallback и stale vacancy guardrail. — `python -m unittest tests.test_prepare_screening_workflow` -> `3 tests, OK`; `python -m unittest tests.test_analyze_workflow tests.test_prepare_screening_workflow` -> `5 tests, OK`. — Status: `done`.
 - `2026-04-21 19:15` — После успешного завершения M1 план переведен в паузу по запросу пользователя. — Дополнительная валидация не требовалась, так как код и план уже были в зеленом состоянии перед паузой. — Status: `blocked`.
 - `2026-04-21 19:51` — План синхронизирован с новой master-plan последовательностью. — Дополнительной кодовой валидации не проводилось, так как менялась только очередность реализации. — Status: `blocked`.
+- `2026-04-22 10:26` — План переведён из `blocked` в `planned` после закрытия master M4 и remediation по current stack. — Следующий шаг теперь не ждать completion gate, а переоценить, остается ли `prepare-screening` первым кандидатом в M5 ordered planning. — Status: `planned`.
 
 ## Current state
 
 - Current milestone: `M2`
-- Current status: `blocked`
-- Next step: `Не возобновлять этот план до завершения repository cleanup и отдельного completion gate для \`bootstrap\` / \`ingest-vacancy\` / \`analyze-vacancy\`; после этого решить, остается ли этот plan в очереди без изменений.`
+- Current status: `planned`
+- Next step: `В рамках master M5 переоценить этот plan после закрытия current-stack remediation и решить, возобновляется ли он следующим remaining workflow без изменения scope.`
 - Active blockers:
-  - План поставлен на паузу по запросу пользователя.
-  - Master plan больше не считает `prepare-screening` следующим этапом.
-  - Нет зафиксированного completion gate, подтверждающего, что existing workflows уже достаточно доведены для feature expansion.
+  - Master M5 ещё не подтвердил итоговый порядок remaining workflow plans.
 - Open questions:
   - Нужно ли после M3/M4 продолжать именно этот implementation plan или переоткрыть `prepare-screening` уже в новой очереди remaining workflows?
   - Нужен ли более формальный downstream contract для структуры `screening.md`, если от него будут зависеть следующие workflow?
