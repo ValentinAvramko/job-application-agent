@@ -4,8 +4,8 @@
 - Slug: `2026-04-22-current-workflow-completion-gate`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 09:17`
-- Overall status: `in_progress`
+- Last updated: `2026-04-22 10:03`
+- Overall status: `done`
 
 ## Objective
 
@@ -95,6 +95,26 @@
 - Must the current stack be considered blocked until all `CV/` references are migrated to `resumes/`, given that the real workspace no longer has a `CV/` directory?
 - Is vacancy-local `adoptions.md` acceptable as the current runtime staging contract until a dedicated migration to root `adoptions/` happens?
 
+## M2 Gate Decisions
+
+| Topic | Decision | Impact on current stack |
+| --- | --- | --- |
+| `bootstrap` catalog boundary | `bootstrap` is a setup-only CLI command, not a runtime workflow and not a member of the workflow catalog | `WORKFLOW_CATALOG`, `project_memory.workflow_catalog`, tests and docs must stop treating `bootstrap` as a workflow entry |
+| `CV/` vs `resumes/` path contract | `resumes/` is the only valid canonical resume root for current and future work | All code, tests and operator docs that still read `CV/` require remediation before the current stack can be considered minimally done |
+| `response-monitoring.xlsx` dependency policy | For the current stack, workbook integration remains a hard prerequisite, not a degradable mode | `ingest-vacancy` should fail explicitly and predictably when the workbook is missing or broken; docs must state this precondition |
+| Vacancy-local `adoptions.md` | Accept as the current staging/runtime artifact until a separate migration to root `adoptions/` is implemented | This does not block completion gate closure for the current stack |
+| Stale runtime historical trail | Accept report-first reconciliation as sufficient current behavior | No remediation is required before feature expansion as long as diagnostics stay explicit |
+
+## M2 Completion Checklist
+
+| Area | Final gate status | Resolution path |
+| --- | --- | --- |
+| `bootstrap` catalog drift | `requires_fix` | Remove `bootstrap` from workflow catalog defaults and align memory/tests/docs to setup-only semantics |
+| `CV/` -> `resumes/` drift | `requires_fix` | Remediate code/tests/docs to use `resumes/` consistently |
+| Excel dependency ambiguity | `requires_fix` | Keep workbook mandatory, but encode the rule explicitly in code/tests/docs |
+| Vacancy-local `adoptions.md` | `explicitly_deferred` | Keep as accepted interim contract until a later adoptions-pipeline workstream |
+| Stale runtime history | `done_now` | Current reconciliation behavior is sufficient for gate purposes |
+
 ## Milestones
 
 ### M1. Completion Gate Evidence Baseline
@@ -124,7 +144,7 @@
 
 ### M2. Gate Decisions And Minimal-Done Criteria
 
-- Status: `in_progress`
+- Status: `done`
 - Goal:
   - принять решения по тому, что именно считается достаточным состоянием current stack перед feature expansion.
 - Deliverables:
@@ -140,11 +160,13 @@
   - `Get-Content -Raw plans\2026-04-21-repository-reconstruction-and-backlog.md`
   - `python run_agent.py --root ../.. list-workflows`
 - Notes / discoveries:
-  - Стартует после собранного contradiction ledger из M1; первыми решениями требуют M2 `bootstrap` catalog boundary, `CV/` -> `resumes/` migration expectation и Excel failure policy.
+  - `bootstrap` reclassified as setup-only CLI command outside workflow catalog.
+  - `resumes/` confirmed as the only valid runtime resume root; `CV/` drift remains a real blocker until fixed.
+  - `response-monitoring.xlsx` kept as a hard prerequisite for the current stack; remediation should make this rule explicit and operator-visible.
 
 ### M3. Follow-Up Packaging
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - упаковать результат gate review в следующий конкретный execution step.
 - Deliverables:
@@ -157,31 +179,34 @@
   - `Get-Content -Raw plans\2026-04-22-current-workflow-completion-gate.md`
   - `Get-Content -Raw plans\2026-04-21-repository-reconstruction-and-backlog.md`
 - Notes / discoveries:
-  - Заполняется после M2.
+  - Blockers from M2 are packaged into `2026-04-22-current-stack-contract-remediation.md`.
+  - Feature planning remains gated behind execution of that remediation plan.
 
 ## Decision log
 
 - `2026-04-22 09:10` — Completion gate вынесен в отдельный plan, а не оставлен абзацем внутри master plan. — Здесь нужен самостоятельный contradiction ledger и gate checklist по текущему стеку. — Это снижает риск снова смешать cleanup, safety findings и future feature planning.
 - `2026-04-22 09:17` — Для completion gate собран первый contradiction ledger и draft completion matrix. — Это перевело workstream из стадии baseline collection в стадию gate decisions: теперь спор идёт не о том, где доказательства, а о том, что считать blocker-ом для feature expansion. — M1 можно считать завершённым.
+- `2026-04-22 10:03` — Gate decisions приняты и упакованы в отдельный remediation plan. — Это снимает двусмысленность по текущему стеку: `bootstrap` больше не должен жить в workflow catalog, `resumes/` признан единственным валидным resume root, а `response-monitoring.xlsx` закреплён как обязательный prerequisite текущего ingest path. — Completion gate как planning/workstream можно считать завершённым.
 
 ## Progress log
 
 - `2026-04-22 09:10` — Workstream открыт на основании master M4 и первичного baseline по CLI, runtime memory и tests. — `python run_agent.py --root ../.. list-workflows` показывает 2 workflow, `show-memory` показывает registry/catalog mismatch и stale historical trail, `python -m unittest discover -s tests` -> `39 tests, OK`. — Status: `in_progress`.
 - `2026-04-22 09:17` — M1 закрыт: в план добавлены contradiction ledger, draft completion matrix и gate questions по текущему стеку. — Дополнительная верификация показала, что `bootstrap` расходится между registry и memory catalog, `ingest-vacancy` не имеет зафиксированной Excel failure policy, а `analyze-vacancy` всё ещё читает `CV/`, хотя реальный workspace уже использует `resumes/`. — Status: `done`.
+- `2026-04-22 10:03` — M2 и M3 закрыты: gate decisions зафиксированы, а remediation path вынесен в отдельный execution plan. — Non-blocking items (`vacancy-local adoptions.md`, stale runtime history) оформлены как допустимые interim contracts/follow-ups; blocking items (`bootstrap` catalog drift, `CV/` -> `resumes/`, explicit Excel prerequisite) переданы в remediation plan. — Status: `done`.
 
 ## Current state
 
 - Current milestone: `M2`
-- Current status: `in_progress`
-- Next step: `Зафиксировать gate decisions по `bootstrap` catalog boundary, `CV/` -> `resumes/` drift и Excel dependency policy, чтобы отделить реальные blocker-ы от допустимых follow-up.` 
+- Current status: `done`
+- Next step: `Исполнить remediation plan `2026-04-22-current-stack-contract-remediation.md` и снять blocker-ы current workflow stack перед возвратом в master plan.` 
 - Active blockers:
-  - Не зафиксировано, является ли `bootstrap` частью workflow catalog или отдельной setup-командой.
-  - Код current stack всё ещё использует `CV/`, хотя в реальном workspace существует только `resumes/`.
-  - Не определено, считать ли `response-monitoring.xlsx` жёсткой обязательной зависимостью или degradable integration.
+  - none
 - Open questions:
-  - Можно ли считать vacancy-local `adoptions.md` допустимым interim contract до отдельной миграции в root `adoptions/`?
-  - Нужен ли отдельный remediation implementation plan после gate review?
+  - none
 
 ## Completion summary
 
-Заполняется после завершения workstream-а.
+- Собран и закрыт completion gate для текущего workflow-стека: contradictions сведены в один ledger, по ним приняты явные решения и отделены blocker-ы от допустимых follow-up.
+- Подтверждено, что blocking remediation сейчас касается трёх зон: `bootstrap` catalog drift, `CV/` -> `resumes/` path drift и explicit Excel prerequisite policy.
+- Подтверждено, что vacancy-local `adoptions.md` и report-first stale runtime reconciliation не блокируют следующий этап.
+- Следующий execution step вынесен в `2026-04-22-current-stack-contract-remediation.md`.
