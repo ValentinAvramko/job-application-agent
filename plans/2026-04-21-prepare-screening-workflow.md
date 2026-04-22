@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-prepare-screening-workflow`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-21 19:51`
+- Last updated: `2026-04-22 08:55`
 - Overall status: `blocked`
 
 ## Objective
@@ -62,7 +62,7 @@ M1 этого плана уже реализовал ядро `prepare-screening
 ## External touchpoints
 
 - `C:\Users\avramko\OneDrive\Documents\Career\vacancies\` — чтение / обновление / проверка — источник vacancy-local артефактов и место записи `screening.md`;
-- `C:\Users\avramko\OneDrive\Documents\Career\CV\` — чтение / проверка — источник role resume для self-intro и talking points;
+- `C:\Users\avramko\OneDrive\Documents\Career\resumes\` — чтение / проверка — источник role resume для self-intro и talking points;
 - `C:\Users\avramko\OneDrive\Documents\Career\agent_memory\runtime\` — чтение / обновление / проверка — task memory и workflow run history;
 - `C:\Users\avramko\OneDrive\Documents\Career\agent_memory\workflows\` — обновление / проверка — private contract для нового workflow;
 - `C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\2026-04-21-repository-reconstruction-and-backlog.md` — чтение / проверка — текущая очередность реализации и dependency gate;

@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-workflow-contract-alignment-and-safety`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-21 19:51`
+- Last updated: `2026-04-22 08:55`
 - Overall status: `done`
 
 ## Objective
@@ -75,7 +75,7 @@
 - `C:\Users\avramko\OneDrive\Documents\Career\agent_memory\runtime\` — чтение / обновление / проверка — task/project/user memory и run history;
 - `C:\Users\avramko\OneDrive\Documents\Career\agent_memory\workflows\` — чтение / обновление / проверка — workflow contracts;
 - `C:\Users\avramko\OneDrive\Documents\Career\response-monitoring.xlsx` — чтение / обновление / проверка — ingest side effect и внешний Excel contract;
-- `C:\Users\avramko\OneDrive\Documents\Career\CV\` — чтение / проверка — role resumes для `analyze-vacancy`;
+- `C:\Users\avramko\OneDrive\Documents\Career\resumes\` — чтение / проверка — role resumes для `analyze-vacancy`;
 - `C:\Users\avramko\OneDrive\Documents\Career\tooling\git\` — чтение / обновление / проверка — intended git flow;
 - `C:\Users\avramko\OneDrive\Documents\Career\tooling\run-ingest-analyze.md` и `tooling\git-workflow.md` — чтение / обновление / проверка — operator-facing contract.
 
@@ -160,11 +160,11 @@
 
     | Priority | Workflow | Proposed minimal contract | External touchpoints | Dependency gate | Validation baseline |
     | --- | --- | --- | --- | --- | --- |
-    | `1` | `prepare-screening` | Input: `vacancy_id`, optional `selected_resume`, `output_language`, `preparation_depth`. Output: `vacancies/<vacancy_id>/screening.md` со storyline, self-intro и screening questions. | `vacancies/<id>/meta.yml`, `analysis.md`, `adoptions.md`, `CV/<role>.md` | Опирается на existing vacancy-local contour. | `python run_agent.py --root ../.. prepare-screening --vacancy-id <id>` |
-    | `2` | `rebuild-master` | Input: `CV/MASTER.md`, accepted permanent signals, confirmed new user facts, processed vacancy history. Output: updated `CV/MASTER.md` + change report. | `CV/MASTER.md`, `adoptions/accepted/MASTER.md`, `agent_memory/runtime/`, `knowledge/` | Требует explicit permanent-signal store. | targeted unittest + smoke diff |
-    | `3` | `rebuild-role-resume` | Input: `CV/MASTER.md`, role signal base, target role. Output: updated `CV/<role>.md` + diff summary. | `CV/MASTER.md`, role CV files, `knowledge/roles/`, `adoptions/accepted/` | Зависит от `rebuild-master`. | targeted CLI/test validation |
-    | `4` | `build-linkedin` | Input: `CV/MASTER.md`, optional role/language. Output: draft `profile/linkedin.md` или аналогичный artifact. | `CV/MASTER.md`, `profile/`, optional `knowledge/roles/` | Зависит от стабильного `MASTER`. | smoke-check draft |
-    | `5` | `export-resume-pdf` | Input: target resume, `output_language`, `contact_region`, optional template. Output: PDF + render verification artifact. | `CV/<role>.md` или `CV/MASTER.md`, `profile/contact-regions.yml`, `templates/` | Не стартует до фиксации rendering/contact contract. | CLI export + render verification |
+    | `1` | `prepare-screening` | Input: `vacancy_id`, optional `selected_resume`, `output_language`, `preparation_depth`. Output: `vacancies/<vacancy_id>/screening.md` со storyline, self-intro и screening questions. | `vacancies/<id>/meta.yml`, `analysis.md`, `adoptions.md`, `resumes/<role>.md` | Опирается на existing vacancy-local contour. | `python run_agent.py --root ../.. prepare-screening --vacancy-id <id>` |
+    | `2` | `rebuild-master` | Input: `resumes/MASTER.md`, accepted permanent signals, confirmed new user facts, processed vacancy history. Output: updated `resumes/MASTER.md` + change report. | `resumes/MASTER.md`, `adoptions/accepted/MASTER.md`, `agent_memory/runtime/`, `knowledge/` | Требует explicit permanent-signal store. | targeted unittest + smoke diff |
+    | `3` | `rebuild-role-resume` | Input: `resumes/MASTER.md`, role signal base, target role. Output: updated `resumes/<role>.md` + diff summary. | `resumes/MASTER.md`, role resume files, `knowledge/roles/`, `adoptions/accepted/` | Зависит от `rebuild-master`. | targeted CLI/test validation |
+    | `4` | `build-linkedin` | Input: `resumes/MASTER.md`, optional role/language. Output: draft `profile/linkedin.md` или аналогичный artifact. | `resumes/MASTER.md`, `profile/`, optional `knowledge/roles/` | Зависит от стабильного `MASTER`. | smoke-check draft |
+    | `5` | `export-resume-pdf` | Input: target resume, `output_language`, `contact_region`, optional template. Output: PDF + render verification artifact. | `resumes/<role>.md` или `resumes/MASTER.md`, `profile/contact-regions.yml`, `templates/` | Не стартует до фиксации rendering/contact contract. | CLI export + render verification |
 
   - Explicit hold points before feature expansion:
     - для `rebuild-master` / `rebuild-role-resume` нужно закрепить destination для permanent adoptions и accepted signals;

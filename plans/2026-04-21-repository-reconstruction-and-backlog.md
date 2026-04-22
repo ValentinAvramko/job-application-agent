@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-21 20:33`
+- Last updated: `2026-04-22 08:55`
 - Overall status: `in_progress`
 
 ## Objective
@@ -31,14 +31,14 @@
 - `python -m unittest discover -s tests` проходит;
 - `pytest` в текущем окружении отсутствует;
 - runtime memory содержит stale ссылки на отсутствующие vacancy folders;
-- root-слой содержит незавершённые long-lived stores (`knowledge/`, `profile/`, `adoptions/`) и manual/historical artifacts (`Employers/`, `archive/`, `promts/`);
+- root-слой содержит незавершённые long-lived stores (`knowledge/`, `profile/`, `adoptions/`) и manual/historical artifacts (`employers/`, `archive/`, `promts/`);
 - superseded plan/spec artifacts (`plans/resume-agent-spec.md`, `plans/repository-topology.md`, `tooling/application-agent/plans/ingest-refactor-plan.md`) мигрированы в active plans и удалены.
 
 Содержательно из старых артефактов уже мигрированы или подлежат миграции в новую структуру следующие намерения:
 
 - public/private split: код и инженерные решения живут в `tooling/application-agent`, root хранит данные, шаблоны, результаты и orchestration artifacts;
 - target workflow catalog: `prepare-screening`, `rebuild-master`, `rebuild-role-resume`, `build-linkedin`, `export-resume-pdf`;
-- source-of-truth rules: `CV/MASTER.md` остаётся главным фактическим источником о кандидате, ролевые CV — производные, contact/profile overlays должны жить отдельно от resume text;
+- source-of-truth rules: `resumes/MASTER.md` остаётся главным фактическим источником о кандидате, ролевые resumes — производные, contact/profile overlays должны жить отдельно от resume text;
 - output contracts и long-lived stores должны быть явно определены, а не оставаться скрытыми в historical docs и manual artifacts.
 
 Главный источник путаницы на текущий момент:
@@ -60,7 +60,7 @@
 ### Out of scope
 
 - реализация новых workflows в рамках этого master plan;
-- изменение фактического содержимого `CV/`, `knowledge/`, `profile/`, `adoptions/`;
+- изменение фактического содержимого `resumes/`, `knowledge/`, `profile/`, `adoptions/`;
 - генерация новых resume/PDF/LinkedIn outputs;
 - неограниченная перепись runtime и root данных без отдельного workstream-плана.
 
@@ -83,7 +83,7 @@
 - `C:\Users\avramko\OneDrive\Documents\Career\vacancies\` — чтение / проверка — фактические vacancy artifacts и рассинхронизация с runtime;
 - `C:\Users\avramko\OneDrive\Documents\Career\agent_memory\` — чтение / проверка — workflow contracts и runtime state;
 - `C:\Users\avramko\OneDrive\Documents\Career\response-monitoring.xlsx` — чтение / проверка — фактический Excel contract;
-- `C:\Users\avramko\OneDrive\Documents\Career\CV\` — чтение / проверка — source-of-truth для resume branch;
+- `C:\Users\avramko\OneDrive\Documents\Career\resumes\` — чтение / проверка — source-of-truth для resume branch;
 - `C:\Users\avramko\OneDrive\Documents\Career\plans\` — historical touchpoint; superseded root planning artifacts уже мигрированы и удалены;
 - `C:\Users\avramko\OneDrive\Documents\Career\tooling\run-ingest-analyze.md` и `tooling\git-workflow.md` — чтение / проверка — operator-facing contract.
 
@@ -207,8 +207,8 @@
 - `2026-04-21 19:51` — Старые плановые артефакты (`plans/resume-agent-spec.md`, `plans/repository-topology.md`, `tooling/application-agent/plans/ingest-refactor-plan.md`) должны быть не просто помечены, а содержательно перенесены в новые active plans и затем удалены. — Это убирает конкурирующие источники истины. — Migration/removal включены в M3.
 - `2026-04-21 19:51` — Planning remaining workflows отложен за completion gate по текущему workflow-стеку. — Safety findings недостаточно, чтобы считать `ingest-vacancy` и `analyze-vacancy` полностью доведенными. — До завершения M4 feature expansion не является следующим шагом.
 - `2026-04-21 20:35` — M1 в workstream-плане root normalization завершен: добавлены inventory matrix и migration map, зафиксировано, какие root artifacts реально участвуют в runtime сегодня. — Это сместило активный шаг M3 с инвентаризации на canonical root contract decisions. — Master plan синхронизирован с новым состоянием workstream-а.
-- `2026-04-21 21:02` — M2 в workstream-плане root normalization завершен: canonical contracts закреплены для `CV`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel, templates и legacy corpus. — Это снимает часть source-of-truth конфликтов и переводит активный шаг M3 на output pipeline migration path. — Master plan обновлен без изменения общей очередности `M3 -> M4 -> M5`.
-- `2026-04-21 20:33` — M3 output-placement decisions в root-normalization workstream закрыты: `vacancies/<id>/` зафиксирован как working output layer для vacancy-scoped generation, `profile/` — как home для durable profile derivatives, `archive/` — как finalized-export sink, `Employers/` — как manual-only reference workspace. — Это снимает blocker по output home/lifecycle policy и оставляет в M3 только legacy corpus distillation. — Master sequencing `M3 -> M4 -> M5` сохраняется.
+- `2026-04-21 21:02` — M2 в workstream-плане root normalization завершен: canonical contracts закреплены для `resumes`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel, templates и legacy corpus. — Это снимает часть source-of-truth конфликтов и переводит активный шаг M3 на output placement clarification. — Master plan обновлен без изменения общей очередности `M3 -> M4 -> M5`.
+- `2026-04-21 20:33` — M3 output-placement decisions в root-normalization workstream закрыты: `vacancies/<id>/` зафиксирован как working output layer для vacancy-scoped generation, `profile/` — как home для durable profile derivatives, а `archive/`, `resumes/versions/` и `employers/` — как manual-only historical/reference layers вне runtime и agent workflows. — Это снимает blocker по output home/lifecycle policy и оставляет в M3 только legacy corpus distillation. — Master sequencing `M3 -> M4 -> M5` сохраняется.
 
 ## Progress log
 
@@ -216,9 +216,9 @@
 - `2026-04-21 16:43` — Создан master plan и выделены самостоятельные workstreams для дальнейшей работы без повторного обследования. — Валидация опирается на файловую структуру, `unittest` и документированные команды CLI. — Status: `in_progress`.
 - `2026-04-21 19:51` — Master plan пересобран после повторного review всех plans и superseded artifacts. — Последовательность зафиксирована как `M3 cleanup -> M4 completion gate -> M5 planning remaining workflows`. — Status: `in_progress`.
 - `2026-04-21 19:51` — Superseded plan/spec artifacts мигрированы в active plans и удалены из репозитория. — Валидация migration/removal теперь опирается на `Test-Path = False` для старых файлов и на содержимое новых plan files. — Status: `in_progress`.
-- `2026-04-21 20:35` — M1 в workstream-плане root normalization завершен: добавлены inventory matrix и migration map, подтверждено, что runtime реально живет на `CV/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores. — M1 validation passed with `root/plans = False`, `profile/contact-regions.yml = False` and 3 current vacancy directories; активный шаг M3 смещен на canonical root contracts. — Status: `in_progress`.
+- `2026-04-21 20:35` — M1 в workstream-плане root normalization завершен: добавлены inventory matrix и migration map, подтверждено, что runtime реально живет на `resumes/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores. — M1 validation passed with `root/plans = False`, `profile/contact-regions.yml = False` and 3 current vacancy directories; активный шаг M3 смещен на canonical root contracts. — Status: `in_progress`.
 - `2026-04-21 21:02` — M2 в workstream-плане root normalization завершен: canonical contract map зафиксировал разделение между durable root stores, generated vacancy-local artifacts и historical/reference layers. — Ключевой результат: root `adoptions/` признан long-lived review layer, а `vacancies/<id>/adoptions.md` — staging artifact текущего runtime. — Status: `in_progress`.
-- `2026-04-21 20:33` — M3 output-placement substep в root-normalization workstream закрыт: validation confirmed the current contents of `Employers/`, `archive/` и `CV/versions/`, after which placement and lifecycle rules were fixed in the workstream plan. — Следующий cleanup focus внутри master M3 переместился на legacy prompt/doc distillation (`promts/`, `responses.md`, `adoptions_00.md`). — Status: `in_progress`.
+- `2026-04-21 20:33` — M3 output-placement substep в root-normalization workstream закрыт: validation confirmed the current contents of `employers/`, `archive/` и `resumes/versions/`, after which placement and lifecycle rules were fixed in the workstream plan. — Следующий cleanup focus внутри master M3 переместился на legacy prompt/doc distillation (`promts/`, `responses.md`, `adoptions_00.md`). — Status: `in_progress`.
 
 ## Current state
 
