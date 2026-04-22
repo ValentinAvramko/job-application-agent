@@ -4,7 +4,7 @@
 - Slug: `2026-04-22-adoptions-review-and-acceptance-workflow`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 11:42`
+- Last updated: `2026-04-22 13:50`
 - Overall status: `in_progress`
 
 ## Objective
@@ -13,28 +13,29 @@
 
 - vacancy-specific предложения сначала попадали в `adoptions/inbox/<vacancy_id>.md`;
 - unresolved вопросы накапливались в `adoptions/questions/`;
-- ручная agent-guided session переводила approved signals в `adoptions/accepted/MASTER.md`;
+- отдельная interactive agent-guided session переводила approved signals в `adoptions/accepted/MASTER.md`;
 - в этой же session при необходимости пересматривались `knowledge/roles/`;
 - downstream `rebuild-master` получал уже только approved permanent signals, а не сырые vacancy drafts.
 
 ## Background and context
 
-После завершения `prepare-screening` следующим по safety backlog был `rebuild-master`, но owner-level clarification уточнила sequencing:
+После завершения `prepare-screening` следующим remaining workflow по backlog initially выглядел `rebuild-master`, но owner-level clarification зафиксировала другое sequencing:
 
-1. после анализа каждой вакансии сырые предложения по конкретной вакансии должны жить в `adoptions/inbox/<vacancy_id>.md`;
-2. в том же контуре должны накапливаться вопросы в `adoptions/questions/`;
-3. отдельный ручной process должен разбирать `inbox/`, собирать ответы на `questions/`, формировать `accepted/` и пересматривать `knowledge/roles/`;
-4. только после этого, более редким отдельным process, обновляется `resumes/MASTER.md`, а затем downstream role resumes.
+1. после анализа каждой вакансии сырые предложения должны жить в `adoptions/inbox/<vacancy_id>.md`;
+2. параллельно должны накапливаться вопросы в `adoptions/questions/`;
+3. отдельный ручной/agent-guided process должен разбирать `inbox/`, собирать ответы на `questions/`, формировать `accepted/` и при необходимости пересматривать `knowledge/roles/`;
+4. только после этого отдельный, более редкий process обновляет `resumes/MASTER.md`, а затем downstream role resumes.
 
-Это означает, что review/acceptance process стал самостоятельным upstream workflow family и больше не должен быть скрытой частью `rebuild-master`.
-
-Подтверждённые факты:
+Дополнительно подтверждено:
 
 - `vacancies/<id>/adoptions.md` уже существует как generated staging artifact после `analyze-vacancy`;
 - `adoptions/` уже содержит `inbox/`, `accepted/`, `questions/`;
-- `adoptions/questions/open.md` уже существует как placeholder;
-- `knowledge/roles/` существует как intended normalized store, но пока практически пуст;
-- accepted permanent signals должны сначала жить в `adoptions/accepted/MASTER.md`, а не попадать напрямую в `resumes/MASTER.md`.
+- `adoptions/questions/open.md` уже существует как placeholder shared ledger;
+- `knowledge/roles/` пока практически пуст, но остаётся intended normalized store;
+- accepted permanent signals должны сначала жить в `adoptions/accepted/MASTER.md`, а не попадать напрямую в `resumes/MASTER.md`;
+- role resumes всегда должны строиться только downstream от согласованного `resumes/MASTER.md`.
+
+Это означает, что review/acceptance process стал самостоятельным upstream workflow family и больше не должен быть скрытой частью `rebuild-master`.
 
 ## Scope
 
@@ -42,36 +43,39 @@
 
 - file/state contract для `adoptions/inbox/`, `adoptions/questions/`, `adoptions/accepted/`, `knowledge/roles/`;
 - sequencing между vacancy-local `adoptions.md` и root review layers;
-- минимальный contract для ручной/agent-guided acceptance session;
-- implementation-ready plan для последующей автоматизации этого review process.
+- минимальный contract для deterministic intake step и отдельной interactive acceptance session;
+- implementation-ready decomposition для последующей автоматизации этого review process.
 
 ### Out of scope
 
 - прямое обновление `resumes/MASTER.md`;
 - реализация `rebuild-master` и role resume rebuild;
 - ретроспективная миграция всех historical vacancy artifacts в `inbox/`;
-- redesign формата vacancy-local `analysis.md` или `screening.md`.
+- redesign форматов vacancy-local `analysis.md` или `screening.md`.
 
 ## Assumptions
 
 - `vacancies/<id>/adoptions.md` остаётся generated draft, а не durable review layer;
-- `adoptions/inbox/<vacancy_id>.md` хранит один review input file на вакансию;
+- `adoptions/inbox/<vacancy_id>.md` хранит один review input file на одну вакансию;
+- `adoptions/questions/open.md` остаётся initial shared ledger для unresolved/answered items;
+- ответы на вопросы получаются в agent-guided Q&A session внутри review process, а не отдельным ручным merge вне него;
 - `adoptions/accepted/MASTER.md` хранит нормализованный current-state набор approved permanent signals без обязательной полной истории решений;
-- `knowledge/roles/` пересматривается в acceptance session как downstream shaping layer для будущих role resumes;
-- вопросы могут разрешаться через agent-guided Q&A session, а не только руками вне системы.
+- role-specific accepted artifacts на этом этапе не вводятся;
+- `knowledge/roles/` пересматривается в acceptance session как shaping layer для будущих role resumes;
+- role resumes всегда downstream-зависят от согласованного `resumes/MASTER.md`, а не от `accepted/` напрямую.
 
 ## Risks and unknowns
 
-- не зафиксирован точный формат `adoptions/questions/`: один общий ledger или набор файлов по вакансиям/темам;
-- не зафиксировано, должна ли acceptance session быть одним интерактивным workflow или набором отдельных CLI-команд;
-- если перенос из vacancy-local `adoptions.md` в `inbox/` окажется неявным, снова смешаются generated drafts и review layer;
-- если `accepted/MASTER.md` начнёт хранить историю вместо нормализованного current-state, downstream merge в `MASTER` станет нестабильным.
+- если deterministic intake step и interactive review session снова смешаются в один workflow, generated drafts и approved signals опять окажутся без чёткой границы;
+- если `adoptions/questions/open.md` начнёт использоваться как неструктурированный notes dump, Q&A session не сможет надёжно отслеживать unresolved vs answered items;
+- если `accepted/MASTER.md` начнёт хранить историю вместо current-state набора сигналов, downstream merge в `MASTER` станет нестабильным;
+- future scale может потребовать per-vacancy question files и отдельной history/archive policy, но это не блокирует initial implementation.
 
 ## External touchpoints
 
 - `C:\Users\avramko\OneDrive\Documents\Career\vacancies\` — чтение / проверка — source generated vacancy-local `adoptions.md`;
 - `C:\Users\avramko\OneDrive\Documents\Career\adoptions\inbox\` — обновление / проверка — per-vacancy review inputs;
-- `C:\Users\avramko\OneDrive\Documents\Career\adoptions\questions\` — обновление / проверка — unresolved questions for review;
+- `C:\Users\avramko\OneDrive\Documents\Career\adoptions\questions\` — обновление / проверка — unresolved questions ledger;
 - `C:\Users\avramko\OneDrive\Documents\Career\adoptions\accepted\` — обновление / проверка — approved permanent signals;
 - `C:\Users\avramko\OneDrive\Documents\Career\knowledge\roles\` — обновление / проверка — role-shaping knowledge revised during review;
 - `C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\2026-04-22-rebuild-master-workflow.md` — чтение / проверка — downstream dependency and handoff.
@@ -89,7 +93,7 @@
   - явная привязка к downstream `rebuild-master`.
 - Acceptance criteria:
   - plan описывает, какие слои используются до обновления `MASTER`;
-  - role `vacancies/<id>/adoptions.md` vs `adoptions/inbox/<vacancy_id>.md` разделена явно;
+  - роль `vacancies/<id>/adoptions.md` vs `adoptions/inbox/<vacancy_id>.md` разделена явно;
   - есть один конкретный следующий шаг для implementation planning.
 - Validation commands:
   - `Get-ChildItem C:\Users\avramko\OneDrive\Documents\Career\adoptions -Recurse`
@@ -99,7 +103,7 @@
 
 ### M2. Session Shape And File Contract
 
-- Status: `in_progress`
+- Status: `done`
 - Goal:
   - определить точный interaction model и file-level contract для acceptance session.
 - Deliverables:
@@ -107,19 +111,25 @@
   - format expectations для `inbox/`, `questions/`, `accepted/MASTER.md`;
   - updated current state без архитектурной двусмысленности.
 - Acceptance criteria:
-  - ясно, это один interactive workflow или несколько явных commands/stages;
+  - ясно, что workflow разделён на deterministic intake step и отдельную interactive review session;
   - ясно, как вопросы живут в `questions/` и как ответы влияют на `accepted/MASTER.md`;
   - ясно, когда и как пересматривается `knowledge/roles/`.
 - Validation commands:
   - `Get-Content -Raw plans\2026-04-22-adoptions-review-and-acceptance-workflow.md`
+  - `Get-ChildItem C:\Users\avramko\OneDrive\Documents\Career\adoptions -Recurse | Select-Object FullName`
+  - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\adoptions\questions\open.md`
 - Notes / discoveries:
-  - user уже подтвердил high-level sequencing, но точная форма session остаётся архитектурным выбором.
+  - acceptance path зафиксирован как два explicit stages, а не один монолитный workflow;
+  - `adoptions/inbox/` хранит один файл на одну вакансию;
+  - `adoptions/questions/open.md` остаётся initial shared ledger, а ответы получаются в interactive agent Q&A session;
+  - `adoptions/accepted/MASTER.md` остаётся единственным approved current-state artifact для permanent signals;
+  - role-specific accepted artifacts на этом этапе не вводятся.
 
 ### M3. Implementation-Ready Acceptance Workflow Plan
 
-- Status: `planned`
+- Status: `in_progress`
 - Goal:
-  - разбить review/acceptance process на исполнимые implementation milestones.
+  - разложить review/acceptance process на исполнимые implementation milestones.
 - Deliverables:
   - code-facing milestone decomposition;
   - validation baseline;
@@ -130,28 +140,63 @@
 - Validation commands:
   - `Get-Content -Raw plans\2026-04-22-adoptions-review-and-acceptance-workflow.md`
 - Notes / discoveries:
-  - implementation decomposition имеет смысл только после закрытия M2.
+  - implementation decomposition теперь должна опираться на подтверждённый split между deterministic intake и interactive review.
+
+## Interaction and file contract
+
+- `vacancies/<id>/adoptions.md` — generated vacancy-local draft; не является durable review layer.
+- `adoptions/inbox/<vacancy_id>.md` — deterministic review input, один файл на одну вакансию.
+- `adoptions/questions/open.md` — shared unresolved ledger; записи должны идентифицировать vacancy, topic, current status и latest answer state.
+- `adoptions/accepted/MASTER.md` — canonical approved current-state set of permanent signals; не history log.
+- `knowledge/roles/` — reference/shaping layer, которая может обновляться в acceptance session, но не подменяет `accepted/MASTER.md` и `resumes/MASTER.md`.
+- `resumes/MASTER.md` не мутируется в acceptance workflow; это downstream отдельный process.
+
+## Implementation decomposition draft
+
+- `A1 Intake workflow`:
+  - отдельная deterministic CLI/runtime operation;
+  - читает `vacancies/<id>/adoptions.md`;
+  - готовит `adoptions/inbox/<vacancy_id>.md`;
+  - обновляет `adoptions/questions/open.md` initial unresolved items;
+  - не трогает `accepted/` и `resumes/`.
+- `A2 Review session workflow`:
+  - interactive agent-guided command/session;
+  - показывает pending inbox items;
+  - ведёт Q&A по unresolved items;
+  - переводит approved signals в `adoptions/accepted/MASTER.md`;
+  - закрывает или обновляет записи в `adoptions/questions/open.md`;
+  - при необходимости корректирует `knowledge/roles/`.
+- `A3 Runtime/docs/tests alignment`:
+  - registry/CLI/docs/tests описывают intake и review как отдельные workflow stages;
+  - явно разделяются generated drafts, unresolved questions и approved signals;
+  - runtime memory и operator docs отражают новый sequencing.
+- `A4 Rebuild-master handoff`:
+  - `2026-04-22-rebuild-master-workflow.md` читает этот upstream workflow как стабильный input contract;
+  - downstream `rebuild-master` не зависит от raw vacancy drafts и не редактирует role resumes.
 
 ## Decision log
 
-- `2026-04-22 11:42` — Owner-approved sequencing закрепил отдельный upstream process: `vacancies/<id>/adoptions.md` -> `adoptions/inbox/<vacancy_id>.md` + `adoptions/questions/` -> `adoptions/accepted/MASTER.md` + `knowledge/roles/`. — Это убирает скрытую перегрузку из `rebuild-master`. — Дальнейшая реализация resume mutation должна идти только downstream от этого процесса.
-- `2026-04-22 11:42` — `accepted/MASTER.md` признан canonical approved staging layer, а не history log. — Это делает downstream merge в `resumes/MASTER.md` детерминированнее. — Историю, если она потребуется, нужно будет проектировать отдельно, не смешивая с current-state layer.
+- `2026-04-22 11:42` — Owner-approved sequencing закрепил отдельный upstream process: `vacancies/<id>/adoptions.md` -> `adoptions/inbox/<vacancy_id>.md` + `adoptions/questions/` -> `adoptions/accepted/MASTER.md` + `knowledge/roles/`. — Это убирает скрытую перегрузку из `rebuild-master`. — Дальнейшая реализация resume mutation должна идти только downstream от этого process.
+- `2026-04-22 11:42` — `accepted/MASTER.md` признан canonical approved staging layer, а не history log. — Это делает downstream merge в `resumes/MASTER.md` детерминированнее. — Историю, если она потребуется, нужно будет проектировать отдельно.
+- `2026-04-22 13:50` — Interaction model зафиксирован как два explicit stages: deterministic intake prep и отдельная interactive agent-guided review session. — Это разводит generated vacancy drafts и human/agent adjudication. — Implementation decomposition должна опираться именно на эту границу.
+- `2026-04-22 13:50` — `adoptions/questions/open.md` остаётся initial shared ledger, а ответы на вопросы получаются в interactive agent Q&A session. — Это совместимо с текущим root baseline и не требует сразу вводить per-vacancy question files. — Initial implementation можно делать без миграции формата `questions/`.
+- `2026-04-22 13:50` — Role-specific accepted artifacts не вводятся на acceptance stage. — Причина: role resumes должны строиться только downstream от согласованного `resumes/MASTER.md`. — `accepted/` на этом этапе остаётся master-only approved staging layer.
 
 ## Progress log
 
-- `2026-04-22 11:42` — Создан dedicated plan для review/acceptance workflow и закрыт baseline milestone M1 на основе owner-approved process. — Блокировка на уровне product sequencing снята, но interaction model acceptance session ещё не выбран. — Status: `in_progress`.
+- `2026-04-22 11:42` — Создан dedicated plan для review/acceptance workflow и закрыт baseline milestone M1 на основе owner-approved process. — Блокировка на уровне product sequencing снята, но interaction model acceptance session ещё не был выбран. — Status: `in_progress`.
+- `2026-04-22 13:50` — M2 closed: interaction shape и file contract зафиксированы на основе owner confirmation и реального root baseline (`adoptions/questions/open.md`, existing `adoptions/`/`knowledge/roles/` layout). — Следующий шаг теперь чисто implementation-facing: разложить кодовые milestones и handoff. — Status: `in_progress`.
 
 ## Current state
 
-- Current milestone: `M2`
+- Current milestone: `M3`
 - Current status: `in_progress`
-- Next step: `Зафиксировать, должен ли review/acceptance process быть одним interactive workflow с Q&A session или набором отдельных explicit commands/stages.`
+- Next step: `Разложить implementation на конкретные code-facing milestones для separate intake workflow, interactive review session, tests/docs alignment и downstream handoff в rebuild-master.`
 - Active blockers:
-  - Не выбрана точная interaction shape для acceptance session.
+  - none
 - Open questions:
-  - `questions/` должен оставаться одним общим ledger (`open.md`) или лучше перейти на per-vacancy question files?
-  - Acceptance session должна сама переносить vacancy-local `adoptions.md` в `inbox/`, или это должен быть отдельный preparatory step?
+  - none
 
 ## Completion summary
 
-Заполняется после завершения всех milestones. На текущем этапе baseline и sequencing уже зафиксированы; текущая неопределённость сведена к interaction model и file contract, а не к source-of-truth drift.
+Заполняется после завершения всех milestones. На текущем этапе baseline, sequencing и session/file contract уже зафиксированы; остаётся превратить это в исполнимую implementation decomposition.
