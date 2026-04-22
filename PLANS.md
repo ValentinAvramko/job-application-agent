@@ -185,6 +185,15 @@ Milestones должны быть упорядочены и выполнимы п
 - Active blockers
 - Open questions
 
+## Правило Приоритета Планов
+
+Если одновременно есть master plan и отдельный dedicated plan для активного workstream-а, используй их так:
+
+- master plan определяет, какой milestone или workstream активен сейчас;
+- если master plan ссылается на отдельный plan, этот dedicated plan становится рабочим источником истины для текущего execution step;
+- поле `Next step` в dedicated plan конкретизирует следующий шаг внутри активного workstream-а и имеет приоритет над более общим `Next step` из master plan;
+- после завершения dedicated plan или его текущего milestone вернись в master plan, чтобы выбрать следующий верхнеуровневый этап.
+
 ### 12. Completion summary
 
 После завершения кратко опиши:
