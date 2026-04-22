@@ -4,7 +4,7 @@
 - Slug: `2026-04-22-rebuild-master-workflow`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 18:02`
+- Last updated: `2026-04-22 18:36`
 - Overall status: `in_progress`
 
 ## Objective
@@ -157,7 +157,7 @@
 
 ### M5. Workflow, CLI And Runtime Wiring
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - добавить executable workflow `rebuild-master` в runtime catalog с детерминированными side effects на `resumes/MASTER.md` и runtime report.
 - Deliverables:
@@ -213,12 +213,13 @@
 - `2026-04-22 17:21` — Upstream workflow family закрыт до стабильного `inbox/questions/accepted` contract и handoff зафиксирован в public/runtime docs. — `rebuild-master` больше не blocked. — Status: `in_progress`.
 - `2026-04-22 18:02` — M3 planning milestone закрыт: plan получил explicit milestones M4-M6, managed-section merge contract, runtime report location и baseline no-batching semantics. — Следующий шаг уже чисто implementation-oriented. — Status: `in_progress`.
 - `2026-04-22 18:18` — M4 helper milestone закрыт: добавлен модуль `application_agent.master_rebuild` с deterministic managed-section projection, begin/end markers и runtime report generation; новые tests `tests.test_rebuild_master_helpers` закрывают empty-store, insert+idempotency и update/remove diff semantics. — Validation: `python -m unittest tests.test_rebuild_master_helpers` -> `OK`. — Status: `in_progress`.
+- `2026-04-22 18:36` — M5 wiring milestone закрыт: добавлен executable workflow `rebuild-master`, он подключен в `registry`, `cli` и runtime workflow catalog, а tests `tests.test_rebuild_master_workflow`, `tests.test_cli`, `tests.test_memory_store` зафиксировали deterministic side effects только на `resumes/MASTER.md`, runtime report и workflow memory trail. — Validation: `python -m unittest tests.test_rebuild_master_helpers tests.test_rebuild_master_workflow tests.test_cli tests.test_memory_store` -> `OK`; `python run_agent.py --root ../.. list-workflows` -> shows `rebuild-master`. — Status: `in_progress`.
 
 ## Current state
 
-- Current milestone: `M5`
+- Current milestone: `M6`
 - Current status: `in_progress`
-- Next step: `Добавить workflow `rebuild-master` в registry/cli/runtime catalog и обернуть им helper layer из `application_agent.master_rebuild`.`
+- Next step: `Обновить README/runtime docs по strategy managed section и прогнать full validation baseline для закрытия M6.`
 - Active blockers:
   - none
 - Open questions:

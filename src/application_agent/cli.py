@@ -10,6 +10,7 @@ from application_agent.workflows.analyze_vacancy import AnalyzeVacancyRequest
 from application_agent.workflows.ingest_vacancy import IngestVacancyRequest
 from application_agent.workflows.intake_adoptions import IntakeAdoptionsRequest
 from application_agent.workflows.prepare_screening import PrepareScreeningRequest
+from application_agent.workflows.rebuild_master import RebuildMasterRequest
 from application_agent.workflows.registry import build_default_registry
 
 
@@ -66,6 +67,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Normalize vacancy adoptions into root inbox and pending questions.",
     )
     intake.add_argument("--vacancy-id", default="")
+
+    subparsers.add_parser(
+        "rebuild-master",
+        help="Rebuild the MASTER resume managed approved-signals section and runtime report.",
+    )
     return parser
 
 
@@ -153,6 +159,13 @@ def main() -> int:
     if args.command == "intake-adoptions":
         request = IntakeAdoptionsRequest(vacancy_id=args.vacancy_id)
         workflow = build_default_registry().get("intake-adoptions")
+        result = workflow.run(layout=layout, store=store, request=request)
+        print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "rebuild-master":
+        request = RebuildMasterRequest()
+        workflow = build_default_registry().get("rebuild-master")
         result = workflow.run(layout=layout, store=store, request=request)
         print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
         return 0

@@ -56,7 +56,7 @@ class CliTests(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(
             [item["name"] for item in payload],
-            ["analyze-vacancy", "ingest-vacancy", "intake-adoptions", "prepare-screening"],
+            ["analyze-vacancy", "ingest-vacancy", "intake-adoptions", "prepare-screening", "rebuild-master"],
         )
 
     def test_ingest_cli_returns_workflow_result_without_git_publication_suffix(self) -> None:
@@ -174,5 +174,38 @@ class CliTests(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload["workflow"], "intake-adoptions")
         self.assertIn("intake", payload["summary"])
+
+    def test_rebuild_master_cli_routes_to_rebuild_workflow(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f"cli-rebuild-{uuid.uuid4().hex}"
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+
+        result = WorkflowResult(
+            workflow="rebuild-master",
+            status="completed",
+            summary="Rebuilt MASTER approved-signals section.",
+            artifacts=[str(workspace_dir / "resumes" / "MASTER.md")],
+        )
+        registry = _FakeRegistry(result)
+        stdout = io.StringIO()
+
+        with patch("application_agent.cli.build_default_registry", return_value=registry), patch.object(
+            sys,
+            "argv",
+            [
+                "run_agent.py",
+                "--root",
+                str(workspace_dir),
+                "rebuild-master",
+            ],
+        ), patch("sys.stdout", new=stdout):
+            exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(registry.requested, ["rebuild-master"])
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["workflow"], "rebuild-master")
+        self.assertIn("MASTER", payload["summary"])
 if __name__ == "__main__":
     unittest.main()
