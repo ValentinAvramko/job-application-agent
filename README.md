@@ -10,7 +10,8 @@
 - workflow `ingest-vacancy`, который создаёт каркас вакансии и обновляет runtime-память;
 - стартовый workflow `analyze-vacancy`, который выбирает ролевое резюме и собирает первый fit-анализ;
 - workflow `intake-adoptions`, который переносит vacancy-local `adoptions.md` в root review layer (`adoptions/inbox/` + `adoptions/questions/open.md`);
-- workflow `prepare-screening`, который по готовой вакансии собирает vacancy-local `screening.md` для первичного интервью.
+- workflow `prepare-screening`, который по готовой вакансии собирает vacancy-local `screening.md` для первичного интервью;
+- workflow `rebuild-master`, который синхронизирует managed approved-signals section в `resumes/MASTER.md` из `adoptions/accepted/MASTER.md` и пишет runtime report в `agent_memory/runtime/rebuild-master/latest.md`.
 
 ## Структура private workspace
 
@@ -31,6 +32,7 @@ python run_agent.py --root ../.. ingest-vacancy --company "Example" --position "
 python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager
 python run_agent.py --root ../.. intake-adoptions --vacancy-id 20260420-example-engineering-manager
 python run_agent.py --root ../.. prepare-screening --vacancy-id 20260420-example-engineering-manager
+python run_agent.py --root ../.. rebuild-master
 python run_agent.py --root ../.. show-memory
 ```
 
@@ -52,6 +54,9 @@ python run_agent.py --root ../.. show-memory
 - `python run_agent.py --root ../.. prepare-screening --vacancy-id 20260420-example-engineering-manager`
   По уже ingest/analyze-подготовленной вакансии создаёт `vacancies/<vacancy_id>/screening.md`, обновляет `meta.yml` до статуса `screening_prepared` и пишет runtime memory без Excel или git side effects.
   Обязательные входы: существующий `vacancy_id`, уже собранные `meta.yml`, `source.md`, `analysis.md`; опционально можно передать `--selected-resume`, `--output-language` и `--preparation-depth`.
+- `python run_agent.py --root ../.. rebuild-master`
+  Читает current-state approved signals из `adoptions/accepted/MASTER.md`, детерминированно синхронизирует managed block в `resumes/MASTER.md` и обновляет runtime report `agent_memory/runtime/rebuild-master/latest.md`.
+  Workflow не переписывает narrative sections целиком: baseline-версия управляет только секцией `Approved Permanent Signals`, чтобы downstream `rebuild-role-resume` и `build-linkedin` читали уже согласованный `MASTER`.
 - `python run_agent.py --root ../.. show-memory`
   Показывает текущее содержимое файловой памяти агента: задачи, артефакты и журнал запусков workflow, а также reconciliation-сводку по отсутствующим vacancy artifacts.
 
@@ -63,6 +68,7 @@ python run_agent.py --root ../.. show-memory
 2. `intake-adoptions` переносит draft в root review stores `adoptions/inbox/` и `adoptions/questions/open.md`.
 3. Agent-guided review stage читает context через helper APIs из `application_agent.adoptions_review` и применяет approved updates в `adoptions/accepted/MASTER.md`.
 4. Только после этого downstream workflow `rebuild-master` должен обновлять `resumes/MASTER.md`.
+5. Только после синхронизации `MASTER` downstream workflow family `rebuild-role-resume` и `build-linkedin` должен читать обновлённый canonical resume, а не raw vacancy corpus или `adoptions/accepted/` напрямую.
 
 Подробный пошаговый сценарий первого рабочего прогона в private workspace лежит в [tooling/run-ingest-analyze.md](/C:/Users/avramko/OneDrive/Documents/Career/tooling/run-ingest-analyze.md).
 

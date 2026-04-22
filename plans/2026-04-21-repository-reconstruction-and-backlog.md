@@ -251,12 +251,13 @@
 - `2026-04-22 11:42` — M5 перепоследован после owner clarification: ближайшим planning/execution step теперь является отдельный review/acceptance workflow, а `rebuild-master` переведён в downstream-зависимость от него. — Это повышает качество sequencing: сначала approval/normalization, потом master mutation, потом role rebuild. — Status: `in_progress`.
 - `2026-04-22 13:50` — В dedicated plan review/acceptance закрыт M2: interaction shape и file contract теперь закреплены без product ambiguity, включая shared ledger `adoptions/questions/open.md`, separate intake stage и отсутствие role-specific accepted artifacts. — Remaining work внутри M5 теперь сводится не к выбору модели, а к implementation-ready decomposition. — Status: `in_progress`.
 - `2026-04-22 15:53` — Dedicated planning plan review/acceptance завершён полностью: создан execution plan с отдельными milestones для intake workflow, review helper layer, agent-guided review support и rebuild-master handoff. — Ordered workflow backlog внутри M5 снова стал исполнимым без дополнительных product решений. — Status: `in_progress`.
+- `2026-04-22 18:49` — Upstream review/acceptance execution и downstream `rebuild-master` завершены end-to-end: `README.md` и dedicated plan фиксируют final contract, а full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (57 tests)`, `list-workflows`, `show-memory`). — Sequencing ambiguity для `MASTER` снята; следующий remaining-workflow step внутри M5 теперь сводится к открытию dedicated plan для `rebuild-role-resume`. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M5`
 - Current status: `in_progress`
-- Next step: `Внутри `2026-04-22-implement-adoptions-review-and-acceptance-workflow.md` реализовать M1 deterministic intake workflow для переноса vacancy-local adoptions в inbox/questions root layer.`
+- Next step: `Открыть dedicated plan для `rebuild-role-resume`, который будет читать уже стабилизированный `resumes/MASTER.md` после завершения `rebuild-master`.`
 - Active blockers:
   - none
 - Open questions:
