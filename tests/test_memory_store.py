@@ -30,10 +30,11 @@ class MemoryStoreTests(unittest.TestCase):
         self.assertTrue(store.workflow_runs_path.exists())
 
         project_memory = json.loads(store.project_memory_path.read_text(encoding="utf-8"))
+        self.assertNotIn("bootstrap", project_memory["workflow_catalog"])
         self.assertIn("ingest-vacancy", project_memory["workflow_catalog"])
         self.assertIn("analyze-vacancy", project_memory["workflow_catalog"])
 
-    def test_bootstrap_backfills_new_project_catalog_entries(self) -> None:
+    def test_bootstrap_rewrites_workflow_catalog_to_runtime_defaults(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
         temp_root.mkdir(exist_ok=True)
         workspace_dir = temp_root / f"memory-store-upgrade-{uuid.uuid4().hex}"
@@ -55,7 +56,7 @@ class MemoryStoreTests(unittest.TestCase):
         store.bootstrap()
 
         project_memory = json.loads(store.project_memory_path.read_text(encoding="utf-8"))
-        self.assertEqual(project_memory["workflow_catalog"], ["bootstrap", "ingest-vacancy", "analyze-vacancy"])
+        self.assertEqual(project_memory["workflow_catalog"], ["ingest-vacancy", "analyze-vacancy"])
         self.assertEqual(project_memory["role_resumes"], ["CIO", "CTO", "HoE", "HoD", "EM"])
         self.assertEqual(project_memory["contact_regions"], ["RU", "KZ", "EU"])
 

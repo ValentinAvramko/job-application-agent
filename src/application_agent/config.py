@@ -2,4 +2,4 @@
 
 ROLE_RESUMES = ("CIO", "CTO", "HoE", "HoD", "EM")
 CONTACT_REGIONS = ("RU", "KZ", "EU")
-WORKFLOW_CATALOG = ("bootstrap", "ingest-vacancy", "analyze-vacancy")
+WORKFLOW_CATALOG = ("ingest-vacancy", "analyze-vacancy")

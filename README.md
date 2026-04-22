@@ -6,7 +6,7 @@
 
 - файловый `JsonMemoryStore` для трёх слоёв памяти и журнала запусков;
 - registry workflow;
-- CLI bootstrap для private workspace;
+- CLI setup-команда `bootstrap` для private workspace;
 - workflow `ingest-vacancy`, который создаёт каркас вакансии и обновляет runtime-память;
 - стартовый workflow `analyze-vacancy`, который выбирает ролевое резюме и собирает первый fit-анализ.
 
@@ -33,9 +33,9 @@ python run_agent.py --root ../.. show-memory
 Что делает каждая команда:
 
 - `python run_agent.py --root ../.. bootstrap`
-  Проверяет и создаёт базовую структуру рабочего каталога агента в указанном root.
+  Проверяет и создаёт базовую структуру рабочего каталога агента в указанном root. Это setup-команда, а не runtime workflow.
 - `python run_agent.py --root ../.. list-workflows`
-  Показывает доступные workflow, которые можно запускать через CLI.
+  Показывает доступные runtime workflow, которые можно запускать через CLI. Setup-команда `bootstrap` в этот список не входит.
 - `python run_agent.py --root ../.. ingest-vacancy --company "Example" --position "Engineering Manager" --source-channel "Manual" --source-text "Short vacancy text"`
   Создаёт карточку вакансии, заполняет `meta.yml`, `source.md`, `analysis.md`, `adoptions.md`, добавляет строку в `response-monitoring.xlsx` и обновляет runtime memory.
   Публикация в git не выполняется автоматически: commit/push остаются отдельным ручным шагом по `tooling/git-workflow.md`.

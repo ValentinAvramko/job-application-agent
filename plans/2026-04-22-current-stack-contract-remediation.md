@@ -4,7 +4,7 @@
 - Slug: `2026-04-22-current-stack-contract-remediation`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 10:03`
+- Last updated: `2026-04-22 10:14`
 - Overall status: `in_progress`
 
 ## Objective
@@ -67,7 +67,7 @@ Completion gate из `2026-04-22-current-workflow-completion-gate.md` зафик
 
 ### M1. Bootstrap Catalog Boundary Cleanup
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - привести CLI, runtime memory defaults и tests к одной модели, где `bootstrap` не является runtime workflow.
 - Deliverables:
@@ -81,7 +81,8 @@ Completion gate из `2026-04-22-current-workflow-completion-gate.md` зафик
   - `python run_agent.py --root ../.. list-workflows`
   - `python -m unittest tests.test_memory_store tests.test_cli`
 - Notes / discoveries:
-  - none yet
+  - `WORKFLOW_CATALOG` сокращён до runtime workflows (`ingest-vacancy`, `analyze-vacancy`), а `project_memory.workflow_catalog` теперь синхронизируется как exact list, чтобы legacy `bootstrap` не оставался в runtime memory.
+  - `README.md` уточнён: `bootstrap` описан как setup-only CLI команда вне runtime workflow catalog.
 
 ### M2. Resume Path Alignment
 
@@ -147,18 +148,18 @@ Completion gate из `2026-04-22-current-workflow-completion-gate.md` зафик
 ## Progress log
 
 - `2026-04-22 10:03` — Plan создан как follow-up после завершения completion gate. — На старте workstream-а blockers уже локализованы: catalog drift, resume path drift и implicit Excel prerequisite. — Status: `in_progress`.
+- `2026-04-22 10:14` — M1 закрыт: `bootstrap` удалён из canonical workflow catalog, а sync project memory теперь переписывает legacy catalog к точному runtime-списку. — `python run_agent.py --root ../.. list-workflows` показывает только `analyze-vacancy` и `ingest-vacancy`; `python -m unittest tests.test_memory_store tests.test_cli` -> `5 tests, OK`. — Status: `done`.
 
 ## Current state
 
-- Current milestone: `M1`
+- Current milestone: `M2`
 - Current status: `in_progress`
-- Next step: `Убрать `bootstrap` из workflow catalog defaults и синхронизировать memory/tests под setup-only semantics.`
+- Next step: `Выровнять активные и adjacent code paths с canonical root `resumes/`, начиная с `analyze-vacancy`, tests и operator-facing runbook.`
 - Active blockers:
-  - `bootstrap` catalog drift
   - `CV/` -> `resumes/` path drift
   - implicit Excel prerequisite
 - Open questions:
-  - Нужно ли ограничить path remediation только current stack, или сразу синхронизировать и adjacent `prepare_screening.py`?
+  - Стоит ли в M2 ограничиться current stack (`analyze-vacancy` + docs/tests) или сразу синхронизировать и adjacent `prepare_screening.py`, чтобы не оставлять новый drift рядом с активным стеком?
 
 ## Completion summary
 

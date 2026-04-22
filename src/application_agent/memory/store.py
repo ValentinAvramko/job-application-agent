@@ -157,7 +157,7 @@ class JsonMemoryStore:
             payload = json.load(handle)
 
         changed = False
-        changed |= self._merge_ordered_defaults(payload, "workflow_catalog", WORKFLOW_CATALOG)
+        changed |= self._sync_exact_ordered_list(payload, "workflow_catalog", WORKFLOW_CATALOG)
         changed |= self._merge_ordered_defaults(payload, "role_resumes", ROLE_RESUMES)
         changed |= self._merge_ordered_defaults(payload, "contact_regions", CONTACT_REGIONS)
 
@@ -177,6 +177,14 @@ class JsonMemoryStore:
                 values.append(item)
                 changed = True
         return changed
+
+    def _sync_exact_ordered_list(self, payload: dict[str, object], key: str, defaults: tuple[str, ...]) -> bool:
+        target = list(defaults)
+        values = payload.get(key)
+        if values == target:
+            return False
+        payload[key] = target
+        return True
 
     def _write_json(self, path: Path, payload: object) -> None:
         with path.open("w", encoding="utf-8", newline="\n") as handle:

@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-22 10:03`
+- Last updated: `2026-04-22 10:14`
 - Overall status: `in_progress`
 
 ## Objective
@@ -215,6 +215,7 @@
 - `2026-04-22 09:10` — Для master M4 открыт отдельный plan `2026-04-22-current-workflow-completion-gate.md`. — Completion gate требует собственного contradiction ledger и явного решения по blocker-ам текущего стека. — Следующий execution focus переносится в этот новый plan.
 - `2026-04-22 09:17` — В completion-gate plan собран contradiction ledger и draft completion matrix. — Это завершило baseline-сборку и проявило три главных gate-topic: `bootstrap` catalog boundary, `CV/` vs `resumes/` drift и Excel dependency policy. — Master M4 теперь находится в стадии решений, а не разведки.
 - `2026-04-22 10:03` — Completion gate доведён до явных решений: `bootstrap` признан setup-only command, `resumes/` — единственным valid resume root, а `response-monitoring.xlsx` — hard prerequisite для текущего ingest path. — Эти решения упакованы в отдельный remediation plan `2026-04-22-current-stack-contract-remediation.md`. — Master M4 остаётся активным до снятия blocker-ов через этот remediation plan.
+- `2026-04-22 10:14` — В remediation plan закрыт M1 по `bootstrap` catalog boundary: `WORKFLOW_CATALOG` и runtime memory синхронизированы под setup-only semantics, а `README.md` больше не описывает `bootstrap` как runtime workflow. — Это снимает первый blocker внутри master M4 и переводит execution focus на path remediation `CV/` -> `resumes/`. — Master plan остаётся в M4 до закрытия remaining blocker-ов.
 
 ## Progress log
 
@@ -229,15 +230,15 @@
 - `2026-04-22 09:10` — Master M4 стартовал: создан отдельный plan `2026-04-22-current-workflow-completion-gate.md` и зафиксирован initial baseline по CLI, runtime memory и tests. — `list-workflows` показывает только `ingest-vacancy` и `analyze-vacancy`, тогда как `show-memory` и `WORKFLOW_CATALOG` всё ещё включают `bootstrap`; `unittest` остаётся зелёным (`39 tests, OK`). — Status: `in_progress`.
 - `2026-04-22 09:17` — M4 продолжен внутри dedicated plan: baseline доведён до contradiction ledger и candidate completion criteria. — Дополнительная проверка показала реальный runtime blocker по path contract (`resumes/` существует, `CV/` отсутствует, но код всё ещё читает `CV/`) и незакрытый policy question по `response-monitoring.xlsx`. — Status: `in_progress`.
 - `2026-04-22 10:03` — Stage решений завершён: completion-gate plan закрыт как planning artifact, а следующий execution step перенесён в `2026-04-22-current-stack-contract-remediation.md`. — Это отделяет определение blocker-ов от их исправления и делает master M4 исполнимым. — Status: `in_progress`.
+- `2026-04-22 10:14` — Первый remediation substep завершён: `python run_agent.py --root ../.. list-workflows` теперь согласован с `project_memory.workflow_catalog`, а `python -m unittest tests.test_memory_store tests.test_cli` проходит (`5 tests, OK`). — Bootstrap catalog drift снят; remaining focus внутри M4 смещён на `CV/` -> `resumes/` и explicit Excel prerequisite. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M4`
 - Current status: `in_progress`
-- Next step: `Исполнить plan `2026-04-22-current-stack-contract-remediation.md`, начиная с cleanup `bootstrap` catalog boundary.`
+- Next step: `Продолжить plan `2026-04-22-current-stack-contract-remediation.md` с M2 path remediation (`CV/` -> `resumes/`) в active и adjacent workflow surface.`
 - Active blockers:
   - Current stack всё ещё имеет runtime/path drift между кодом и реальным root contract (`CV/` vs `resumes/`).
-  - Current stack всё ещё имеет contract drift между setup-only `bootstrap` и runtime workflow catalog.
   - Excel prerequisite policy ещё не реализована как явный operator-visible contract.
 - Open questions:
   - Какой набор `bootstrap` / `ingest-vacancy` / `analyze-vacancy` нужно считать минимально завершенным до M5?

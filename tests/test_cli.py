@@ -33,6 +33,29 @@ class _FakeRegistry:
 
 
 class CliTests(unittest.TestCase):
+    def test_list_workflows_excludes_bootstrap_setup_command(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f"cli-list-{uuid.uuid4().hex}"
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+        stdout = io.StringIO()
+
+        with patch.object(
+            sys,
+            "argv",
+            [
+                "run_agent.py",
+                "--root",
+                str(workspace_dir),
+                "list-workflows",
+            ],
+        ), patch("sys.stdout", new=stdout):
+            exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual([item["name"] for item in payload], ["analyze-vacancy", "ingest-vacancy"])
+
     def test_ingest_cli_returns_workflow_result_without_git_publication_suffix(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
         temp_root.mkdir(exist_ok=True)
