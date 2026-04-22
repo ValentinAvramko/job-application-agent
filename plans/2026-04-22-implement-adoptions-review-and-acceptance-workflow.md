@@ -4,7 +4,7 @@
 - Slug: `2026-04-22-implement-adoptions-review-and-acceptance-workflow`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 15:53`
+- Last updated: `2026-04-22 16:33`
 - Overall status: `in_progress`
 
 ## Objective
@@ -87,7 +87,7 @@
 
 ### M1. Deterministic Intake Workflow
 
-- Status: `in_progress`
+- Status: `done`
 - Goal:
   - добавить reproducible runtime step, который переводит vacancy-local `adoptions.md` в `adoptions/inbox/` и `adoptions/questions/open.md`.
 - Deliverables:
@@ -103,11 +103,12 @@
   - `python -m unittest tests.test_adoptions_intake_workflow tests.test_cli tests.test_memory_store`
   - `python run_agent.py --root ../.. list-workflows`
 - Notes / discoveries:
-  - final CLI name можно выбрать в рамках milestone, но он должен оставаться явно stage-specific и не выдавать intake за review/acceptance.
+  - final CLI name выбран как `intake-adoptions`: он остаётся явно stage-specific и не выдаёт intake за review/acceptance;
+  - vacancy-local `adoptions.md` оказался не копией будущего inbox-формата, а source draft с секциями, поэтому intake нормализует его в табличный `inbox` contract и синхронизирует только `questions/open.md` pending rows для текущей вакансии.
 
 ### M2. Review Helper Layer For Questions And Accepted Signals
 
-- Status: `planned`
+- Status: `in_progress`
 - Goal:
   - сделать review session опирающейся на структурированные helper-операции, а не на ad-hoc markdown editing.
 - Deliverables:
@@ -165,16 +166,18 @@
 ## Decision log
 
 - `2026-04-22 15:53` — Initial implementation split выбран как `runtime intake` + `agent-guided review support`, а не как два fully productized CLI workflows. — Причина: user описал review как ручную Q&A session, а текущая архитектура инструмента уже хорошо поддерживает deterministic stages и плохо подходит для встроенного conversational REPL. — Это уменьшает implementation risk и не мешает позже productize review stage отдельно.
+- `2026-04-22 16:33` — Для deterministic intake выбран CLI command `intake-adoptions`, а не review/acceptance-oriented имя. — Причина: runtime step делает только normalizing handoff `vacancies/<id>/adoptions.md -> adoptions/inbox/<vacancy_id>.md + adoptions/questions/open.md` и не должен создавать ложное впечатление, что он уже решает review или acceptance. — Это удерживает контракт M1 узким и совместимым с последующим M2 helper layer.
 
 ## Progress log
 
 - `2026-04-22 15:53` — Создан execution plan на основе завершённого planning plan `2026-04-22-adoptions-review-and-acceptance-workflow.md`. — Следующий шаг уже не про product ambiguity, а про код: начать deterministic intake workflow. — Status: `in_progress`.
+- `2026-04-22 16:33` — M1 завершён: добавлен workflow `intake-adoptions`, он зарегистрирован в runtime CLI/registry/catalog, детерминированно рендерит `adoptions/inbox/<vacancy_id>.md`, синхронизирует initial unresolved items в `adoptions/questions/open.md` и не трогает `adoptions/accepted/MASTER.md`, `knowledge/roles/` или `resumes/MASTER.md`. — Validation: `python -m unittest tests.test_adoptions_intake_workflow tests.test_cli tests.test_memory_store` -> `OK`, `python run_agent.py --root ../.. list-workflows` показывает `intake-adoptions`. — Status: `in_progress`.
 
 ## Current state
 
-- Current milestone: `M1`
+- Current milestone: `M2`
 - Current status: `in_progress`
-- Next step: `Реализовать deterministic intake workflow: выбрать final CLI name, добавить workflow в registry/CLI и покрыть tests для inbox/questions mutation без side effects в accepted/resumes.`
+- Next step: `Реализовать helper layer для `adoptions/questions/open.md` и `adoptions/accepted/MASTER.md`, чтобы review session опиралась на кодовые операции, а не на ad-hoc markdown editing.`
 - Active blockers:
   - none
 - Open questions:

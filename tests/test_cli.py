@@ -54,7 +54,10 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual([item["name"] for item in payload], ["analyze-vacancy", "ingest-vacancy", "prepare-screening"])
+        self.assertEqual(
+            [item["name"] for item in payload],
+            ["analyze-vacancy", "ingest-vacancy", "intake-adoptions", "prepare-screening"],
+        )
 
     def test_ingest_cli_returns_workflow_result_without_git_publication_suffix(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
@@ -136,5 +139,40 @@ class CliTests(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload["workflow"], "prepare-screening")
         self.assertIn("screening", payload["summary"])
+
+    def test_intake_adoptions_cli_routes_to_intake_workflow(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f"cli-intake-{uuid.uuid4().hex}"
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+
+        result = WorkflowResult(
+            workflow="intake-adoptions",
+            status="completed",
+            summary="Prepared adoptions intake for vacancy 20260421-example-role.",
+            artifacts=[str(workspace_dir / "adoptions" / "inbox" / "20260421-example-role.md")],
+        )
+        registry = _FakeRegistry(result)
+        stdout = io.StringIO()
+
+        with patch("application_agent.cli.build_default_registry", return_value=registry), patch.object(
+            sys,
+            "argv",
+            [
+                "run_agent.py",
+                "--root",
+                str(workspace_dir),
+                "intake-adoptions",
+                "--vacancy-id",
+                "20260421-example-role",
+            ],
+        ), patch("sys.stdout", new=stdout):
+            exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(registry.requested, ["intake-adoptions"])
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["workflow"], "intake-adoptions")
+        self.assertIn("intake", payload["summary"])
 if __name__ == "__main__":
     unittest.main()

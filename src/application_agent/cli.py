@@ -8,6 +8,7 @@ from application_agent.memory.store import JsonMemoryStore
 from application_agent.workspace import WorkspaceLayout
 from application_agent.workflows.analyze_vacancy import AnalyzeVacancyRequest
 from application_agent.workflows.ingest_vacancy import IngestVacancyRequest
+from application_agent.workflows.intake_adoptions import IntakeAdoptionsRequest
 from application_agent.workflows.prepare_screening import PrepareScreeningRequest
 from application_agent.workflows.registry import build_default_registry
 
@@ -59,6 +60,12 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--selected-resume", default="")
     prepare.add_argument("--output-language", default="")
     prepare.add_argument("--preparation-depth", default="")
+
+    intake = subparsers.add_parser(
+        "intake-adoptions",
+        help="Normalize vacancy adoptions into root inbox and pending questions.",
+    )
+    intake.add_argument("--vacancy-id", default="")
     return parser
 
 
@@ -139,6 +146,13 @@ def main() -> int:
             preparation_depth=args.preparation_depth,
         )
         workflow = build_default_registry().get("prepare-screening")
+        result = workflow.run(layout=layout, store=store, request=request)
+        print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "intake-adoptions":
+        request = IntakeAdoptionsRequest(vacancy_id=args.vacancy_id)
+        workflow = build_default_registry().get("intake-adoptions")
         result = workflow.run(layout=layout, store=store, request=request)
         print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
         return 0
