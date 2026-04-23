@@ -42,6 +42,12 @@ python run_agent.py --root ../.. export-resume-pdf --target-resume CTO --contact
 python run_agent.py --root ../.. show-memory
 ```
 
+## Тесты
+
+```powershell
+python -m pytest tests
+```
+
 Что делает каждая команда:
 
 - `python run_agent.py --root ../.. bootstrap`

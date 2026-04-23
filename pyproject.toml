@@ -9,6 +9,9 @@ description = "Public workflow agent for a split public/private career workspace
 requires-python = ">=3.11"
 dependencies = ["reportlab>=4.4,<5"]
 
+[project.optional-dependencies]
+dev = ["pytest>=9,<10"]
+
 [project.scripts]
 application-agent = "application_agent.cli:main"
 
@@ -20,4 +23,8 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "application_agent.data" = ["*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
 
