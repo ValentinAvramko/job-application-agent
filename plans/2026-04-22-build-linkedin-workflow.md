@@ -4,8 +4,8 @@
 - Slug: `2026-04-22-build-linkedin-workflow`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-22 19:33`
-- Overall status: `blocked`
+- Last updated: `2026-04-23 08:57`
+- Overall status: `in_progress`
 
 ## Objective
 
@@ -28,11 +28,13 @@
 - в историческом root corpus есть `promts/promt-create-linkedin-profile.md` с deliverable map для RU/EN LinkedIn packs, но root-normalization plan уже закрепил этот файл как historical reference only, а не как canonical spec;
 - в коде `tooling/application-agent` workflow `build-linkedin` пока отсутствует: есть только sequencing mentions в `README.md`, что этот шаг должен читать уже обновлённый canonical resume family.
 
-Главная двусмысленность для первой исполнимой версии:
+Для first executable contract M2 зафиксированы следующие baseline-решения:
 
-- ещё не закреплён first executable contract: должен ли workflow собирать один bilingual `profile/linkedin.md`, набор отдельных RU/EN artifacts, draft pack с field-by-field guide, либо более узкий baseline output;
-- не определён input precedence между `resumes/MASTER.md`, выбранным `resumes/<role>.md` и будущим profile metadata layer;
-- отсутствие `profile/contact-regions.yml` означает, что location/contact/public-profile overlay пока нельзя считать стабильным machine-readable input.
+- workflow строит один per-role artifact `profile/linkedin/<target_role>.md`, а не россыпь отдельных файлов: внутри него живут executive summary, ready-to-paste RU pack, ready-to-paste EN pack, field-by-field filling guide и `GAP` list;
+- `target_role` обязателен для первой версии, потому что LinkedIn workflow должен собирать один целевой positioning pack, а не угадывать между generic executive profile и role-specific angle;
+- input precedence жёстко разделена по слоям: `resumes/MASTER.md` обязателен и остаётся единственным factual source, `resumes/<target_role>.md` обязателен как positioning overlay без права противоречить `MASTER`, `profile/contact-regions.yml` optional и может влиять только на name/location/contact/public-link surface;
+- если `profile/contact-regions.yml` отсутствует, workflow использует только то, что уже явно есть в canonical resume family, и выводит `CHECK` / `GAP` вместо молчаливой подстановки profile metadata;
+- private contact channels (`phone`, `email`, `telegram`, `whatsapp`) не попадают автоматически в public-ready copy blocks и остаются только в filling guide как `OPTIONAL` или `CHECK`, если их публикация требует ручного решения.
 
 ## Scope
 
@@ -62,12 +64,10 @@
 
 ## Risks and unknowns
 
-- без owner-level решения по форме output artifact можно либо переусложнить первую версию, либо потерять ключевые deliverables из historical prompt map;
-- если input precedence между `MASTER`, role resume и profile metadata не будет жёстко зафиксирован, появится новый contract drift внутри resume/profile family;
-- отсутствие `profile/contact-regions.yml` создаёт риск некорректного выбора contact/location blocks и публичных ссылок;
-- LinkedIn требует editorial condensation и section-specific formatting, поэтому слишком deterministic baseline может дать слабый результат, а слишком свободная генерация — начать выдумывать факты;
-- bilingual output увеличивает объём и сложность acceptance surface, особенно если для публикации реально нужен только один язык;
-- profile-specific artifact может затронуть privacy-sensitive данные, если заранее не закрепить правила публикации контактов.
+- отсутствие `profile/contact-regions.yml` остаётся реальным quality risk для location/contact/public-link recommendations: baseline fallback теперь понятен, но может быть беднее желаемого profile overlay;
+- LinkedIn требует editorial condensation и section-specific formatting, поэтому helper layer должен быть достаточно структурным, чтобы не скатиться либо в дословный resume dump, либо в свободную генерацию с drift;
+- единый bilingual per-role pack удобен для review и handoff, но может оказаться слишком объёмным; если это проявится на M3/M4, позже может понадобиться split без смены factual/input contract;
+- первая версия жёстко требует `target_role`, поэтому generic executive LinkedIn profile без role overlay остаётся отдельным follow-up, а не implicit fallback.
 
 ## External touchpoints
 
@@ -108,7 +108,7 @@
 
 ### M2. First Executable LinkedIn Contract
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - закрепить минимальный, но полноценный contract для первой исполнимой версии `build-linkedin`.
 - Deliverables:
@@ -124,21 +124,25 @@
   - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\profile\README.md`
   - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\promts\promt-create-linkedin-profile.md`
 - Notes / discoveries:
-  - пока нет
+  - first executable artifact закреплён как per-role file `profile/linkedin/<target_role>.md` с five-part pack: executive summary, RU pack, EN pack, filling guide, `GAP` list;
+  - `target_role` обязателен в baseline-версии, чтобы workflow не гадал между несколькими role angles;
+  - `resumes/MASTER.md` остаётся единственным factual source, `resumes/<target_role>.md` используется только как positioning overlay, `profile/contact-regions.yml` — optional metadata overlay только для profile surface;
+  - private contact channels не должны автоматически попадать в public-ready output sections.
 
 ### M3. Draft Builder For LinkedIn Profile Artifacts
 
 - Status: `planned`
 - Goal:
-  - реализовать helper layer, который читает canonical inputs и рендерит deterministic LinkedIn draft artifact(s) без фактического drift.
+  - реализовать helper layer, который читает `resumes/MASTER.md`, выбранное `resumes/<target_role>.md` и optional `profile/contact-regions.yml`, а затем рендерит deterministic per-role LinkedIn pack без фактического drift.
 - Deliverables:
-  - builder module для load/merge/render LinkedIn pack;
-  - explicit section model для output artifact(s);
+  - builder module для load/merge/render `profile/linkedin/<target_role>.md`;
+  - explicit section model для five-part output pack;
   - targeted tests на no-hallucination, idempotency и missing-input markers.
 - Acceptance criteria:
   - helper layer не invents facts beyond `MASTER` plus approved optional overlays;
   - одинаковые inputs дают idempotent output;
-  - missing optional metadata отражается маркерами, а не silent omission без trace.
+  - missing optional metadata отражается маркерами, а не silent omission без trace;
+  - private contact channels не попадают в ready-to-paste public sections автоматически.
 - Validation commands:
   - `python -m unittest tests.test_build_linkedin_helpers`
 - Notes / discoveries:
@@ -189,22 +193,24 @@
 
 - `2026-04-22 19:33` — Dedicated plan для `build-linkedin` открыт только после завершения `rebuild-master` и `rebuild-role-resume`. — Причина: downstream LinkedIn workflow должен читать уже стабилизированный canonical resume family, а не raw vacancy/adoption layers. — Это сохраняет последовательность `accepted -> MASTER -> role resume -> LinkedIn`.
 - `2026-04-22 19:33` — Исторический файл `promts/promt-create-linkedin-profile.md` закреплён как reference-only deliverable map, а не как source-of-truth спецификация. — Причина: root-normalization уже классифицировал legacy prompt corpus как historical material. — Реальный executable contract должен жить в dedicated plan и затем в коде/README.
+- `2026-04-23 08:57` — First executable artifact закреплён как один per-role pack `profile/linkedin/<target_role>.md`, а не как набор разрозненных RU/EN файлов. — Причина: historical prompt map требует не только тексты по языкам, но и executive summary, filling guide и `GAP` list; один pack сохраняет reviewability и не плодит лишние file contracts. — Это делает M3 implementation scope конкретным и совместимым с future split при необходимости.
+- `2026-04-23 08:57` — `target_role` объявлен обязательным input первой версии; `resumes/MASTER.md` остаётся единственным factual source, `resumes/<target_role>.md` — обязательным positioning overlay, а `profile/contact-regions.yml` — optional metadata overlay только для contact/location/public-link surface. — Причина: baseline workflow не должен угадывать целевой angle и не должен создавать новый source-of-truth drift между resume и profile слоями. — Это снимает product ambiguity для helper/workflow milestones M3-M4.
+- `2026-04-23 08:57` — Private contact channels не включаются автоматически в public-ready output sections и остаются только в filling guide как `OPTIONAL` / `CHECK`. — Причина: LinkedIn artifact живёт в `profile/` и затрагивает privacy-sensitive surface; безопасный baseline не должен публиковать телефоны, мессенджеры и почту без ручного решения. — Это фиксирует contact exposure policy до начала реализации.
 
 ## Progress log
 
 - `2026-04-22 19:33` — Создан dedicated plan и закрыт baseline milestone M1 по текущему состоянию `resumes/`, `profile/`, `knowledge/roles/`, historical LinkedIn prompt material и code references. — Validation опиралась на реальный root inventory, `MASTER.md`, `profile/README.md`, historical prompt и `rg` по submodule-коду. — Status: `blocked`.
+- `2026-04-23 08:57` — M2 закрыт: first executable contract теперь жёстко фиксирует per-role output `profile/linkedin/<target_role>.md`, обязательный `target_role`, input precedence (`MASTER` -> role resume -> optional profile metadata`) и privacy-safe contact policy. — Validation выполнена повторным чтением dedicated plan, `profile/README.md` и historical prompt map; product ambiguity для M3 снята. — Status: `in_progress`.
 
 ## Current state
 
-- Current milestone: `M2`
-- Current status: `blocked`
-- Next step: `Закрепить first executable contract для `build-linkedin`: input precedence (`MASTER` vs role resume vs profile metadata), output artifact layout в `profile/`, bilingual policy и правила `CHECK` / `GAP` markers.`
+- Current milestone: `M3`
+- Current status: `in_progress`
+- Next step: `Реализовать helper layer для `build-linkedin`, который собирает per-role artifact `profile/linkedin/<target_role>.md` из `resumes/MASTER.md`, `resumes/<target_role>.md` и optional `profile/contact-regions.yml`, а затем покрыть его targeted tests.`
 - Active blockers:
-  - Не закреплён first executable contract для LinkedIn artifacts и profile metadata overlay.
+  - none
 - Open questions:
-  - Нужен один bilingual `profile/linkedin.md`, два language-specific artifacts или более дробный pack с field-by-field guide?
-  - Является ли `target_role` обязательным input для первой версии или workflow должен уметь строить generic executive profile только из `MASTER`?
-  - Нужно ли first version читать отдельный profile metadata file, если `profile/contact-regions.yml` пока отсутствует?
+  - none
 
 ## Completion summary
 
