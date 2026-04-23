@@ -14,6 +14,7 @@
 - workflow `rebuild-master`, который синхронизирует managed approved-signals section в `resumes/MASTER.md` из `adoptions/accepted/MASTER.md` и пишет runtime report в `agent_memory/runtime/rebuild-master/latest.md`.
 - workflow `rebuild-role-resume`, который синхронизирует managed canonical block в выбранном `resumes/<role>.md` из уже согласованного `resumes/MASTER.md` и optional `knowledge/roles/<role>.md`.
 - workflow `build-linkedin`, который собирает per-role LinkedIn draft pack в `profile/linkedin/<target_role>.md` из canonical `MASTER`, выбранного role resume и optional profile metadata, а runtime report пишет в `agent_memory/runtime/build-linkedin/<target_role>.md`.
+- workflow `export-resume-pdf`, который рендерит проверяемый PDF-артефакт из `resumes/MASTER.md` или выбранного `resumes/<role>.md`, пишет итоговый файл в `profile/pdf/<target_resume>/<language>-<region>.pdf` и сохраняет verification trail в `agent_memory/runtime/export-resume-pdf/<target_resume>/<language>-<region>/`.
 
 ## Структура private workspace
 
@@ -37,6 +38,7 @@ python run_agent.py --root ../.. prepare-screening --vacancy-id 20260420-example
 python run_agent.py --root ../.. rebuild-master
 python run_agent.py --root ../.. rebuild-role-resume --target-role CTO
 python run_agent.py --root ../.. build-linkedin --target-role CTO
+python run_agent.py --root ../.. export-resume-pdf --target-resume CTO --contact-region EU
 python run_agent.py --root ../.. show-memory
 ```
 
@@ -67,6 +69,10 @@ python run_agent.py --root ../.. show-memory
 - `python run_agent.py --root ../.. build-linkedin --target-role CTO`
   Читает canonical `resumes/MASTER.md`, выбранное `resumes/CTO.md` и optional `profile/contact-regions.yml`, затем детерминированно собирает bilingual draft pack в `profile/linkedin/CTO.md`.
   Артефакт содержит executive summary, RU и EN ready-to-paste blocks, filling guide и `GAP` list; private contacts не попадают автоматически в public-ready copy, а runtime report пишется в `agent_memory/runtime/build-linkedin/CTO.md`.
+- `python run_agent.py --root ../.. export-resume-pdf --target-resume CTO --contact-region EU`
+  Читает `resumes/MASTER.md` или выбранное `resumes/<role>.md`, применяет public contact overlay из `profile/contact-regions.yml` только к верхнему contact/location surface и рендерит PDF в `profile/pdf/CTO/ru-EU.pdf`.
+  `--target-resume` обязателен; `--output-language` в baseline поддерживает только `ru`, `--contact-region` принимает `RU`, `KZ`, `EU` и по умолчанию берётся из `profile/contact-regions.yml` (иначе `EU`), `--template-id` сейчас поддерживает только `default`.
+  Успешный run обязан сохранить `report.md` и preview PNG pages в `agent_memory/runtime/export-resume-pdf/CTO/ru-EU/`; если отсутствует `pdftoppm` из Poppler, workflow завершается явной ошибкой вместо partial success.
 - `python run_agent.py --root ../.. show-memory`
   Показывает текущее содержимое файловой памяти агента: задачи, артефакты и журнал запусков workflow, а также reconciliation-сводку по отсутствующим vacancy artifacts.
 
@@ -80,7 +86,7 @@ python run_agent.py --root ../.. show-memory
 4. Только после этого downstream workflow `rebuild-master` должен обновлять `resumes/MASTER.md`.
 5. Только после синхронизации `MASTER` workflow `rebuild-role-resume` должен обновлять конкретное `resumes/<role>.md` из canonical resume и optional `knowledge/roles/<role>.md`, а не из raw vacancy corpus или `adoptions/accepted/` напрямую.
 6. Только после этого downstream workflow `build-linkedin` должен читать обновлённый canonical resume family и собирать `profile/linkedin/<target_role>.md`.
-7. Следующий remaining workflow после LinkedIn pack generation должен уже проектировать `export-resume-pdf` поверх стабилизированных resume/profile derivatives, а не поверх raw vacancy artifacts.
+7. Только после этого downstream workflow `export-resume-pdf` должен читать уже стабилизированные resume/profile derivatives и собирать durable PDF artifact в `profile/pdf/<target_resume>/` вместе с verification trail в `agent_memory/runtime/export-resume-pdf/<target_resume>/`.
 
 Подробный пошаговый сценарий первого рабочего прогона в private workspace лежит в [tooling/run-ingest-analyze.md](/C:/Users/avramko/OneDrive/Documents/Career/tooling/run-ingest-analyze.md).
 

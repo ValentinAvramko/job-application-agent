@@ -4,8 +4,8 @@
 - Slug: `2026-04-23-export-resume-pdf-workflow`
 - Owner: `Codex`
 - Created: `2026-04-23`
-- Last updated: `2026-04-23 14:59`
-- Overall status: `in_progress`
+- Last updated: `2026-04-23 15:04`
+- Overall status: `done`
 
 ## Objective
 
@@ -185,7 +185,7 @@
 
 ### M5. Docs Sync, Full Validation And Master-Plan Handoff
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - синхронизировать docs, прогнать full validation baseline и закрыть handoff обратно в master plan после последнего remaining workflow.
 - Deliverables:
@@ -202,7 +202,10 @@
   - `python run_agent.py --root ../.. list-workflows`
   - `python run_agent.py --root ../.. show-memory`
 - Notes / discoveries:
-  - пока нет
+  - `README.md` теперь описывает CLI-входы `export-resume-pdf`, итоговый PDF path, runtime verification trail и требование preview generation через `pdftoppm`/Poppler;
+  - root-level `profile/README.md` синхронизирован с новым durable artifact family `profile/pdf/<target_resume>/<language>-<region>.pdf`;
+  - full validation baseline после docs sync проходит: `python -m unittest discover -s tests` -> `OK (74 tests)`, `list-workflows` включает `export-resume-pdf`, `show-memory` исполняется успешно;
+  - этот milestone закрывает последний remaining workflow в master sequencing, поэтому handoff возвращается не в следующий dedicated workflow plan, а в completion update master plan.
 
 ## Decision log
 
@@ -219,12 +222,13 @@
 - `2026-04-23 10:08` — M2 contract milestone закрыт: first executable version теперь жёстко фиксирует source selection (`MASTER` или один role resume), `ru`-only baseline language policy, explicit `contact_region`, built-in `template_id=default`, durable output path under `profile/pdf/` и mandatory preview/report trail under `agent_memory/runtime/export-resume-pdf/`. — Validation выполнена повторным чтением dedicated plan, `profile/contact-regions.yml`, historical renderer и `pyproject.toml`; product ambiguity для M3 снята. — Status: `in_progress`.
 - `2026-04-23 10:57` — M3 helper milestone завершён: добавлен модуль `application_agent.export_resume_pdf` с markdown projection, contact-region overlay, `reportlab` renderer, preview helper и render report generation; `pyproject.toml` теперь явно декларирует `reportlab`. — Validation: `python -m unittest tests.test_export_resume_pdf_helpers` -> `OK`. — Status: `in_progress`.
 - `2026-04-23 14:59` — M4 завершён: добавлен workflow `src/application_agent/workflows/export_resume_pdf.py`, wiring в `registry`, `cli` и `config`, а новые tests `tests.test_export_resume_pdf_workflow` плюс обновлённые `tests.test_cli` и `tests.test_memory_store` подтверждают controlled side effects, CLI routing и runtime catalog bootstrap. — Validation: `python -m unittest tests.test_export_resume_pdf_helpers tests.test_export_resume_pdf_workflow tests.test_cli tests.test_memory_store` -> `OK`; `python run_agent.py --root ../.. list-workflows` показывает `export-resume-pdf`. — Status: `in_progress`.
+- `2026-04-23 15:04` — M5 завершён: operator docs в `README.md` и root profile docs в `profile/README.md` синхронизированы с final PDF contract, после чего full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (74 tests)`, `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory`). — Dedicated plan переведён в `done` и отдаёт handoff обратно в master plan как для последнего remaining workflow. — Status: `done`.
 
 ## Current state
 
-- Current milestone: `M5`
-- Current status: `in_progress`
-- Next step: `Синхронизировать docs для `export-resume-pdf`, прогнать full validation baseline (`python -m unittest discover -s tests`, `list-workflows`, `show-memory`) и затем вернуть handoff в master plan как для последнего remaining workflow.`
+- Current milestone: `completed`
+- Current status: `done`
+- Next step: `Вернуться в master plan `2026-04-21-repository-reconstruction-and-backlog.md` и отметить очередь remaining workflows полностью завершённой.`
 - Active blockers:
   - none
 - Open questions:
@@ -232,4 +236,19 @@
 
 ## Completion summary
 
-Заполняется только после завершения задачи.
+Завершён executable workflow `export-resume-pdf`: публичный CLI, request contract, deterministic PDF output path, verification trail и workflow memory теперь согласованы и задокументированы.
+
+Провалидировано:
+
+- `python -m unittest discover -s tests` -> `OK (74 tests)`
+- `python run_agent.py --root ../.. list-workflows`
+- `python run_agent.py --root ../.. show-memory`
+
+Follow-up вне этого dedicated plan:
+
+- отдельный template system для PDF beyond `template_id=default`;
+- поддержка дополнительных языков только после появления отдельного bilingual resume source.
+
+Остаточный риск один и он уже зафиксирован в контракте: preview generation зависит от внешнего `pdftoppm`/Poppler и при его отсутствии workflow должен завершаться явной ошибкой.
+
+Затронутые root-level artifacts: обновлён `C:\Users\avramko\OneDrive\Documents\Career\profile\README.md`; durable PDF outputs и runtime previews этим milestone не генерировались.
