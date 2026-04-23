@@ -4,7 +4,7 @@
 - Slug: `2026-04-23-export-resume-pdf-workflow`
 - Owner: `Codex`
 - Created: `2026-04-23`
-- Last updated: `2026-04-23 10:57`
+- Last updated: `2026-04-23 14:59`
 - Overall status: `in_progress`
 
 ## Objective
@@ -162,7 +162,7 @@
 
 ### M4. Workflow, CLI And Runtime Verification Wiring
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - добавить executable workflow `export-resume-pdf` в runtime catalog с контролируемыми side effects только на agreed PDF outputs и runtime verification trail.
 - Deliverables:
@@ -178,7 +178,10 @@
   - `python -m unittest tests.test_export_resume_pdf_helpers tests.test_export_resume_pdf_workflow tests.test_cli tests.test_memory_store`
   - `python run_agent.py --root ../.. list-workflows`
 - Notes / discoveries:
-  - пока нет
+  - Добавлен executable workflow `export-resume-pdf` с request normalization для `target_resume`, `output_language`, `contact_region` и `template_id`;
+  - default `contact_region` теперь берётся из `profile/contact-regions.yml` (`defaults.contact_region_by_vacancy_country.default`) с fallback на `EU`, а final artifact contract остаётся `profile/pdf/<target_resume>/<language>-<region>.pdf`;
+  - runtime verification report продолжает жить в `agent_memory/runtime/export-resume-pdf/<target_resume>/<language>-<region>/report.md`, а workflow memory записывает PDF, report и preview PNG files как явные artifacts;
+  - public CLI, registry и `project_memory.workflow_catalog` теперь знают `export-resume-pdf`, а targeted tests покрывают workflow side effects, CLI routing и catalog bootstrap/upgrade.
 
 ### M5. Docs Sync, Full Validation And Master-Plan Handoff
 
@@ -215,12 +218,13 @@
 - `2026-04-23 10:08` — Создан dedicated plan и закрыт baseline milestone M1 по текущему состоянию `resumes/`, `profile/contact-regions.yml`, `templates/`, historical manual renderer в `employers/TaxDome/` и existing PDF traces в `archive/`. — Validation опиралась на реальный root inventory, `pyproject.toml`, `README.md` и search по plans/src/tests. — Status: `in_progress`.
 - `2026-04-23 10:08` — M2 contract milestone закрыт: first executable version теперь жёстко фиксирует source selection (`MASTER` или один role resume), `ru`-only baseline language policy, explicit `contact_region`, built-in `template_id=default`, durable output path under `profile/pdf/` и mandatory preview/report trail under `agent_memory/runtime/export-resume-pdf/`. — Validation выполнена повторным чтением dedicated plan, `profile/contact-regions.yml`, historical renderer и `pyproject.toml`; product ambiguity для M3 снята. — Status: `in_progress`.
 - `2026-04-23 10:57` — M3 helper milestone завершён: добавлен модуль `application_agent.export_resume_pdf` с markdown projection, contact-region overlay, `reportlab` renderer, preview helper и render report generation; `pyproject.toml` теперь явно декларирует `reportlab`. — Validation: `python -m unittest tests.test_export_resume_pdf_helpers` -> `OK`. — Status: `in_progress`.
+- `2026-04-23 14:59` — M4 завершён: добавлен workflow `src/application_agent/workflows/export_resume_pdf.py`, wiring в `registry`, `cli` и `config`, а новые tests `tests.test_export_resume_pdf_workflow` плюс обновлённые `tests.test_cli` и `tests.test_memory_store` подтверждают controlled side effects, CLI routing и runtime catalog bootstrap. — Validation: `python -m unittest tests.test_export_resume_pdf_helpers tests.test_export_resume_pdf_workflow tests.test_cli tests.test_memory_store` -> `OK`; `python run_agent.py --root ../.. list-workflows` показывает `export-resume-pdf`. — Status: `in_progress`.
 
 ## Current state
 
-- Current milestone: `M4`
+- Current milestone: `M5`
 - Current status: `in_progress`
-- Next step: `Реализовать M4 workflow wiring для `export-resume-pdf`: request contract, workflow module, registry/CLI/config integration, runtime memory reporting и targeted workflow/CLI tests.`
+- Next step: `Синхронизировать docs для `export-resume-pdf`, прогнать full validation baseline (`python -m unittest discover -s tests`, `list-workflows`, `show-memory`) и затем вернуть handoff в master plan как для последнего remaining workflow.`
 - Active blockers:
   - none
 - Open questions:

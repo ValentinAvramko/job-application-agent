@@ -8,6 +8,7 @@ from application_agent.memory.store import JsonMemoryStore
 from application_agent.workspace import WorkspaceLayout
 from application_agent.workflows.analyze_vacancy import AnalyzeVacancyRequest
 from application_agent.workflows.build_linkedin import BuildLinkedInRequest
+from application_agent.workflows.export_resume_pdf import ExportResumePdfRequest
 from application_agent.workflows.ingest_vacancy import IngestVacancyRequest
 from application_agent.workflows.intake_adoptions import IntakeAdoptionsRequest
 from application_agent.workflows.prepare_screening import PrepareScreeningRequest
@@ -84,6 +85,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Build a deterministic LinkedIn draft pack for a selected role resume.",
     )
     build_linkedin.add_argument("--target-role", default="")
+    export_resume_pdf = subparsers.add_parser(
+        "export-resume-pdf",
+        help="Render a PDF artifact and verification trail for a selected resume source.",
+    )
+    export_resume_pdf.add_argument("--target-resume", default="")
+    export_resume_pdf.add_argument("--output-language", default="")
+    export_resume_pdf.add_argument("--contact-region", default="")
+    export_resume_pdf.add_argument("--template-id", default="")
     return parser
 
 
@@ -192,6 +201,18 @@ def main() -> int:
     if args.command == "build-linkedin":
         request = BuildLinkedInRequest(target_role=args.target_role)
         workflow = build_default_registry().get("build-linkedin")
+        result = workflow.run(layout=layout, store=store, request=request)
+        print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "export-resume-pdf":
+        request = ExportResumePdfRequest(
+            target_resume=args.target_resume,
+            output_language=args.output_language,
+            contact_region=args.contact_region,
+            template_id=args.template_id,
+        )
+        workflow = build_default_registry().get("export-resume-pdf")
         result = workflow.run(layout=layout, store=store, request=request)
         print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
         return 0

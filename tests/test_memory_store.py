@@ -38,6 +38,7 @@ class MemoryStoreTests(unittest.TestCase):
         self.assertIn("rebuild-master", project_memory["workflow_catalog"])
         self.assertIn("rebuild-role-resume", project_memory["workflow_catalog"])
         self.assertIn("build-linkedin", project_memory["workflow_catalog"])
+        self.assertIn("export-resume-pdf", project_memory["workflow_catalog"])
 
     def test_bootstrap_rewrites_workflow_catalog_to_runtime_defaults(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
@@ -71,6 +72,7 @@ class MemoryStoreTests(unittest.TestCase):
                 "rebuild-master",
                 "rebuild-role-resume",
                 "build-linkedin",
+                "export-resume-pdf",
             ],
         )
         self.assertEqual(project_memory["role_resumes"], ["CIO", "CTO", "HoE", "HoD", "EM"])

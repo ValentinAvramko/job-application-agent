@@ -59,6 +59,7 @@ class CliTests(unittest.TestCase):
             [
                 "analyze-vacancy",
                 "build-linkedin",
+                "export-resume-pdf",
                 "ingest-vacancy",
                 "intake-adoptions",
                 "prepare-screening",
@@ -285,5 +286,46 @@ class CliTests(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload["workflow"], "build-linkedin")
         self.assertIn("LinkedIn", payload["summary"])
+
+    def test_export_resume_pdf_cli_routes_to_workflow(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / ".tmp-tests"
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f"cli-export-resume-pdf-{uuid.uuid4().hex}"
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+
+        result = WorkflowResult(
+            workflow="export-resume-pdf",
+            status="completed",
+            summary="Exported resume PDF for CTO.",
+            artifacts=[str(workspace_dir / "profile" / "pdf" / "CTO" / "ru-EU.pdf")],
+        )
+        registry = _FakeRegistry(result)
+        stdout = io.StringIO()
+
+        with patch("application_agent.cli.build_default_registry", return_value=registry), patch.object(
+            sys,
+            "argv",
+            [
+                "run_agent.py",
+                "--root",
+                str(workspace_dir),
+                "export-resume-pdf",
+                "--target-resume",
+                "CTO",
+                "--output-language",
+                "ru",
+                "--contact-region",
+                "EU",
+                "--template-id",
+                "default",
+            ],
+        ), patch("sys.stdout", new=stdout):
+            exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(registry.requested, ["export-resume-pdf"])
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["workflow"], "export-resume-pdf")
+        self.assertIn("PDF", payload["summary"])
 if __name__ == "__main__":
     unittest.main()
