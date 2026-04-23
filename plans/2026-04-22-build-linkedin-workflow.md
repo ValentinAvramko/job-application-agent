@@ -4,7 +4,7 @@
 - Slug: `2026-04-22-build-linkedin-workflow`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-23 08:57`
+- Last updated: `2026-04-23 09:17`
 - Overall status: `in_progress`
 
 ## Objective
@@ -131,7 +131,7 @@
 
 ### M3. Draft Builder For LinkedIn Profile Artifacts
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - реализовать helper layer, который читает `resumes/MASTER.md`, выбранное `resumes/<target_role>.md` и optional `profile/contact-regions.yml`, а затем рендерит deterministic per-role LinkedIn pack без фактического drift.
 - Deliverables:
@@ -146,7 +146,9 @@
 - Validation commands:
   - `python -m unittest tests.test_build_linkedin_helpers`
 - Notes / discoveries:
-  - пока нет
+  - helper implementation оформлен отдельным модулем `application_agent.linkedin_builder`, чтобы M4 мог переиспользовать deterministic load/merge/render logic без дублирования;
+  - builder использует front matter `MASTER.md` как fallback profile surface и optional `profile/contact-regions.yml` как override only для name/location/public-link/private-contact recommendations;
+  - private contacts остаются только во filling guide, а missing EN/public profile surface превращаются в явные `CHECK` / `GAP` маркеры вместо выдумывания copy.
 
 ### M4. Workflow, CLI And Runtime Wiring
 
@@ -201,12 +203,13 @@
 
 - `2026-04-22 19:33` — Создан dedicated plan и закрыт baseline milestone M1 по текущему состоянию `resumes/`, `profile/`, `knowledge/roles/`, historical LinkedIn prompt material и code references. — Validation опиралась на реальный root inventory, `MASTER.md`, `profile/README.md`, historical prompt и `rg` по submodule-коду. — Status: `blocked`.
 - `2026-04-23 08:57` — M2 закрыт: first executable contract теперь жёстко фиксирует per-role output `profile/linkedin/<target_role>.md`, обязательный `target_role`, input precedence (`MASTER` -> role resume -> optional profile metadata`) и privacy-safe contact policy. — Validation выполнена повторным чтением dedicated plan, `profile/README.md` и historical prompt map; product ambiguity для M3 снята. — Status: `in_progress`.
+- `2026-04-23 09:17` — M3 helper milestone закрыт: добавлен модуль `application_agent.linkedin_builder` с deterministic projection `MASTER` + selected role resume + optional `profile/contact-regions.yml` -> `profile/linkedin/<target_role>.md`, five-part artifact model и marker-based fallback policy для missing EN/profile-surface inputs. — Validation: `python -m unittest tests.test_build_linkedin_helpers` -> `OK`; targeted tests покрывают metadata precedence, idempotency, privacy-safe handling private contacts и явные `CHECK` / `GAP` markers. — Status: `in_progress`.
 
 ## Current state
 
-- Current milestone: `M3`
+- Current milestone: `M4`
 - Current status: `in_progress`
-- Next step: `Реализовать helper layer для `build-linkedin`, который собирает per-role artifact `profile/linkedin/<target_role>.md` из `resumes/MASTER.md`, `resumes/<target_role>.md` и optional `profile/contact-regions.yml`, а затем покрыть его targeted tests.`
+- Next step: `Добавить executable workflow `build-linkedin` в runtime catalog: обернуть `application_agent.linkedin_builder` в workflow/request contract, подключить registry/cli/config, писать runtime report в `agent_memory/runtime/build-linkedin/` и покрыть это workflow/CLI tests.`
 - Active blockers:
   - none
 - Open questions:

@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-23 08:57`
+- Last updated: `2026-04-23 09:17`
 - Overall status: `in_progress`
 
 ## Objective
@@ -228,6 +228,7 @@
 - `2026-04-22 15:53` — Planning для upstream review/acceptance workflow завершён: создан dedicated execution plan `2026-04-22-implement-adoptions-review-and-acceptance-workflow.md`, а initial implementation shape закреплена как `runtime intake` + `agent-guided review support`. — Это превращает M5 шаг из planning branch в прямой execution backlog. — Следующий execution focus смещён на M1 нового execution plan.
 - `2026-04-22 19:33` — Для следующего remaining workflow открыт dedicated plan `2026-04-22-build-linkedin-workflow.md`. — Baseline inventory подтвердил, что `build-linkedin` ещё не реализован, `profile/` пока почти пуст, а главный blocker сводится к first executable contract по LinkedIn artifacts и profile metadata overlay. — Execution focus внутри M5 теперь перенесён в M2 нового dedicated plan.
 - `2026-04-23 08:57` — В dedicated plan `build-linkedin` закрыт M2 contract milestone: first executable version теперь фиксирует per-role pack `profile/linkedin/<target_role>.md`, обязательный `target_role`, `MASTER` как единственный factual source, role resume как positioning overlay и optional `profile/contact-regions.yml` только для profile surface. — Это снимает product blocker внутри M5 и переводит execution focus с contract discussion на M3 helper implementation. — Следующий execution step теперь уже кодовый, а не planning-only.
+- `2026-04-23 09:17` — В dedicated plan `build-linkedin` закрыт M3 helper milestone: deterministic builder `application_agent.linkedin_builder` теперь собирает per-role LinkedIn pack, уважает precedence `MASTER -> role resume -> optional profile metadata`, держит private contacts только во filling guide и маркирует missing EN/profile-surface inputs через `CHECK` / `GAP`. — Это снимает implementation blocker по helper layer и переводит execution focus master M5 на M4 workflow wiring для `build-linkedin`. — Следующий execution step снова чётко сводится к runtime integration.
 
 ## Progress log
 
@@ -257,12 +258,13 @@
 - `2026-04-22 19:33` — Dedicated plan для `build-linkedin` открыт и доведён до baseline M1: подтверждено отсутствие workflow-кода, пустой почти `profile/` layer и наличие only-historical prompt map в `promts/promt-create-linkedin-profile.md`. — M5 остаётся активным, но его текущий blocker теперь narrowed до одного contract-decision milestone внутри нового плана. — Status: `in_progress`.
 - `2026-04-22 20:05` — `rebuild-role-resume` завершён end-to-end: helper module, workflow wiring, runtime report, docs sync и full validation baseline подтверждены (`python -m unittest discover -s tests` -> `OK (62 tests)`, `list-workflows`, `show-memory`). — Sequencing для resume family теперь доведён от `accepted` до `MASTER` и выбранного role resume; следующий remaining-workflow step смещается на `build-linkedin`. — Status: `in_progress`.
 - `2026-04-23 08:57` — Contract ambiguity для `build-linkedin` снята: dedicated plan M2 закрепил one-pack output `profile/linkedin/<target_role>.md`, обязательный `target_role`, deterministic precedence между `MASTER`, role resume и optional profile metadata, а также privacy-safe contact policy. — Validation опиралась на повторное чтение dedicated plan, `profile/README.md` и historical LinkedIn prompt map. — Status: `in_progress`.
+- `2026-04-23 09:17` — Helper layer для `build-linkedin` реализован и провалидирован: `application_agent.linkedin_builder` рендерит deterministic artifact `profile/linkedin/<target_role>.md`, использует front matter `MASTER.md` как fallback profile surface, уважает optional metadata override и не выводит private contacts в public-ready blocks. — Validation: `python -m unittest tests.test_build_linkedin_helpers` -> `OK`. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M5`
 - Current status: `in_progress`
-- Next step: `Перейти в dedicated plan `2026-04-22-build-linkedin-workflow.md` и реализовать M3 helper layer для per-role LinkedIn pack `profile/linkedin/<target_role>.md` с targeted tests.`
+- Next step: `Перейти в dedicated plan `2026-04-22-build-linkedin-workflow.md` и реализовать M4 workflow wiring: обернуть `application_agent.linkedin_builder` в executable `build-linkedin`, подключить registry/cli/config/runtime report и покрыть workflow/CLI tests.`
 - Active blockers:
   - none
 - Open questions:
