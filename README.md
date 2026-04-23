@@ -13,6 +13,7 @@
 - workflow `prepare-screening`, который по готовой вакансии собирает vacancy-local `screening.md` для первичного интервью;
 - workflow `rebuild-master`, который синхронизирует managed approved-signals section в `resumes/MASTER.md` из `adoptions/accepted/MASTER.md` и пишет runtime report в `agent_memory/runtime/rebuild-master/latest.md`.
 - workflow `rebuild-role-resume`, который синхронизирует managed canonical block в выбранном `resumes/<role>.md` из уже согласованного `resumes/MASTER.md` и optional `knowledge/roles/<role>.md`.
+- workflow `build-linkedin`, который собирает per-role LinkedIn draft pack в `profile/linkedin/<target_role>.md` из canonical `MASTER`, выбранного role resume и optional profile metadata, а runtime report пишет в `agent_memory/runtime/build-linkedin/<target_role>.md`.
 
 ## Структура private workspace
 
@@ -35,6 +36,7 @@ python run_agent.py --root ../.. intake-adoptions --vacancy-id 20260420-example-
 python run_agent.py --root ../.. prepare-screening --vacancy-id 20260420-example-engineering-manager
 python run_agent.py --root ../.. rebuild-master
 python run_agent.py --root ../.. rebuild-role-resume --target-role CTO
+python run_agent.py --root ../.. build-linkedin --target-role CTO
 python run_agent.py --root ../.. show-memory
 ```
 
@@ -62,6 +64,9 @@ python run_agent.py --root ../.. show-memory
 - `python run_agent.py --root ../.. rebuild-role-resume --target-role CTO`
   Читает managed approved-signals section из `resumes/MASTER.md`, optional shaping bullets из `knowledge/roles/CTO.md` и детерминированно синхронизирует managed block в `resumes/CTO.md`.
   Baseline-версия не делает full rewrite всего role resume: она обновляет только parseable managed block и пишет per-role runtime report в `agent_memory/runtime/rebuild-role-resume/CTO.md`.
+- `python run_agent.py --root ../.. build-linkedin --target-role CTO`
+  Читает canonical `resumes/MASTER.md`, выбранное `resumes/CTO.md` и optional `profile/contact-regions.yml`, затем детерминированно собирает bilingual draft pack в `profile/linkedin/CTO.md`.
+  Артефакт содержит executive summary, RU и EN ready-to-paste blocks, filling guide и `GAP` list; private contacts не попадают автоматически в public-ready copy, а runtime report пишется в `agent_memory/runtime/build-linkedin/CTO.md`.
 - `python run_agent.py --root ../.. show-memory`
   Показывает текущее содержимое файловой памяти агента: задачи, артефакты и журнал запусков workflow, а также reconciliation-сводку по отсутствующим vacancy artifacts.
 
@@ -74,7 +79,8 @@ python run_agent.py --root ../.. show-memory
 3. Agent-guided review stage читает context через helper APIs из `application_agent.adoptions_review` и применяет approved updates в `adoptions/accepted/MASTER.md`.
 4. Только после этого downstream workflow `rebuild-master` должен обновлять `resumes/MASTER.md`.
 5. Только после синхронизации `MASTER` workflow `rebuild-role-resume` должен обновлять конкретное `resumes/<role>.md` из canonical resume и optional `knowledge/roles/<role>.md`, а не из raw vacancy corpus или `adoptions/accepted/` напрямую.
-6. Только после этого downstream workflow `build-linkedin` должен читать обновлённый canonical resume family.
+6. Только после этого downstream workflow `build-linkedin` должен читать обновлённый canonical resume family и собирать `profile/linkedin/<target_role>.md`.
+7. Следующий remaining workflow после LinkedIn pack generation должен уже проектировать `export-resume-pdf` поверх стабилизированных resume/profile derivatives, а не поверх raw vacancy artifacts.
 
 Подробный пошаговый сценарий первого рабочего прогона в private workspace лежит в [tooling/run-ingest-analyze.md](/C:/Users/avramko/OneDrive/Documents/Career/tooling/run-ingest-analyze.md).
 
