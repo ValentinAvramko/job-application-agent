@@ -4,7 +4,7 @@
 - Slug: `2026-04-22-build-linkedin-workflow`
 - Owner: `Codex`
 - Created: `2026-04-22`
-- Last updated: `2026-04-23 09:17`
+- Last updated: `2026-04-23 09:27`
 - Overall status: `in_progress`
 
 ## Objective
@@ -152,7 +152,7 @@
 
 ### M4. Workflow, CLI And Runtime Wiring
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - добавить executable workflow `build-linkedin` в runtime catalog с безопасными side effects только на LinkedIn draft artifacts и runtime memory.
 - Deliverables:
@@ -172,7 +172,7 @@
 
 ### M5. Docs Sync And Downstream Handoff To Export-Resume-Pdf
 
-- Status: `planned`
+- Status: `in_progress`
 - Goal:
   - синхронизировать docs, full validation baseline и handoff в следующий remaining workflow после `build-linkedin`.
 - Deliverables:
@@ -205,9 +205,11 @@
 - `2026-04-23 08:57` — M2 закрыт: first executable contract теперь жёстко фиксирует per-role output `profile/linkedin/<target_role>.md`, обязательный `target_role`, input precedence (`MASTER` -> role resume -> optional profile metadata`) и privacy-safe contact policy. — Validation выполнена повторным чтением dedicated plan, `profile/README.md` и historical prompt map; product ambiguity для M3 снята. — Status: `in_progress`.
 - `2026-04-23 09:17` — M3 helper milestone закрыт: добавлен модуль `application_agent.linkedin_builder` с deterministic projection `MASTER` + selected role resume + optional `profile/contact-regions.yml` -> `profile/linkedin/<target_role>.md`, five-part artifact model и marker-based fallback policy для missing EN/profile-surface inputs. — Validation: `python -m unittest tests.test_build_linkedin_helpers` -> `OK`; targeted tests покрывают metadata precedence, idempotency, privacy-safe handling private contacts и явные `CHECK` / `GAP` markers. — Status: `in_progress`.
 
+- `2026-04-23 09:27` — M4 закрыт: helper layer обёрнут в executable workflow `build-linkedin`, добавлены wiring в `registry`, `cli`, `config` и runtime workflow catalog, runtime report пишется в `agent_memory/runtime/build-linkedin/<role>.md`, а новые tests `tests.test_build_linkedin_workflow` плюс обновлённые `tests.test_cli` и `tests.test_memory_store` фиксируют safe side effects и CLI routing. — Validation: `python -m unittest tests.test_build_linkedin_helpers tests.test_build_linkedin_workflow tests.test_cli tests.test_memory_store` -> `OK`; `python run_agent.py --root ../.. list-workflows` показывает `build-linkedin`. — Status: `in_progress`.
+
 ## Current state
 
-- Current milestone: `M4`
+- Current milestone: `M5`
 - Current status: `in_progress`
 - Next step: `Добавить executable workflow `build-linkedin` в runtime catalog: обернуть `application_agent.linkedin_builder` в workflow/request contract, подключить registry/cli/config, писать runtime report в `agent_memory/runtime/build-linkedin/` и покрыть это workflow/CLI tests.`
 - Active blockers:

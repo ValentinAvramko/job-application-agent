@@ -9,4 +9,5 @@ WORKFLOW_CATALOG = (
     "intake-adoptions",
     "rebuild-master",
     "rebuild-role-resume",
+    "build-linkedin",
 )

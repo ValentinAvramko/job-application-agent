@@ -7,6 +7,7 @@ from pathlib import Path
 from application_agent.memory.store import JsonMemoryStore
 from application_agent.workspace import WorkspaceLayout
 from application_agent.workflows.analyze_vacancy import AnalyzeVacancyRequest
+from application_agent.workflows.build_linkedin import BuildLinkedInRequest
 from application_agent.workflows.ingest_vacancy import IngestVacancyRequest
 from application_agent.workflows.intake_adoptions import IntakeAdoptionsRequest
 from application_agent.workflows.prepare_screening import PrepareScreeningRequest
@@ -78,6 +79,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Rebuild the managed canonical block for a selected role resume.",
     )
     rebuild_role.add_argument("--target-role", default="")
+    build_linkedin = subparsers.add_parser(
+        "build-linkedin",
+        help="Build a deterministic LinkedIn draft pack for a selected role resume.",
+    )
+    build_linkedin.add_argument("--target-role", default="")
     return parser
 
 
@@ -179,6 +185,13 @@ def main() -> int:
     if args.command == "rebuild-role-resume":
         request = RebuildRoleResumeRequest(target_role=args.target_role)
         workflow = build_default_registry().get("rebuild-role-resume")
+        result = workflow.run(layout=layout, store=store, request=request)
+        print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "build-linkedin":
+        request = BuildLinkedInRequest(target_role=args.target_role)
+        workflow = build_default_registry().get("build-linkedin")
         result = workflow.run(layout=layout, store=store, request=request)
         print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
         return 0

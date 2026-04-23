@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-23 09:17`
+- Last updated: `2026-04-23 09:27`
 - Overall status: `in_progress`
 
 ## Objective
@@ -259,12 +259,13 @@
 - `2026-04-22 20:05` — `rebuild-role-resume` завершён end-to-end: helper module, workflow wiring, runtime report, docs sync и full validation baseline подтверждены (`python -m unittest discover -s tests` -> `OK (62 tests)`, `list-workflows`, `show-memory`). — Sequencing для resume family теперь доведён от `accepted` до `MASTER` и выбранного role resume; следующий remaining-workflow step смещается на `build-linkedin`. — Status: `in_progress`.
 - `2026-04-23 08:57` — Contract ambiguity для `build-linkedin` снята: dedicated plan M2 закрепил one-pack output `profile/linkedin/<target_role>.md`, обязательный `target_role`, deterministic precedence между `MASTER`, role resume и optional profile metadata, а также privacy-safe contact policy. — Validation опиралась на повторное чтение dedicated plan, `profile/README.md` и historical LinkedIn prompt map. — Status: `in_progress`.
 - `2026-04-23 09:17` — Helper layer для `build-linkedin` реализован и провалидирован: `application_agent.linkedin_builder` рендерит deterministic artifact `profile/linkedin/<target_role>.md`, использует front matter `MASTER.md` как fallback profile surface, уважает optional metadata override и не выводит private contacts в public-ready blocks. — Validation: `python -m unittest tests.test_build_linkedin_helpers` -> `OK`. — Status: `in_progress`.
+- `2026-04-23 09:27` — `build-linkedin` M4 workflow wiring завершён: helper layer обёрнут в executable workflow, добавлены registry/cli/config/runtime-catalog wiring и per-role runtime report, а targeted validation подтверждает новый public entrypoint (`python -m unittest tests.test_build_linkedin_helpers tests.test_build_linkedin_workflow tests.test_cli tests.test_memory_store` -> `OK`, `python run_agent.py --root ../.. list-workflows` показывает `build-linkedin`). — Remaining work внутри master M5 теперь сводится к docs sync и full validation/handoff milestone M5 dedicated plan. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M5`
 - Current status: `in_progress`
-- Next step: `Перейти в dedicated plan `2026-04-22-build-linkedin-workflow.md` и реализовать M4 workflow wiring: обернуть `application_agent.linkedin_builder` в executable `build-linkedin`, подключить registry/cli/config/runtime report и покрыть workflow/CLI tests.`
+- Next step: `Перейти в dedicated plan `2026-04-22-build-linkedin-workflow.md` и реализовать M5 docs sync/full validation: обновить `README.md`, затем прогнать `python -m unittest discover -s tests`, `list-workflows` и `show-memory`, после чего подготовить handoff на `export-resume-pdf`.`
 - Active blockers:
   - none
 - Open questions:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from application_agent.workflows.analyze_vacancy import AnalyzeVacancyWorkflow
+from application_agent.workflows.build_linkedin import BuildLinkedInWorkflow
 from application_agent.workflows.ingest_vacancy import IngestVacancyWorkflow
 from application_agent.workflows.intake_adoptions import IntakeAdoptionsWorkflow
 from application_agent.workflows.prepare_screening import PrepareScreeningWorkflow
@@ -30,6 +31,7 @@ class WorkflowRegistry:
 def build_default_registry() -> WorkflowRegistry:
     registry = WorkflowRegistry()
     registry.register(AnalyzeVacancyWorkflow())
+    registry.register(BuildLinkedInWorkflow())
     registry.register(IngestVacancyWorkflow())
     registry.register(IntakeAdoptionsWorkflow())
     registry.register(PrepareScreeningWorkflow())
