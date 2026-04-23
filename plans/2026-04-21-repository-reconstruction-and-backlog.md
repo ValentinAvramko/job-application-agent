@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-22 15:53`
+- Last updated: `2026-04-22 19:33`
 - Overall status: `in_progress`
 
 ## Objective
@@ -226,6 +226,7 @@
 - `2026-04-22 11:42` — Owner-level sequencing уточнён: перед `rebuild-master` появился отдельный upstream process для review/acceptance signals (`inbox/` + `questions/` -> `accepted/` + `knowledge/roles`). — Это меняет не только contract, но и очередь remaining workflows внутри M5. — Для нового upstream process открыт dedicated plan `2026-04-22-adoptions-review-and-acceptance-workflow.md`.
 - `2026-04-22 13:50` — Upstream review/acceptance plan уточнён до конкретной interaction shape: deterministic intake step отдельно готовит `inbox/` и `questions/`, а отдельная interactive Q&A session обновляет `accepted/MASTER.md` и при необходимости `knowledge/roles/`. — Это снимает двусмысленность текущего шага внутри M5. — Следующим execution focus становится уже code-facing decomposition этого upstream workflow.
 - `2026-04-22 15:53` — Planning для upstream review/acceptance workflow завершён: создан dedicated execution plan `2026-04-22-implement-adoptions-review-and-acceptance-workflow.md`, а initial implementation shape закреплена как `runtime intake` + `agent-guided review support`. — Это превращает M5 шаг из planning branch в прямой execution backlog. — Следующий execution focus смещён на M1 нового execution plan.
+- `2026-04-22 19:33` — Для следующего remaining workflow открыт dedicated plan `2026-04-22-build-linkedin-workflow.md`. — Baseline inventory подтвердил, что `build-linkedin` ещё не реализован, `profile/` пока почти пуст, а главный blocker сводится к first executable contract по LinkedIn artifacts и profile metadata overlay. — Execution focus внутри M5 теперь перенесён в M2 нового dedicated plan.
 
 ## Progress log
 
@@ -252,19 +253,21 @@
 - `2026-04-22 13:50` — В dedicated plan review/acceptance закрыт M2: interaction shape и file contract теперь закреплены без product ambiguity, включая shared ledger `adoptions/questions/open.md`, separate intake stage и отсутствие role-specific accepted artifacts. — Remaining work внутри M5 теперь сводится не к выбору модели, а к implementation-ready decomposition. — Status: `in_progress`.
 - `2026-04-22 15:53` — Dedicated planning plan review/acceptance завершён полностью: создан execution plan с отдельными milestones для intake workflow, review helper layer, agent-guided review support и rebuild-master handoff. — Ordered workflow backlog внутри M5 снова стал исполнимым без дополнительных product решений. — Status: `in_progress`.
 - `2026-04-22 18:49` — Upstream review/acceptance execution и downstream `rebuild-master` завершены end-to-end: `README.md` и dedicated plan фиксируют final contract, а full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (57 tests)`, `list-workflows`, `show-memory`). — Sequencing ambiguity для `MASTER` снята; следующий remaining-workflow step внутри M5 теперь сводится к открытию dedicated plan для `rebuild-role-resume`. — Status: `in_progress`.
+- `2026-04-22 19:33` — Dedicated plan для `build-linkedin` открыт и доведён до baseline M1: подтверждено отсутствие workflow-кода, пустой почти `profile/` layer и наличие only-historical prompt map в `promts/promt-create-linkedin-profile.md`. — M5 остаётся активным, но его текущий blocker теперь narrowed до одного contract-decision milestone внутри нового плана. — Status: `in_progress`.
 - `2026-04-22 20:05` — `rebuild-role-resume` завершён end-to-end: helper module, workflow wiring, runtime report, docs sync и full validation baseline подтверждены (`python -m unittest discover -s tests` -> `OK (62 tests)`, `list-workflows`, `show-memory`). — Sequencing для resume family теперь доведён от `accepted` до `MASTER` и выбранного role resume; следующий remaining-workflow step смещается на `build-linkedin`. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M5`
 - Current status: `in_progress`
-- Next step: `Открыть dedicated plan для `build-linkedin`, который будет читать уже стабилизированные `resumes/MASTER.md` и downstream role-resume family после завершения `rebuild-role-resume`.`
+- Next step: `Перейти в dedicated plan `2026-04-22-build-linkedin-workflow.md` и закрепить first executable contract для `build-linkedin`: input precedence, output artifact layout в `profile/`, bilingual policy и правила `CHECK` / `GAP`.`
 - Active blockers:
-  - none
+  - Не закреплён first executable contract для `build-linkedin`, включая output shape и policy по profile metadata overlay.
 - Open questions:
-  - none
+  - Должен ли baseline workflow собирать один bilingual artifact, два language-specific artifacts или более дробный LinkedIn pack?
+  - Является ли `target_role` обязательным входом для первой версии `build-linkedin`?
 
 ## Completion summary
 
-Заполняется после завершения M1-M5. На текущем этапе cleanup и migration/removal superseded planning artifacts завершены; активная фаза смещена на M4 current workflow completion gate.
+Заполняется после завершения M1-M5.
 
