@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-23 09:27`
+- Last updated: `2026-04-23 10:08`
 - Overall status: `in_progress`
 
 ## Objective
@@ -261,12 +261,13 @@
 - `2026-04-23 09:17` — Helper layer для `build-linkedin` реализован и провалидирован: `application_agent.linkedin_builder` рендерит deterministic artifact `profile/linkedin/<target_role>.md`, использует front matter `MASTER.md` как fallback profile surface, уважает optional metadata override и не выводит private contacts в public-ready blocks. — Validation: `python -m unittest tests.test_build_linkedin_helpers` -> `OK`. — Status: `in_progress`.
 - `2026-04-23 09:27` — `build-linkedin` M4 workflow wiring завершён: helper layer обёрнут в executable workflow, добавлены registry/cli/config/runtime-catalog wiring и per-role runtime report, а targeted validation подтверждает новый public entrypoint (`python -m unittest tests.test_build_linkedin_helpers tests.test_build_linkedin_workflow tests.test_cli tests.test_memory_store` -> `OK`, `python run_agent.py --root ../.. list-workflows` показывает `build-linkedin`). — Remaining work внутри master M5 теперь сводится к docs sync и full validation/handoff milestone M5 dedicated plan. — Status: `in_progress`.
 - `2026-04-23 09:46` — `build-linkedin` завершён end-to-end: operator docs и root profile docs синхронизированы, full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (67 tests)`, `list-workflows`, `show-memory`), а dedicated plan переведён в `done`. — Sequencing remaining workflows снова narrowed до одного шага: открыть dedicated plan для `export-resume-pdf`. — Status: `in_progress`.
+- `2026-04-23 10:08` — Для последнего remaining workflow открыт dedicated plan `2026-04-23-export-resume-pdf-workflow.md`. — Baseline inventory подтвердил отсутствие runtime PDF workflow, наличие только manual historical renderer в `employers/TaxDome/`, существование `profile/contact-regions.yml` и отсутствие PDF templates в `templates/`, а M2 того же плана сразу закрепил first executable contract: `MASTER`/role resume как source, `ru`-only baseline, durable output under `profile/pdf/` и mandatory preview/report trail under `agent_memory/runtime/export-resume-pdf/`. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M5`
 - Current status: `in_progress`
-- Next step: `Открыть dedicated plan для `export-resume-pdf`, зафиксировать rendering/input contract и определить первый исполнимый milestone для PDF export pipeline.`
+- Next step: `Перейти в dedicated plan `2026-04-23-export-resume-pdf-workflow.md` и реализовать M3 helper layer: markdown projection, contact-region overlay, `reportlab` renderer, preview generation и targeted helper tests.`
 - Active blockers:
   - none
 - Open questions:
