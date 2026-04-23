@@ -4,7 +4,7 @@
 - Slug: `2026-04-23-export-resume-pdf-workflow`
 - Owner: `Codex`
 - Created: `2026-04-23`
-- Last updated: `2026-04-23 10:08`
+- Last updated: `2026-04-23 10:57`
 - Overall status: `in_progress`
 
 ## Objective
@@ -142,7 +142,7 @@
 
 ### M3. Markdown Projection And PDF Rendering Helpers
 
-- Status: `planned`
+- Status: `done`
 - Goal:
   - реализовать helper layer, который читает выбранный resume markdown, применяет contact-region overlay и детерминированно рендерит PDF + verification previews.
 - Deliverables:
@@ -156,7 +156,9 @@
 - Validation commands:
   - `python -m unittest tests.test_export_resume_pdf_helpers`
 - Notes / discoveries:
-  - пока нет
+  - helper layer реализован в `src/application_agent/export_resume_pdf.py`: parser/projection читает выбранный resume markdown, применяет `contact_region` overlay только к contact/location/public-link surface, рендерит PDF через `reportlab` и пишет verification report + preview PNGs;
+  - `reportlab` в текущем окружении не даёт побайтово стабильный PDF даже при одинаковом projection, поэтому idempotency helper layer закреплена через стабильный render fingerprint (`projection + renderer version`) и repeatable report/preview outputs, а не через raw PDF byte comparison;
+  - staging/write path перенесён в workspace-local runtime area рядом с final preview/report outputs, чтобы не зависеть от системного `%TEMP%` и не оставлять partial success state при ошибке preview dependency.
 
 ### M4. Workflow, CLI And Runtime Verification Wiring
 
@@ -206,17 +208,19 @@
 - `2026-04-23 10:08` — Durable PDF artifact живёт в `profile/pdf/...`, а preview/report trail — в `agent_memory/runtime/export-resume-pdf/...`. — Причина: root normalization уже закрепил `profile/` как home для durable profile derivatives, тогда как preview PNGs и technical reports являются verification artifacts, а не публичными deliverables. — Это не повторяет manual `tmp_pdf_preview/` contract из `employers/`.
 - `2026-04-23 10:08` — Baseline renderer stack зафиксирован как встроенный `reportlab` renderer с обязательной preview verification через `pdftoppm`/Poppler и explicit dependency error при отсутствии preview toolchain. — Причина: PDF skill и historical prototype одинаково показывают, что без визуальной проверки layout нельзя считать экспорт надёжным. — Это заранее фиксирует quality gate до начала кодовой реализации.
 - `2026-04-23 10:08` — External `templates/` не является blocking dependency первой версии; `template_id=default` остаётся встроенным contract value. — Причина: в репозитории пока нет PDF templates, и попытка ввести template system до базового renderer только распылит scope. — Future template packs остаются follow-up после working baseline.
+- `2026-04-23 10:57` — Idempotency helper layer закреплена через render fingerprint и repeatable verification artifacts, а не через direct PDF byte equality. — Причина: `reportlab` в текущем окружении генерирует различающиеся PDF bytes при одинаковом projection, хотя layout contract и report surface остаются одинаковыми. — Это сохраняет детерминированность M3 без ложных `changed=True` на повторных identical runs.
 
 ## Progress log
 
 - `2026-04-23 10:08` — Создан dedicated plan и закрыт baseline milestone M1 по текущему состоянию `resumes/`, `profile/contact-regions.yml`, `templates/`, historical manual renderer в `employers/TaxDome/` и existing PDF traces в `archive/`. — Validation опиралась на реальный root inventory, `pyproject.toml`, `README.md` и search по plans/src/tests. — Status: `in_progress`.
 - `2026-04-23 10:08` — M2 contract milestone закрыт: first executable version теперь жёстко фиксирует source selection (`MASTER` или один role resume), `ru`-only baseline language policy, explicit `contact_region`, built-in `template_id=default`, durable output path under `profile/pdf/` и mandatory preview/report trail under `agent_memory/runtime/export-resume-pdf/`. — Validation выполнена повторным чтением dedicated plan, `profile/contact-regions.yml`, historical renderer и `pyproject.toml`; product ambiguity для M3 снята. — Status: `in_progress`.
+- `2026-04-23 10:57` — M3 helper milestone завершён: добавлен модуль `application_agent.export_resume_pdf` с markdown projection, contact-region overlay, `reportlab` renderer, preview helper и render report generation; `pyproject.toml` теперь явно декларирует `reportlab`. — Validation: `python -m unittest tests.test_export_resume_pdf_helpers` -> `OK`. — Status: `in_progress`.
 
 ## Current state
 
-- Current milestone: `M3`
+- Current milestone: `M4`
 - Current status: `in_progress`
-- Next step: `Реализовать helper layer для `export-resume-pdf`: parser/projection selected resume markdown + contact-region overlay, renderer на `reportlab`, preview generation и targeted tests `tests.test_export_resume_pdf_helpers`.`
+- Next step: `Реализовать M4 workflow wiring для `export-resume-pdf`: request contract, workflow module, registry/CLI/config integration, runtime memory reporting и targeted workflow/CLI tests.`
 - Active blockers:
   - none
 - Open questions:

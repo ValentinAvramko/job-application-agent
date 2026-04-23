@@ -4,7 +4,7 @@
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
 - Owner: `Codex`
 - Created: `2026-04-21`
-- Last updated: `2026-04-23 10:08`
+- Last updated: `2026-04-23 10:57`
 - Overall status: `in_progress`
 
 ## Objective
@@ -262,12 +262,13 @@
 - `2026-04-23 09:27` — `build-linkedin` M4 workflow wiring завершён: helper layer обёрнут в executable workflow, добавлены registry/cli/config/runtime-catalog wiring и per-role runtime report, а targeted validation подтверждает новый public entrypoint (`python -m unittest tests.test_build_linkedin_helpers tests.test_build_linkedin_workflow tests.test_cli tests.test_memory_store` -> `OK`, `python run_agent.py --root ../.. list-workflows` показывает `build-linkedin`). — Remaining work внутри master M5 теперь сводится к docs sync и full validation/handoff milestone M5 dedicated plan. — Status: `in_progress`.
 - `2026-04-23 09:46` — `build-linkedin` завершён end-to-end: operator docs и root profile docs синхронизированы, full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (67 tests)`, `list-workflows`, `show-memory`), а dedicated plan переведён в `done`. — Sequencing remaining workflows снова narrowed до одного шага: открыть dedicated plan для `export-resume-pdf`. — Status: `in_progress`.
 - `2026-04-23 10:08` — Для последнего remaining workflow открыт dedicated plan `2026-04-23-export-resume-pdf-workflow.md`. — Baseline inventory подтвердил отсутствие runtime PDF workflow, наличие только manual historical renderer в `employers/TaxDome/`, существование `profile/contact-regions.yml` и отсутствие PDF templates в `templates/`, а M2 того же плана сразу закрепил first executable contract: `MASTER`/role resume как source, `ru`-only baseline, durable output under `profile/pdf/` и mandatory preview/report trail under `agent_memory/runtime/export-resume-pdf/`. — Status: `in_progress`.
+- `2026-04-23 10:57` — В dedicated plan `export-resume-pdf` закрыт M3 helper milestone: `application_agent.export_resume_pdf` теперь детерминированно строит markdown projection, применяет `contact_region` overlay только к public surface, рендерит PDF через `reportlab`, собирает verification report и preview PNG trail, а targeted validation подтверждена (`python -m unittest tests.test_export_resume_pdf_helpers` -> `OK`). — Это снимает implementation blocker helper layer внутри master M5 и переводит execution focus на M4 workflow/CLI wiring для `export-resume-pdf`. — Status: `in_progress`.
 
 ## Current state
 
 - Current milestone: `M5`
 - Current status: `in_progress`
-- Next step: `Перейти в dedicated plan `2026-04-23-export-resume-pdf-workflow.md` и реализовать M3 helper layer: markdown projection, contact-region overlay, `reportlab` renderer, preview generation и targeted helper tests.`
+- Next step: `Перейти в dedicated plan `2026-04-23-export-resume-pdf-workflow.md` и реализовать M4 workflow wiring: request contract, registry/CLI/config integration, runtime reporting и targeted workflow/CLI tests.`
 - Active blockers:
   - none
 - Open questions:
