@@ -96,6 +96,75 @@ class TestCli:
         assert request.llm_model == 'test-model'
         assert request.llm_temperature == 0.1
 
+    def test_analyze_cli_uses_workspace_config_defaults(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f'cli-analyze-config-{uuid.uuid4().hex}'
+        config_path = workspace_dir / 'agent_memory' / 'config' / 'application-agent.json'
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(
+            json.dumps(
+                {
+                    'analyze-vacancy': {
+                        'selected_resume': 'HoD',
+                        'llm_provider': 'fake',
+                        'llm_model': 'configured-model',
+                        'llm_temperature': 0.3,
+                        'include_employer_channels': True,
+                    }
+                }
+            ),
+            encoding='utf-8',
+        )
+        result = WorkflowResult(workflow='analyze-vacancy', status='completed', summary='Analyzed vacancy.', artifacts=[])
+        registry = _FakeRegistry(result)
+        stdout = io.StringIO()
+        with patch('application_agent.cli.build_default_registry', return_value=registry), patch.object(sys, 'argv', ['run_agent.py', '--root', str(workspace_dir), 'analyze-vacancy', '--vacancy-id', '20260424-example']), patch('sys.stdout', new=stdout):
+            exit_code = main()
+        request = registry.last_run_kwargs['request']
+        assert exit_code == 0
+        assert request.selected_resume == 'HoD'
+        assert request.llm_provider == 'fake'
+        assert request.llm_model == 'configured-model'
+        assert request.llm_temperature == 0.3
+        assert request.include_employer_channels is True
+
+    def test_analyze_cli_explicit_options_override_workspace_config(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f'cli-analyze-config-override-{uuid.uuid4().hex}'
+        config_path = workspace_dir / 'agent_memory' / 'config' / 'application-agent.json'
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text(
+            json.dumps({'analyze-vacancy': {'llm_provider': 'openai', 'llm_model': 'configured-model', 'llm_temperature': 0.9}}),
+            encoding='utf-8',
+        )
+        result = WorkflowResult(workflow='analyze-vacancy', status='completed', summary='Analyzed vacancy.', artifacts=[])
+        registry = _FakeRegistry(result)
+        stdout = io.StringIO()
+        with patch('application_agent.cli.build_default_registry', return_value=registry), patch.object(sys, 'argv', ['run_agent.py', '--root', str(workspace_dir), 'analyze-vacancy', '--vacancy-id', '20260424-example', '--llm-provider', 'fake', '--llm-model', 'cli-model', '--llm-temperature', '0.1']), patch('sys.stdout', new=stdout):
+            exit_code = main()
+        request = registry.last_run_kwargs['request']
+        assert exit_code == 0
+        assert request.llm_provider == 'fake'
+        assert request.llm_model == 'cli-model'
+        assert request.llm_temperature == 0.1
+
+    def test_cli_reports_invalid_json_config(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f'cli-invalid-config-{uuid.uuid4().hex}'
+        config_path = workspace_dir / 'agent_memory' / 'config' / 'application-agent.json'
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config_path.write_text('{ invalid json', encoding='utf-8')
+        with patch.object(sys, 'argv', ['run_agent.py', '--root', str(workspace_dir), 'analyze-vacancy', '--vacancy-id', '20260424-example']):
+            try:
+                main()
+            except ValueError as exc:
+                assert 'Invalid JSON config' in str(exc)
+            else:
+                raise AssertionError('Expected invalid JSON config to raise ValueError.')
+
     def test_intake_adoptions_cli_routes_to_intake_workflow(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
         temp_root.mkdir(exist_ok=True)

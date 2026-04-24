@@ -25,6 +25,7 @@
 - `knowledge/`
 - `profile/`
 - `agent_memory/`
+  - `agent_memory/config/` — локальные runtime-настройки CLI, например defaults для LLM.
 
 ## Быстрый старт
 
@@ -40,6 +41,46 @@ python run_agent.py --root ../.. rebuild-role-resume --target-role CTO
 python run_agent.py --root ../.. build-linkedin --target-role CTO
 python run_agent.py --root ../.. export-resume-pdf --target-resume CTO --contact-region EU
 python run_agent.py --root ../.. show-memory
+```
+
+## Настройка LLM для `analyze-vacancy`
+
+`analyze-vacancy` по умолчанию использует `llm_provider=openai`. Для реального запуска обязательны:
+
+- переменная окружения `OPENAI_API_KEY`;
+- модель через `--llm-model`, `APPLICATION_AGENT_LLM_MODEL` или config-файл.
+
+Несекретные defaults можно держать в workspace-файле `agent_memory/config/application-agent.json`:
+
+```json
+{
+  "analyze-vacancy": {
+    "llm_provider": "openai",
+    "llm_model": "gpt-4.1-mini",
+    "llm_temperature": 0.2,
+    "target_mode": "balanced",
+    "include_employer_channels": false
+  }
+}
+```
+
+Секреты в этот файл не записываются. API key задаётся только через окружение:
+
+```powershell
+$env:OPENAI_API_KEY = "sk-..."
+python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager
+```
+
+Приоритет настроек: явные CLI-аргументы выше config-файла, config-файл выше встроенных defaults. Альтернативный путь к config можно передать глобальным параметром до имени команды:
+
+```powershell
+python run_agent.py --root ../.. --config ..\..\agent_memory\config\application-agent.json analyze-vacancy --vacancy-id 20260420-example-engineering-manager
+```
+
+Для smoke-запуска без сетевого LLM можно использовать fake provider:
+
+```powershell
+python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager --llm-provider fake --llm-model test
 ```
 
 ## Тесты
@@ -60,6 +101,7 @@ python -m pytest tests
   Публикация в git не выполняется автоматически: commit/push остаются отдельным ручным шагом по `tooling/git-workflow.md`.
 - `python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager`
   Выполняет стартовый анализ уже созданной вакансии: подбирает ролевое резюме и формирует начальный fit-анализ.
+  Для реального LLM-запуска нужны `OPENAI_API_KEY` и модель. Модель можно передать через `--llm-model`, `APPLICATION_AGENT_LLM_MODEL` или `agent_memory/config/application-agent.json`.
 - `python run_agent.py --root ../.. intake-adoptions --vacancy-id 20260420-example-engineering-manager`
   Нормализует vacancy-local `adoptions.md` в root review layer: рендерит `adoptions/inbox/<vacancy_id>.md` и синхронизирует initial unresolved items в `adoptions/questions/open.md`.
   Это deterministic intake stage, а не review/acceptance session: сама review-сессия остаётся agent-guided и опирается на helper APIs и runbook `agent_memory/workflows/adoptions-review.md`.

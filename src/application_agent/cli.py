@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import Any
 
 from application_agent.memory.store import JsonMemoryStore
 from application_agent.workspace import WorkspaceLayout
@@ -16,10 +17,20 @@ from application_agent.workflows.rebuild_master import RebuildMasterRequest
 from application_agent.workflows.rebuild_role_resume import RebuildRoleResumeRequest
 from application_agent.workflows.registry import build_default_registry
 
+DEFAULT_CONFIG_RELATIVE_PATH = Path("agent_memory") / "config" / "application-agent.json"
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="application-agent")
     parser.add_argument("--root", default=".", help="Path to the private workspace root.")
+    parser.add_argument(
+        "--config",
+        default="",
+        help=(
+            "Optional JSON config with workflow defaults. "
+            "Defaults to <root>/agent_memory/config/application-agent.json when that file exists."
+        ),
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("bootstrap", help="Create the expected workspace and runtime memory layout.")
@@ -52,12 +63,12 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--language", default="")
     analyze.add_argument("--country", default="")
     analyze.add_argument("--work-mode", default="")
-    analyze.add_argument("--target-mode", default="")
-    analyze.add_argument("--selected-resume", default="")
-    analyze.add_argument("--llm-provider", default="openai")
-    analyze.add_argument("--llm-model", default="")
-    analyze.add_argument("--llm-temperature", default=0.2, type=float)
-    analyze.add_argument("--include-employer-channels", action="store_true")
+    analyze.add_argument("--target-mode", default=None)
+    analyze.add_argument("--selected-resume", default=None)
+    analyze.add_argument("--llm-provider", default=None)
+    analyze.add_argument("--llm-model", default=None)
+    analyze.add_argument("--llm-temperature", default=None, type=float)
+    analyze.add_argument("--include-employer-channels", action="store_true", default=None)
 
     prepare = subparsers.add_parser(
         "prepare-screening",
@@ -97,6 +108,49 @@ def build_parser() -> argparse.ArgumentParser:
     export_resume_pdf.add_argument("--contact-region", default="")
     export_resume_pdf.add_argument("--template-id", default="")
     return parser
+
+
+def load_cli_config(*, root: Path, config_path: str) -> dict[str, Any]:
+    path = resolve_config_path(root=root, config_path=config_path)
+    if path is None or not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON config at {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"Invalid config at {path}: top-level JSON value must be an object.")
+    return payload
+
+
+def resolve_config_path(*, root: Path, config_path: str) -> Path | None:
+    if config_path.strip():
+        path = Path(config_path).expanduser()
+        return path if path.is_absolute() else (Path.cwd() / path).resolve()
+    return root / DEFAULT_CONFIG_RELATIVE_PATH
+
+
+def workflow_config(config: dict[str, Any], workflow_name: str) -> dict[str, Any]:
+    raw = config.get(workflow_name, {})
+    if raw == {} and isinstance(config.get("workflows"), dict):
+        raw = config["workflows"].get(workflow_name, {})
+    if not isinstance(raw, dict):
+        raise ValueError(f"Invalid config for workflow '{workflow_name}': expected object.")
+    return raw
+
+
+def config_value(
+    args: argparse.Namespace,
+    config: dict[str, Any],
+    attr: str,
+    *,
+    config_key: str | None = None,
+    default: Any = "",
+) -> Any:
+    value = getattr(args, attr)
+    if value is not None:
+        return value
+    return config.get(config_key or attr, default)
 
 
 def main() -> int:
@@ -145,6 +199,8 @@ def main() -> int:
         return 0
 
     if args.command == "analyze-vacancy":
+        config = load_cli_config(root=layout.root, config_path=args.config)
+        analyze_config = workflow_config(config, "analyze-vacancy")
         source_text = args.source_text
         if args.input_file:
             source_text = Path(args.input_file).read_text(encoding="utf-8")
@@ -159,12 +215,14 @@ def main() -> int:
             language=args.language,
             country=args.country,
             work_mode=args.work_mode,
-            target_mode=args.target_mode,
-            selected_resume=args.selected_resume,
-            llm_provider=args.llm_provider,
-            llm_model=args.llm_model,
-            llm_temperature=args.llm_temperature,
-            include_employer_channels=args.include_employer_channels,
+            target_mode=config_value(args, analyze_config, "target_mode", default=""),
+            selected_resume=config_value(args, analyze_config, "selected_resume", default=""),
+            llm_provider=config_value(args, analyze_config, "llm_provider", default="openai"),
+            llm_model=config_value(args, analyze_config, "llm_model", default=""),
+            llm_temperature=float(config_value(args, analyze_config, "llm_temperature", default=0.2)),
+            include_employer_channels=bool(
+                config_value(args, analyze_config, "include_employer_channels", default=False)
+            ),
         )
         workflow = build_default_registry().get("analyze-vacancy")
         result = workflow.run(layout=layout, store=store, request=request)

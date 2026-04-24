@@ -37,6 +37,10 @@ class WorkspaceLayout:
         return self.agent_memory_dir / "runtime"
 
     @property
+    def config_dir(self) -> Path:
+        return self.agent_memory_dir / "config"
+
+    @property
     def workflow_specs_dir(self) -> Path:
         return self.agent_memory_dir / "workflows"
 
@@ -56,6 +60,7 @@ class WorkspaceLayout:
             self.knowledge_dir / "roles",
             self.knowledge_dir / "company_signals",
             self.profile_dir,
+            self.config_dir,
             self.workflow_specs_dir,
             self.schema_dir,
             self.runtime_memory_dir,
