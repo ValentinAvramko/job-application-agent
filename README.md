@@ -30,24 +30,31 @@
 ## Быстрый старт
 
 ```powershell
-python run_agent.py --root ../.. bootstrap
-python run_agent.py --root ../.. list-workflows
-python run_agent.py --root ../.. ingest-vacancy --company "Example" --position "Engineering Manager" --source-channel "Manual" --source-text "Short vacancy text"
-python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager
-python run_agent.py --root ../.. intake-adoptions --vacancy-id 20260420-example-engineering-manager
-python run_agent.py --root ../.. prepare-screening --vacancy-id 20260420-example-engineering-manager
-python run_agent.py --root ../.. rebuild-master
-python run_agent.py --root ../.. rebuild-role-resume --target-role CTO
-python run_agent.py --root ../.. build-linkedin --target-role CTO
-python run_agent.py --root ../.. export-resume-pdf --target-resume CTO --contact-region EU
-python run_agent.py --root ../.. show-memory
+python job-application-agent.py --root ../.. bootstrap
+python job-application-agent.py --root ../.. list-workflows
+python job-application-agent.py --root ../.. ingest-vacancy --company "Example" --position "Engineering Manager" --source-channel "Manual" --source-text "Short vacancy text"
+python job-application-agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager
+python job-application-agent.py --root ../.. intake-adoptions --vacancy-id 20260420-example-engineering-manager
+python job-application-agent.py --root ../.. prepare-screening --vacancy-id 20260420-example-engineering-manager
+python job-application-agent.py --root ../.. rebuild-master
+python job-application-agent.py --root ../.. rebuild-role-resume --target-role CTO
+python job-application-agent.py --root ../.. build-linkedin --target-role CTO
+python job-application-agent.py --root ../.. export-resume-pdf --target-resume CTO --contact-region EU
+python job-application-agent.py --root ../.. show-memory
+```
+
+После установки пакета в editable-режиме можно запускать без `python ...py`:
+
+```powershell
+python -m pip install -e .
+job-application-agent --root ../.. list-workflows
 ```
 
 ## Настройка LLM для `analyze-vacancy`
 
-`analyze-vacancy` по умолчанию использует `llm_provider=openai`. Для реального запуска обязательны:
+`analyze-vacancy` по умолчанию использует `llm_provider=openai` и OpenAI Responses API. Для реального запуска обязательны:
 
-- переменная окружения `OPENAI_API_KEY`;
+- `OPENAI_API_KEY` в окружении или в `agent_memory/config/secrets.json`;
 - модель через `--llm-model`, `APPLICATION_AGENT_LLM_MODEL` или config-файл.
 
 Несекретные defaults можно держать в workspace-файле `agent_memory/config/application-agent.json`:
@@ -56,8 +63,10 @@ python run_agent.py --root ../.. show-memory
 {
   "analyze-vacancy": {
     "llm_provider": "openai",
-    "llm_model": "gpt-4.1",
-    "llm_temperature": 0.2,
+    "llm_model": "gpt-5.4-mini",
+    "llm_reasoning_effort": "medium",
+    "llm_reasoning_summary": "auto",
+    "llm_text_verbosity": "medium",
     "target_mode": "balanced",
     "include_employer_channels": false
   }
@@ -70,7 +79,10 @@ python run_agent.py --root ../.. show-memory
 | --- | --- | --- | --- |
 | `llm_provider` | string | `openai` | LLM-provider для анализа. Поддерживаются `openai` и `fake`; `fake` нужен для локального smoke-теста без сетевого вызова. |
 | `llm_model` | string | `""` | Модель для реального LLM-запуска. Для `llm_provider=openai` обязательна: через config, `--llm-model` или `APPLICATION_AGENT_LLM_MODEL`. |
-| `llm_temperature` | number | `0.2` | Температура генерации. Для этого workflow лучше держать низкой, потому что результат должен быть evidence-bound и воспроизводимым. |
+| `llm_temperature` | number/null | `null` | Опциональная температура. Для GPT-5.4 mini по умолчанию не задаётся; основной контроль качества идёт через reasoning settings. |
+| `llm_reasoning_effort` | string | `""` | Усилие reasoning для Responses API: обычно `low`, `medium` или `high`. Для текущего агента рекомендуется `medium`. |
+| `llm_reasoning_summary` | string | `""` | Настройка summary reasoning, если модель и аккаунт её поддерживают. Для отладки удобно `auto`. |
+| `llm_text_verbosity` | string | `""` | Verbosity текстового ответа Responses API. Для этого workflow рекомендуется `medium`: достаточно подробно, но без лишней воды. |
 | `target_mode` | string | `""` | Режим позиционирования: `conservative`, `balanced`, `aggressive`. Если не задан, workflow берёт значение из `meta.yml` или использует `balanced` при ingest. |
 | `selected_resume` | string | `""` | Ручной override выбора резюме. Обычно лучше не задавать глобально, чтобы workflow сам выбирал роль под вакансию. |
 | `include_employer_channels` | boolean | `false` | Включает employer-facing каналы в анализ там, где workflow это учитывает. Для обычного анализа вакансии рекомендуется `false`. |
@@ -80,34 +92,46 @@ python run_agent.py --root ../.. show-memory
 ```json
 {
   "llm_provider": "openai",
-  "llm_model": "gpt-4.1",
-  "llm_temperature": 0.2
+  "llm_model": "gpt-5.4-mini",
+  "llm_reasoning_effort": "medium",
+  "llm_reasoning_summary": "auto",
+  "llm_text_verbosity": "medium"
 }
 ```
 
 Почему так:
 
-- `analyze-vacancy` сейчас использует OpenAI-compatible Chat Completions endpoint, `response_format: {"type": "json_object"}` и параметр `temperature`; это делает `gpt-4.1` наиболее консервативным default для текущей реализации.
-- Задача workflow — не creative writing, а доказательный fit-анализ, выбор ролевого резюме и draft-правки с factual boundary. Поэтому `llm_temperature=0.2` снижает разброс формулировок и риск лишних claims.
-- Более новые reasoning-модели семейства GPT-5.4 могут быть лучше для сложного reasoning, но перед тем как ставить их default здесь, стоит мигрировать provider на Responses API и явно добавить поддержку reasoning-настроек. Сейчас ключи вроде `llm_reasoning_effort` не читаются кодом.
+- `analyze-vacancy` строит evidence pack, выбирает ролевое резюме, проверяет требования и просит модель вернуть строгий JSON. Responses API с structured output лучше соответствует этому контракту, чем legacy Chat Completions.
+- `gpt-5.4-mini` выбран как стартовый баланс качества, стоимости и скорости для регулярного анализа вакансий.
+- `llm_reasoning_effort=medium` даёт модели достаточно reasoning для сопоставления требований и фактов, но не делает каждый запуск максимально дорогим.
+- `llm_text_verbosity=medium` подходит для `analysis.md` и `adoptions.md`: результат должен быть содержательным, но не расползаться.
 
-Секреты в этот файл не записываются. API key задаётся только через окружение:
+Секреты в `application-agent.json` не записываются. Для локального API key используется `agent_memory/config/secrets.json`, который должен быть в `.gitignore`:
+
+```json
+{
+  "OPENAI_API_KEY": "sk-...",
+  "OPENAI_BASE_URL": "https://api.openai.com/v1"
+}
+```
+
+Окружение имеет приоритет над `secrets.json`, поэтому временно переопределить ключ можно так:
 
 ```powershell
 $env:OPENAI_API_KEY = "sk-..."
-python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager
+python job-application-agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager
 ```
 
 Приоритет настроек: явные CLI-аргументы выше config-файла, config-файл выше встроенных defaults. Альтернативный путь к config можно передать глобальным параметром до имени команды:
 
 ```powershell
-python run_agent.py --root ../.. --config ..\..\agent_memory\config\application-agent.json analyze-vacancy --vacancy-id 20260420-example-engineering-manager
+python job-application-agent.py --root ../.. --config ..\..\agent_memory\config\application-agent.json analyze-vacancy --vacancy-id 20260420-example-engineering-manager
 ```
 
 Для smoke-запуска без сетевого LLM можно использовать fake provider:
 
 ```powershell
-python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager --llm-provider fake --llm-model test
+python job-application-agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager --llm-provider fake --llm-model test
 ```
 
 ## Тесты
@@ -118,37 +142,37 @@ python -m pytest tests
 
 Что делает каждая команда:
 
-- `python run_agent.py --root ../.. bootstrap`
+- `python job-application-agent.py --root ../.. bootstrap`
   Проверяет и создаёт базовую структуру рабочего каталога агента в указанном root. Это setup-команда, а не runtime workflow.
-- `python run_agent.py --root ../.. list-workflows`
+- `python job-application-agent.py --root ../.. list-workflows`
   Показывает доступные runtime workflow, которые можно запускать через CLI. Setup-команда `bootstrap` в этот список не входит.
-- `python run_agent.py --root ../.. ingest-vacancy --company "Example" --position "Engineering Manager" --source-channel "Manual" --source-text "Short vacancy text"`
+- `python job-application-agent.py --root ../.. ingest-vacancy --company "Example" --position "Engineering Manager" --source-channel "Manual" --source-text "Short vacancy text"`
   Создаёт карточку вакансии, заполняет `meta.yml`, `source.md`, `analysis.md`, `adoptions.md`, добавляет строку в `response-monitoring.xlsx` и обновляет runtime memory.
   Перед запуском в root workspace должен существовать валидный `response-monitoring.xlsx`; без него `ingest-vacancy` завершится ошибкой и не создаст vacancy scaffold.
   Публикация в git не выполняется автоматически: commit/push остаются отдельным ручным шагом по `tooling/git-workflow.md`.
-- `python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager`
+- `python job-application-agent.py --root ../.. analyze-vacancy --vacancy-id 20260420-example-engineering-manager`
   Выполняет стартовый анализ уже созданной вакансии: подбирает ролевое резюме и формирует начальный fit-анализ.
-  Для реального LLM-запуска нужны `OPENAI_API_KEY` и модель. Модель можно передать через `--llm-model`, `APPLICATION_AGENT_LLM_MODEL` или `agent_memory/config/application-agent.json`.
-- `python run_agent.py --root ../.. intake-adoptions --vacancy-id 20260420-example-engineering-manager`
+  Для реального LLM-запуска нужны `OPENAI_API_KEY` и модель. Ключ можно положить в `agent_memory/config/secrets.json`, а модель — передать через `--llm-model`, `APPLICATION_AGENT_LLM_MODEL` или `agent_memory/config/application-agent.json`.
+- `python job-application-agent.py --root ../.. intake-adoptions --vacancy-id 20260420-example-engineering-manager`
   Нормализует vacancy-local `adoptions.md` в root review layer: рендерит `adoptions/inbox/<vacancy_id>.md` и синхронизирует initial unresolved items в `adoptions/questions/open.md`.
   Это deterministic intake stage, а не review/acceptance session: сама review-сессия остаётся agent-guided и опирается на helper APIs и runbook `agent_memory/workflows/adoptions-review.md`.
-- `python run_agent.py --root ../.. prepare-screening --vacancy-id 20260420-example-engineering-manager`
+- `python job-application-agent.py --root ../.. prepare-screening --vacancy-id 20260420-example-engineering-manager`
   По уже ingest/analyze-подготовленной вакансии создаёт `vacancies/<vacancy_id>/screening.md`, обновляет `meta.yml` до статуса `screening_prepared` и пишет runtime memory без Excel или git side effects.
   Обязательные входы: существующий `vacancy_id`, уже собранные `meta.yml`, `source.md`, `analysis.md`; опционально можно передать `--selected-resume`, `--output-language` и `--preparation-depth`.
-- `python run_agent.py --root ../.. rebuild-master`
+- `python job-application-agent.py --root ../.. rebuild-master`
   Читает current-state approved signals из `adoptions/accepted/MASTER.md`, детерминированно синхронизирует managed block в `resumes/MASTER.md` и обновляет runtime report `agent_memory/runtime/rebuild-master/latest.md`.
   Workflow не переписывает narrative sections целиком: baseline-версия управляет только секцией `Approved Permanent Signals`, чтобы downstream `rebuild-role-resume` и `build-linkedin` читали уже согласованный `MASTER`.
-- `python run_agent.py --root ../.. rebuild-role-resume --target-role CTO`
+- `python job-application-agent.py --root ../.. rebuild-role-resume --target-role CTO`
   Читает managed approved-signals section из `resumes/MASTER.md`, optional shaping bullets из `knowledge/roles/CTO.md` и детерминированно синхронизирует managed block в `resumes/CTO.md`.
   Baseline-версия не делает full rewrite всего role resume: она обновляет только parseable managed block и пишет per-role runtime report в `agent_memory/runtime/rebuild-role-resume/CTO.md`.
-- `python run_agent.py --root ../.. build-linkedin --target-role CTO`
+- `python job-application-agent.py --root ../.. build-linkedin --target-role CTO`
   Читает canonical `resumes/MASTER.md`, выбранное `resumes/CTO.md` и optional `profile/contact-regions.yml`, затем детерминированно собирает bilingual draft pack в `profile/linkedin/CTO.md`.
   Артефакт содержит executive summary, RU и EN ready-to-paste blocks, filling guide и `GAP` list; private contacts не попадают автоматически в public-ready copy, а runtime report пишется в `agent_memory/runtime/build-linkedin/CTO.md`.
-- `python run_agent.py --root ../.. export-resume-pdf --target-resume CTO --contact-region EU`
+- `python job-application-agent.py --root ../.. export-resume-pdf --target-resume CTO --contact-region EU`
   Читает `resumes/MASTER.md` или выбранное `resumes/<role>.md`, применяет public contact overlay из `profile/contact-regions.yml` только к верхнему contact/location surface и рендерит PDF в `profile/pdf/CTO/ru-EU.pdf`.
   `--target-resume` обязателен; `--output-language` в baseline поддерживает только `ru`, `--contact-region` принимает `RU`, `KZ`, `EU` и по умолчанию берётся из `profile/contact-regions.yml` (иначе `EU`), `--template-id` сейчас поддерживает только `default`.
   Успешный run обязан сохранить `report.md` и preview PNG pages в `agent_memory/runtime/export-resume-pdf/CTO/ru-EU/`; если отсутствует `pdftoppm` из Poppler, workflow завершается явной ошибкой вместо partial success.
-- `python run_agent.py --root ../.. show-memory`
+- `python job-application-agent.py --root ../.. show-memory`
   Показывает текущее содержимое файловой памяти агента: задачи, артефакты и журнал запусков workflow, а также reconciliation-сводку по отсутствующим vacancy artifacts.
 
 `analyze-vacancy` также умеет стартовать без готового `vacancy_id`, если передать `--company`, `--position` и текст вакансии.

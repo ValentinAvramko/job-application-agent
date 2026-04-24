@@ -20,6 +20,23 @@ from application_agent.workspace import WorkspaceLayout
 ROLE_README = "README.md"
 VALID_COVERAGE = {"full", "partial", "none", "unclear"}
 VALID_PRIORITY = {"must", "nice"}
+LLM_PACKAGE_REQUIRED_KEYS = [
+    "why_this_resume",
+    "why_not_others",
+    "strengths",
+    "gaps",
+    "positioning",
+    "final_recommendation",
+    "cover_letter_standard",
+    "cover_letter_short",
+    "adaptation_overview",
+    "temp_signals",
+    "perm_signals",
+    "open_questions",
+    "profile_updates",
+    "competency_updates",
+    "experience_updates",
+]
 
 RU_PRIORITY = {"must": "Обязательное", "nice": "Плюс"}
 RU_COVERAGE = {"full": "Полное", "partial": "Частичное", "none": "Нет", "unclear": "Неясно"}
@@ -73,7 +90,23 @@ class AnalyzeVacancyRequest:
     include_employer_channels: bool = False
     llm_provider: str = "openai"
     llm_model: str = ""
-    llm_temperature: float = 0.2
+    llm_temperature: float | None = None
+    llm_reasoning_effort: str = ""
+    llm_reasoning_summary: str = ""
+    llm_text_verbosity: str = ""
+    llm_api_key: str = ""
+    llm_base_url: str = ""
+
+
+@dataclass(frozen=True)
+class LLMRuntimeConfig:
+    model: str
+    api_key: str = ""
+    base_url: str = "https://api.openai.com/v1"
+    temperature: float | None = None
+    reasoning_effort: str = ""
+    reasoning_summary: str = ""
+    text_verbosity: str = ""
 
 
 @dataclass(frozen=True)
@@ -124,71 +157,72 @@ class AnalyzeVacancyError(RuntimeError):
 
 
 class LLMProvider:
-    def generate(self, *, evidence_pack: dict[str, Any], model: str, temperature: float) -> dict[str, Any]:
+    def generate(self, *, evidence_pack: dict[str, Any], config: LLMRuntimeConfig) -> dict[str, Any]:
         raise NotImplementedError
 
 
 class FakeLLMProvider(LLMProvider):
-    def generate(self, *, evidence_pack: dict[str, Any], model: str, temperature: float) -> dict[str, Any]:
+    def generate(self, *, evidence_pack: dict[str, Any], config: LLMRuntimeConfig) -> dict[str, Any]:
         return build_deterministic_llm_package(evidence_pack)
 
 
 class OpenAICompatibleProvider(LLMProvider):
-    def generate(self, *, evidence_pack: dict[str, Any], model: str, temperature: float) -> dict[str, Any]:
-        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-        if not api_key:
+    def generate(self, *, evidence_pack: dict[str, Any], config: LLMRuntimeConfig) -> dict[str, Any]:
+        if not config.api_key:
             raise AnalyzeVacancyError("OPENAI_API_KEY is required for llm_provider=openai.")
-        if not model:
+        if not config.model:
             raise AnalyzeVacancyError("llm_model is required for llm_provider=openai. Pass --llm-model or set a default.")
 
-        base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
         payload = {
-            "model": model,
-            "temperature": temperature,
-            "messages": [
+            "model": config.model,
+            "input": [
                 {
                     "role": "system",
-                    "content": (
-                        "You are a career editor for senior IT leadership roles. "
-                        "Return only valid JSON matching the requested analysis package. "
-                        "Do not invent facts; use only the evidence pack."
-                    ),
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": (
+                                "You are a career editor for senior IT leadership roles. "
+                                "Return only valid JSON matching the requested analysis package. "
+                                "Do not invent facts; use only the evidence pack."
+                            ),
+                        }
+                    ],
                 },
                 {
                     "role": "user",
-                    "content": json.dumps(
+                    "content": [
                         {
-                            "task": "Create a rich vacancy analysis, two cover letters and resume adaptation draft inputs.",
-                            "language": evidence_pack.get("language", "ru"),
-                            "required_json_keys": [
-                                "why_this_resume",
-                                "why_not_others",
-                                "strengths",
-                                "gaps",
-                                "positioning",
-                                "final_recommendation",
-                                "cover_letter_standard",
-                                "cover_letter_short",
-                                "adaptation_overview",
-                                "temp_signals",
-                                "perm_signals",
-                                "open_questions",
-                                "profile_updates",
-                                "competency_updates",
-                                "experience_updates",
-                            ],
-                            "evidence_pack": evidence_pack,
-                        },
-                        ensure_ascii=False,
-                    ),
+                            "type": "input_text",
+                            "text": json.dumps(
+                                {
+                                    "task": "Create a rich vacancy analysis, two cover letters and resume adaptation draft inputs.",
+                                    "language": evidence_pack.get("language", "ru"),
+                                    "required_json_keys": LLM_PACKAGE_REQUIRED_KEYS,
+                                    "evidence_pack": evidence_pack,
+                                },
+                                ensure_ascii=False,
+                            ),
+                        }
+                    ],
                 },
             ],
-            "response_format": {"type": "json_object"},
+            "text": {"format": build_llm_response_format()},
         }
+        if config.temperature is not None:
+            payload["temperature"] = config.temperature
+        if config.reasoning_effort or config.reasoning_summary:
+            payload["reasoning"] = {}
+            if config.reasoning_effort:
+                payload["reasoning"]["effort"] = config.reasoning_effort
+            if config.reasoning_summary:
+                payload["reasoning"]["summary"] = config.reasoning_summary
+        if config.text_verbosity:
+            payload["text"]["verbosity"] = config.text_verbosity
         request = urllib.request.Request(
-            f"{base_url}/chat/completions",
+            f"{config.base_url.rstrip('/')}/responses",
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Bearer {config.api_key}", "Content-Type": "application/json"},
             method="POST",
         )
         try:
@@ -197,11 +231,65 @@ class OpenAICompatibleProvider(LLMProvider):
         except urllib.error.URLError as exc:
             raise AnalyzeVacancyError(f"LLM request failed: {exc}") from exc
 
-        content = raw.get("choices", [{}])[0].get("message", {}).get("content", "")
+        content = extract_response_output_text(raw)
         try:
             return json.loads(content)
         except json.JSONDecodeError as exc:
             raise AnalyzeVacancyError("LLM returned invalid JSON content.") from exc
+
+
+def build_llm_runtime_config(request: AnalyzeVacancyRequest) -> LLMRuntimeConfig:
+    return LLMRuntimeConfig(
+        model=request.llm_model or os.environ.get("APPLICATION_AGENT_LLM_MODEL", "").strip(),
+        api_key=os.environ.get("OPENAI_API_KEY", "").strip() or request.llm_api_key.strip(),
+        base_url=os.environ.get("OPENAI_BASE_URL", "").strip()
+        or request.llm_base_url.strip()
+        or "https://api.openai.com/v1",
+        temperature=request.llm_temperature,
+        reasoning_effort=request.llm_reasoning_effort.strip(),
+        reasoning_summary=request.llm_reasoning_summary.strip(),
+        text_verbosity=request.llm_text_verbosity.strip(),
+    )
+
+
+def build_llm_response_format() -> dict[str, Any]:
+    string_array = {"type": "array", "items": {"type": "string"}}
+    string_fields = {
+        "positioning",
+        "final_recommendation",
+        "cover_letter_standard",
+        "cover_letter_short",
+        "adaptation_overview",
+    }
+    properties = {
+        key: {"type": "string"} if key in string_fields else string_array
+        for key in LLM_PACKAGE_REQUIRED_KEYS
+    }
+    return {
+        "type": "json_schema",
+        "name": "analyze_vacancy_package",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": properties,
+            "required": LLM_PACKAGE_REQUIRED_KEYS,
+        },
+    }
+
+
+def extract_response_output_text(raw: dict[str, Any]) -> str:
+    if isinstance(raw.get("output_text"), str):
+        return raw["output_text"]
+    for item in raw.get("output", []):
+        if not isinstance(item, dict):
+            continue
+        for content in item.get("content", []):
+            if not isinstance(content, dict):
+                continue
+            if isinstance(content.get("text"), str):
+                return content["text"]
+    return ""
 
 
 class AnalyzeVacancyWorkflow:
@@ -314,8 +402,8 @@ class AnalyzeVacancyWorkflow:
             raw_source=raw_source,
         )
         provider = self.provider or build_llm_provider(request.llm_provider)
-        llm_model = request.llm_model or os.environ.get("APPLICATION_AGENT_LLM_MODEL", "").strip()
-        llm_package = provider.generate(evidence_pack=evidence_pack, model=llm_model, temperature=request.llm_temperature)
+        llm_config = build_llm_runtime_config(request)
+        llm_package = provider.generate(evidence_pack=evidence_pack, config=llm_config)
         analysis_package = validate_llm_package(llm_package)
 
         analysis_path.write_text(
@@ -333,7 +421,10 @@ class AnalyzeVacancyWorkflow:
         meta["target_mode"] = target_mode
         meta["include_employer_channels"] = include_employer_channels
         meta["llm_provider"] = request.llm_provider
-        meta["llm_model"] = llm_model or "n/a"
+        meta["llm_model"] = llm_config.model or "n/a"
+        meta["llm_reasoning_effort"] = request.llm_reasoning_effort or "n/a"
+        meta["llm_reasoning_summary"] = request.llm_reasoning_summary or "n/a"
+        meta["llm_text_verbosity"] = request.llm_text_verbosity or "n/a"
         meta["status"] = "analyzed"
         meta["analyzed_at"] = datetime.now(timezone.utc).isoformat()
         write_simple_yaml(meta_path, meta)
@@ -878,23 +969,7 @@ def build_llm_provider(name: str) -> LLMProvider:
 
 
 def validate_llm_package(payload: dict[str, Any]) -> dict[str, Any]:
-    required = [
-        "why_this_resume",
-        "why_not_others",
-        "strengths",
-        "gaps",
-        "positioning",
-        "final_recommendation",
-        "cover_letter_standard",
-        "cover_letter_short",
-        "adaptation_overview",
-        "temp_signals",
-        "perm_signals",
-        "open_questions",
-        "profile_updates",
-        "competency_updates",
-        "experience_updates",
-    ]
+    required = LLM_PACKAGE_REQUIRED_KEYS
     missing = [key for key in required if key not in payload]
     if missing:
         raise AnalyzeVacancyError(f"LLM response is missing required keys: {', '.join(missing)}.")

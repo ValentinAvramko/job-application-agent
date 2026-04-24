@@ -16,6 +16,9 @@ from application_agent.workflows.analyze_vacancy import (
     AnalyzeVacancyError,
     AnalyzeVacancyRequest,
     AnalyzeVacancyWorkflow,
+    LLMRuntimeConfig,
+    LLM_PACKAGE_REQUIRED_KEYS,
+    OpenAICompatibleProvider,
     RequirementAssessment,
     compute_fit_result,
 )
@@ -196,6 +199,55 @@ def test_missing_real_llm_config_fails_after_evidence_validation(monkeypatch: py
             store=store,
             request=AnalyzeVacancyRequest(vacancy_id=vacancy_id, llm_provider="openai", llm_model="gpt-test"),
         )
+
+
+def test_openai_provider_uses_responses_api_with_reasoning(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+    package = {
+        key: "text value" if key in {"positioning", "final_recommendation", "cover_letter_standard", "cover_letter_short", "adaptation_overview"} else ["item"]
+        for key in LLM_PACKAGE_REQUIRED_KEYS
+    }
+
+    class _FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps({"output_text": json.dumps(package)}).encode("utf-8")
+
+    def fake_urlopen(request, timeout: int):
+        captured["url"] = request.full_url
+        captured["headers"] = dict(request.header_items())
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        captured["timeout"] = timeout
+        return _FakeResponse()
+
+    monkeypatch.setattr("application_agent.workflows.analyze_vacancy.urllib.request.urlopen", fake_urlopen)
+
+    result = OpenAICompatibleProvider().generate(
+        evidence_pack={"language": "ru", "vacancy_id": "v"},
+        config=LLMRuntimeConfig(
+            model="gpt-5.4-mini",
+            api_key="test-key",
+            base_url="https://api.openai.com/v1",
+            reasoning_effort="medium",
+            reasoning_summary="auto",
+            text_verbosity="medium",
+        ),
+    )
+
+    assert result == package
+    assert captured["url"] == "https://api.openai.com/v1/responses"
+    assert captured["timeout"] == 90
+    payload = captured["payload"]
+    assert payload["model"] == "gpt-5.4-mini"
+    assert payload["reasoning"] == {"effort": "medium", "summary": "auto"}
+    assert payload["text"]["verbosity"] == "medium"
+    assert payload["text"]["format"]["type"] == "json_schema"
+    assert "temperature" not in payload
 
 
 def test_role_catalog_supports_russian_headings() -> None:

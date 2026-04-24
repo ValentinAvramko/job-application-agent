@@ -86,7 +86,7 @@ class TestCli:
         result = WorkflowResult(workflow='analyze-vacancy', status='completed', summary='Analyzed vacancy.', artifacts=[str(workspace_dir / 'vacancies' / 'v' / 'analysis.md')])
         registry = _FakeRegistry(result)
         stdout = io.StringIO()
-        with patch('application_agent.cli.build_default_registry', return_value=registry), patch.object(sys, 'argv', ['run_agent.py', '--root', str(workspace_dir), 'analyze-vacancy', '--vacancy-id', '20260424-example', '--selected-resume', 'HoE', '--llm-provider', 'fake', '--llm-model', 'test-model', '--llm-temperature', '0.1']), patch('sys.stdout', new=stdout):
+        with patch('application_agent.cli.build_default_registry', return_value=registry), patch.object(sys, 'argv', ['job-application-agent.py', '--root', str(workspace_dir), 'analyze-vacancy', '--vacancy-id', '20260424-example', '--selected-resume', 'HoE', '--llm-provider', 'fake', '--llm-model', 'test-model', '--llm-temperature', '0.1', '--llm-reasoning-effort', 'low', '--llm-reasoning-summary', 'auto', '--llm-text-verbosity', 'low']), patch('sys.stdout', new=stdout):
             exit_code = main()
         request = registry.last_run_kwargs['request']
         assert exit_code == 0
@@ -95,6 +95,9 @@ class TestCli:
         assert request.llm_provider == 'fake'
         assert request.llm_model == 'test-model'
         assert request.llm_temperature == 0.1
+        assert request.llm_reasoning_effort == 'low'
+        assert request.llm_reasoning_summary == 'auto'
+        assert request.llm_text_verbosity == 'low'
 
     def test_analyze_cli_uses_workspace_config_defaults(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
@@ -109,7 +112,9 @@ class TestCli:
                         'selected_resume': 'HoD',
                         'llm_provider': 'fake',
                         'llm_model': 'configured-model',
-                        'llm_temperature': 0.3,
+                        'llm_reasoning_effort': 'medium',
+                        'llm_reasoning_summary': 'auto',
+                        'llm_text_verbosity': 'medium',
                         'include_employer_channels': True,
                     }
                 }
@@ -126,8 +131,28 @@ class TestCli:
         assert request.selected_resume == 'HoD'
         assert request.llm_provider == 'fake'
         assert request.llm_model == 'configured-model'
-        assert request.llm_temperature == 0.3
+        assert request.llm_temperature is None
+        assert request.llm_reasoning_effort == 'medium'
+        assert request.llm_reasoning_summary == 'auto'
+        assert request.llm_text_verbosity == 'medium'
         assert request.include_employer_channels is True
+
+    def test_analyze_cli_loads_openai_secrets_config(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f'cli-analyze-secrets-{uuid.uuid4().hex}'
+        secrets_path = workspace_dir / 'agent_memory' / 'config' / 'secrets.json'
+        secrets_path.parent.mkdir(parents=True, exist_ok=True)
+        secrets_path.write_text(json.dumps({'OPENAI_API_KEY': 'secret-key', 'OPENAI_BASE_URL': 'https://example.test/v1'}), encoding='utf-8')
+        result = WorkflowResult(workflow='analyze-vacancy', status='completed', summary='Analyzed vacancy.', artifacts=[])
+        registry = _FakeRegistry(result)
+        stdout = io.StringIO()
+        with patch('application_agent.cli.build_default_registry', return_value=registry), patch.object(sys, 'argv', ['job-application-agent.py', '--root', str(workspace_dir), 'analyze-vacancy', '--vacancy-id', '20260424-example', '--llm-provider', 'fake']), patch('sys.stdout', new=stdout):
+            exit_code = main()
+        request = registry.last_run_kwargs['request']
+        assert exit_code == 0
+        assert request.llm_api_key == 'secret-key'
+        assert request.llm_base_url == 'https://example.test/v1'
 
     def test_analyze_cli_explicit_options_override_workspace_config(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'

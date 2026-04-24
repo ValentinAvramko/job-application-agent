@@ -18,10 +18,11 @@ from application_agent.workflows.rebuild_role_resume import RebuildRoleResumeReq
 from application_agent.workflows.registry import build_default_registry
 
 DEFAULT_CONFIG_RELATIVE_PATH = Path("agent_memory") / "config" / "application-agent.json"
+DEFAULT_SECRETS_RELATIVE_PATH = Path("agent_memory") / "config" / "secrets.json"
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="application-agent")
+    parser = argparse.ArgumentParser(prog="job-application-agent")
     parser.add_argument("--root", default=".", help="Path to the private workspace root.")
     parser.add_argument(
         "--config",
@@ -29,6 +30,14 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Optional JSON config with workflow defaults. "
             "Defaults to <root>/agent_memory/config/application-agent.json when that file exists."
+        ),
+    )
+    parser.add_argument(
+        "--secrets",
+        default="",
+        help=(
+            "Optional JSON secrets config. "
+            "Defaults to <root>/agent_memory/config/secrets.json when that file exists."
         ),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -68,6 +77,9 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--llm-provider", default=None)
     analyze.add_argument("--llm-model", default=None)
     analyze.add_argument("--llm-temperature", default=None, type=float)
+    analyze.add_argument("--llm-reasoning-effort", default=None)
+    analyze.add_argument("--llm-reasoning-summary", default=None)
+    analyze.add_argument("--llm-text-verbosity", default=None)
     analyze.add_argument("--include-employer-channels", action="store_true", default=None)
 
     prepare = subparsers.add_parser(
@@ -123,11 +135,31 @@ def load_cli_config(*, root: Path, config_path: str) -> dict[str, Any]:
     return payload
 
 
+def load_secret_config(*, root: Path, secrets_path: str) -> dict[str, Any]:
+    path = resolve_secrets_path(root=root, secrets_path=secrets_path)
+    if path is None or not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid JSON secrets config at {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"Invalid secrets config at {path}: top-level JSON value must be an object.")
+    return payload
+
+
 def resolve_config_path(*, root: Path, config_path: str) -> Path | None:
     if config_path.strip():
         path = Path(config_path).expanduser()
         return path if path.is_absolute() else (Path.cwd() / path).resolve()
     return root / DEFAULT_CONFIG_RELATIVE_PATH
+
+
+def resolve_secrets_path(*, root: Path, secrets_path: str) -> Path | None:
+    if secrets_path.strip():
+        path = Path(secrets_path).expanduser()
+        return path if path.is_absolute() else (Path.cwd() / path).resolve()
+    return root / DEFAULT_SECRETS_RELATIVE_PATH
 
 
 def workflow_config(config: dict[str, Any], workflow_name: str) -> dict[str, Any]:
@@ -151,6 +183,13 @@ def config_value(
     if value is not None:
         return value
     return config.get(config_key or attr, default)
+
+
+def optional_float_config_value(args: argparse.Namespace, config: dict[str, Any], attr: str) -> float | None:
+    value = config_value(args, config, attr, default=None)
+    if value in {None, ""}:
+        return None
+    return float(value)
 
 
 def main() -> int:
@@ -200,6 +239,7 @@ def main() -> int:
 
     if args.command == "analyze-vacancy":
         config = load_cli_config(root=layout.root, config_path=args.config)
+        secrets = load_secret_config(root=layout.root, secrets_path=args.secrets)
         analyze_config = workflow_config(config, "analyze-vacancy")
         source_text = args.source_text
         if args.input_file:
@@ -219,7 +259,12 @@ def main() -> int:
             selected_resume=config_value(args, analyze_config, "selected_resume", default=""),
             llm_provider=config_value(args, analyze_config, "llm_provider", default="openai"),
             llm_model=config_value(args, analyze_config, "llm_model", default=""),
-            llm_temperature=float(config_value(args, analyze_config, "llm_temperature", default=0.2)),
+            llm_temperature=optional_float_config_value(args, analyze_config, "llm_temperature"),
+            llm_reasoning_effort=config_value(args, analyze_config, "llm_reasoning_effort", default=""),
+            llm_reasoning_summary=config_value(args, analyze_config, "llm_reasoning_summary", default=""),
+            llm_text_verbosity=config_value(args, analyze_config, "llm_text_verbosity", default=""),
+            llm_api_key=str(secrets.get("OPENAI_API_KEY", "")).strip(),
+            llm_base_url=str(secrets.get("OPENAI_BASE_URL", "")).strip(),
             include_employer_channels=bool(
                 config_value(args, analyze_config, "include_employer_channels", default=False)
             ),
