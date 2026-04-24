@@ -40,7 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--target-mode", default="balanced")
     ingest.add_argument("--include-employer-channels", action="store_true")
 
-    analyze = subparsers.add_parser("analyze-vacancy", help="Create the first-pass fit analysis for a vacancy.")
+    analyze = subparsers.add_parser("analyze-vacancy", help="Create the deep fit analysis package for a vacancy.")
     analyze.add_argument("--vacancy-id", default="")
     analyze.add_argument("--company", default="")
     analyze.add_argument("--position", default="")
@@ -54,6 +54,9 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--work-mode", default="")
     analyze.add_argument("--target-mode", default="")
     analyze.add_argument("--selected-resume", default="")
+    analyze.add_argument("--llm-provider", default="openai")
+    analyze.add_argument("--llm-model", default="")
+    analyze.add_argument("--llm-temperature", default=0.2, type=float)
     analyze.add_argument("--include-employer-channels", action="store_true")
 
     prepare = subparsers.add_parser(
@@ -158,6 +161,9 @@ def main() -> int:
             work_mode=args.work_mode,
             target_mode=args.target_mode,
             selected_resume=args.selected_resume,
+            llm_provider=args.llm_provider,
+            llm_model=args.llm_model,
+            llm_temperature=args.llm_temperature,
             include_employer_channels=args.include_employer_channels,
         )
         workflow = build_default_registry().get("analyze-vacancy")

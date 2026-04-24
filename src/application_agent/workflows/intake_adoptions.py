@@ -342,14 +342,45 @@ def extract_section_bullets(markdown: str, heading: str) -> list[str]:
     if match:
         section = section[: match.start()]
     items: list[str] = []
+    table_headers: list[str] = []
     for raw_line in section.splitlines():
         line = raw_line.strip()
-        if not line.startswith("- "):
+        if line.startswith("- "):
+            item = normalize_bullet(line[2:])
+            if item:
+                items.append(item)
             continue
-        item = normalize_bullet(line[2:])
-        if item:
-            items.append(item)
+        if line.startswith("|") and line.endswith("|"):
+            cells = split_table_row(line)
+            if not cells or is_table_separator(cells):
+                continue
+            if not table_headers:
+                table_headers = cells
+                continue
+            item = normalize_table_item(table_headers, cells)
+            if item:
+                items.append(item)
     return dedupe_preserve_order(items)
+
+
+def split_table_row(line: str) -> list[str]:
+    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    return [cell for cell in cells if cell]
+
+
+def is_table_separator(cells: list[str]) -> bool:
+    return all(re.fullmatch(r":?-{3,}:?", cell.strip()) for cell in cells)
+
+
+def normalize_table_item(headers: list[str], cells: list[str]) -> str:
+    pairs: list[str] = []
+    for index, cell in enumerate(cells):
+        normalized_cell = normalize_bullet(cell)
+        if not normalized_cell:
+            continue
+        header = headers[index] if index < len(headers) else f"Column {index + 1}"
+        pairs.append(f"{header}: {normalized_cell}")
+    return "; ".join(pairs)
 
 
 def normalize_bullet(value: str) -> str:

@@ -1,94 +1,34 @@
 from __future__ import annotations
 
+import json
+import os
 import re
-from dataclasses import dataclass
+import urllib.error
+import urllib.request
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from application_agent.memory.models import WorkflowRun
 from application_agent.memory.store import JsonMemoryStore
-from application_agent.utils.placeholders import is_unspecified
 from application_agent.utils.simple_yaml import load_simple_yaml, write_simple_yaml
 from application_agent.workflows.base import WorkflowResult
 from application_agent.workflows.ingest_vacancy import IngestVacancyRequest, IngestVacancyWorkflow
 from application_agent.workspace import WorkspaceLayout
 
-ROLE_HINTS = {
-    "CIO": (
-        "cio",
-        "chief information officer",
-        "it director",
-        "director of it",
-        "директор по ит",
-        "руководитель it",
-        "digital transformation",
-        "governance",
-    ),
-    "CTO": (
-        "cto",
-        "chief technology officer",
-        "директор по технологиям",
-        "technology strategy",
-        "architecture",
-        "platform strategy",
-    ),
-    "HoE": (
-        "head of engineering",
-        "vp of engineering",
-        "vp engineering",
-        "engineering director",
-        "engineering excellence",
-        "platform engineering",
-    ),
-    "HoD": (
-        "head of development",
-        "director of development",
-        "директор по разработке",
-        "руководитель разработки",
-        "software development",
-        "delivery ownership",
-    ),
-    "EM": (
-        "engineering manager",
-        "team lead",
-        "people management",
-        "cross-functional",
-        "delivery manager",
-        "performance review",
-    ),
-}
+ROLE_README = "README.md"
+VALID_COVERAGE = {"full", "partial", "none", "unclear"}
+VALID_PRIORITY = {"must", "nice"}
 
-HIGH_PRIORITY_MARKERS = (
-    "must",
-    "required",
-    "requirement",
-    "опыт",
-    "нужно",
-    "обязательно",
-    "responsible",
-    "ownership",
-    "lead",
-)
-LOW_PRIORITY_MARKERS = ("nice to have", "preferred", "будет плюсом", "желательно", "plus")
-REQUIREMENT_MARKERS = HIGH_PRIORITY_MARKERS + (
-    "experience",
-    "expertise",
-    "manage",
-    "build",
-    "develop",
-    "design",
-    "drive",
-    "требования",
-    "ожидания",
-    "задачи",
-    "будете",
-    "отвечать",
-)
+RU_PRIORITY = {"must": "Обязательное", "nice": "Плюс"}
+RU_COVERAGE = {"full": "Полное", "partial": "Частичное", "none": "Нет", "unclear": "Неясно"}
+RU_CONFIDENCE = {"high": "Высокая", "medium": "Средняя", "low": "Низкая"}
+
 STOPWORDS = {
     "and",
     "the",
     "for",
-    "what",
     "with",
     "that",
     "this",
@@ -99,11 +39,6 @@ STOPWORDS = {
     "our",
     "will",
     "are",
-    "makes",
-    "great",
-    "fit",
-    "year",
-    "experience",
     "как",
     "для",
     "это",
@@ -112,13 +47,11 @@ STOPWORDS = {
     "над",
     "под",
     "при",
-    "team",
-    "teams",
     "опыт",
     "работы",
     "будет",
     "нужно",
-    "role",
+    "роль",
     "позиция",
 }
 
@@ -138,6 +71,31 @@ class AnalyzeVacancyRequest:
     target_mode: str = ""
     selected_resume: str = ""
     include_employer_channels: bool = False
+    llm_provider: str = "openai"
+    llm_model: str = ""
+    llm_temperature: float = 0.2
+
+
+@dataclass(frozen=True)
+class RoleProfile:
+    role_id: str
+    path: Path
+    positioning_signals: list[str]
+    strong_evidence_patterns: list[str]
+    safe_emphasis_areas: list[str]
+    risky_claims: list[str]
+    frequent_ats_terms: list[str]
+    notes: list[str]
+
+
+@dataclass(frozen=True)
+class RoleCandidate:
+    role_id: str
+    resume_path: Path
+    profile: RoleProfile
+    score: int
+    rationale: str
+    diagnostics: list[str]
 
 
 @dataclass
@@ -148,17 +106,116 @@ class RequirementAssessment:
     evidence: str
     coverage: str
     notes: str
+    selected_evidence: str = ""
+    master_evidence: str = ""
+    action: str = ""
+
+
+@dataclass(frozen=True)
+class FitResult:
+    score: int
+    verdict: str
+    confidence: str
+    rationale: str
+
+
+class AnalyzeVacancyError(RuntimeError):
+    pass
+
+
+class LLMProvider:
+    def generate(self, *, evidence_pack: dict[str, Any], model: str, temperature: float) -> dict[str, Any]:
+        raise NotImplementedError
+
+
+class FakeLLMProvider(LLMProvider):
+    def generate(self, *, evidence_pack: dict[str, Any], model: str, temperature: float) -> dict[str, Any]:
+        return build_deterministic_llm_package(evidence_pack)
+
+
+class OpenAICompatibleProvider(LLMProvider):
+    def generate(self, *, evidence_pack: dict[str, Any], model: str, temperature: float) -> dict[str, Any]:
+        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            raise AnalyzeVacancyError("OPENAI_API_KEY is required for llm_provider=openai.")
+        if not model:
+            raise AnalyzeVacancyError("llm_model is required for llm_provider=openai. Pass --llm-model or set a default.")
+
+        base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+        payload = {
+            "model": model,
+            "temperature": temperature,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a career editor for senior IT leadership roles. "
+                        "Return only valid JSON matching the requested analysis package. "
+                        "Do not invent facts; use only the evidence pack."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "task": "Create a rich vacancy analysis, two cover letters and resume adaptation draft inputs.",
+                            "language": evidence_pack.get("language", "ru"),
+                            "required_json_keys": [
+                                "why_this_resume",
+                                "why_not_others",
+                                "strengths",
+                                "gaps",
+                                "positioning",
+                                "final_recommendation",
+                                "cover_letter_standard",
+                                "cover_letter_short",
+                                "adaptation_overview",
+                                "temp_signals",
+                                "perm_signals",
+                                "open_questions",
+                                "profile_updates",
+                                "competency_updates",
+                                "experience_updates",
+                            ],
+                            "evidence_pack": evidence_pack,
+                        },
+                        ensure_ascii=False,
+                    ),
+                },
+            ],
+            "response_format": {"type": "json_object"},
+        }
+        request = urllib.request.Request(
+            f"{base_url}/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=90) as response:
+                raw = json.loads(response.read().decode("utf-8"))
+        except urllib.error.URLError as exc:
+            raise AnalyzeVacancyError(f"LLM request failed: {exc}") from exc
+
+        content = raw.get("choices", [{}])[0].get("message", {}).get("content", "")
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise AnalyzeVacancyError("LLM returned invalid JSON content.") from exc
 
 
 class AnalyzeVacancyWorkflow:
     name = "analyze-vacancy"
-    description = "Создаёт стартовый анализ соответствия вакансии и обновляет артефакты вакансии."
+    description = "Создаёт глубокий LLM-backed анализ вакансии и draft-входы для адаптации резюме."
+
+    def __init__(self, provider: LLMProvider | None = None) -> None:
+        self.provider = provider
 
     def run(self, *, layout: WorkspaceLayout, store: JsonMemoryStore, request: AnalyzeVacancyRequest) -> WorkflowResult:
         started_at = datetime.now(timezone.utc).isoformat()
         bootstrap_artifacts: list[str] = []
-
         vacancy_id = request.vacancy_id
+
         if not vacancy_id:
             ingest_result = IngestVacancyWorkflow().run(
                 layout=layout,
@@ -194,7 +251,6 @@ class AnalyzeVacancyWorkflow:
                 f"Vacancy '{vacancy_id}' is missing from vacancies/. Runtime memory or the provided vacancy_id is stale; "
                 "run ingest-vacancy again or pass an existing --vacancy-id."
             )
-
         if not meta_path.exists() or not source_path.exists():
             raise FileNotFoundError(
                 f"Vacancy '{vacancy_id}' is incomplete: meta.yml or source.md is missing. "
@@ -205,65 +261,70 @@ class AnalyzeVacancyWorkflow:
         raw_source = extract_raw_source(source_path)
         position = request.position.strip() or str(meta.get("position", "")).strip()
         company = request.company.strip() or str(meta.get("company", "")).strip()
-        language = request.language or str(meta.get("language", "ru"))
+        language = normalize_language(request.language or str(meta.get("language", "ru")))
         target_mode = request.target_mode or str(meta.get("target_mode", "balanced"))
         include_employer_channels = request.include_employer_channels or bool(meta.get("include_employer_channels", False))
-        selected_resume = request.selected_resume.strip() or choose_resume(position=position, source_text=raw_source)
 
-        resume_path = layout.resumes_dir / f"{selected_resume}.md"
-        resume_text = resume_path.read_text(encoding="utf-8") if resume_path.exists() else ""
+        role_profiles, role_diagnostics = load_role_profiles(layout)
+        role_candidates = build_role_candidates(layout=layout, profiles=role_profiles)
+        role_diagnostics.extend(candidate_diagnostics(role_profiles=role_profiles, candidates=role_candidates))
+        if not role_candidates:
+            raise AnalyzeVacancyError(
+                "No valid role profiles found. Add role files to knowledge/roles/ and matching resumes/<Role>.md files."
+            )
 
+        master_text = read_optional(layout.resumes_dir / "MASTER.md")
         requirements = extract_requirements(position=position, source_text=raw_source)
-        assessments = [assess_requirement(requirement, resume_text) for requirement in requirements]
+        selected_resume, override_note = resolve_selected_resume(
+            explicit_resume=request.selected_resume,
+            position=position,
+            source_text=raw_source,
+            candidates=role_candidates,
+            requirements=requirements,
+            master_text=master_text,
+        )
+        selected_candidate = require_candidate(role_candidates, selected_resume)
+        selected_resume_text = selected_candidate.resume_path.read_text(encoding="utf-8")
+        assessments = [assess_requirement(requirement, selected_resume_text, master_text=master_text) for requirement in requirements]
+        fit = compute_fit_result(assessments)
+        ranked_candidates = rank_role_candidates(
+            position=position,
+            source_text=raw_source,
+            candidates=role_candidates,
+            requirements=requirements,
+            master_text=master_text,
+        )
 
-        current_fit = compute_fit_score(assessments)
-        projected_fit = min(100, current_fit + estimate_fit_delta(assessments, target_mode))
-        delta = projected_fit - current_fit
-
-        strengths = build_strengths(assessments, selected_resume)
-        gaps = build_gaps(assessments)
-        cover_letter_notes = build_cover_letter_notes(company, position, strengths, gaps)
-        resume_edit_notes = build_resume_edit_notes(gaps, selected_resume)
-        contact_channels = build_contact_channels(meta, include_employer_channels)
-        follow_up_questions = build_follow_up_questions(meta, raw_source, gaps)
-        permanent_candidates = build_permanent_candidates(strengths)
-        master_resume_recommendations = build_master_resume_recommendations(assessments, selected_resume)
-        profile_updates = build_profile_updates(position, company, strengths, gaps)
-        competency_updates = build_competency_updates(assessments)
-        experience_updates = build_experience_updates(assessments, selected_resume)
+        evidence_pack = build_evidence_pack(
+            vacancy_id=vacancy_id,
+            company=company,
+            position=position,
+            language=language,
+            target_mode=target_mode,
+            selected_resume=selected_resume,
+            selected_resume_text=selected_resume_text,
+            selected_profile=selected_candidate.profile,
+            ranked_candidates=ranked_candidates,
+            role_diagnostics=role_diagnostics,
+            override_note=override_note,
+            requirements=requirements,
+            assessments=assessments,
+            fit=fit,
+            master_text=master_text,
+            raw_source=raw_source,
+        )
+        provider = self.provider or build_llm_provider(request.llm_provider)
+        llm_model = request.llm_model or os.environ.get("APPLICATION_AGENT_LLM_MODEL", "").strip()
+        llm_package = provider.generate(evidence_pack=evidence_pack, model=llm_model, temperature=request.llm_temperature)
+        analysis_package = validate_llm_package(llm_package)
 
         analysis_path.write_text(
-            render_analysis(
-                vacancy_id=vacancy_id,
-                selected_resume=selected_resume,
-                target_mode=target_mode,
-                language=language,
-                include_employer_channels=include_employer_channels,
-                current_fit=current_fit,
-                projected_fit=projected_fit,
-                delta=delta,
-                assessments=assessments,
-                strengths=strengths,
-                gaps=gaps,
-                cover_letter_notes=cover_letter_notes,
-                resume_edit_notes=resume_edit_notes,
-                contact_channels=contact_channels,
-                follow_up_questions=follow_up_questions,
-            ),
+            render_analysis(evidence_pack=evidence_pack, analysis_package=analysis_package),
             encoding="utf-8",
             newline="\n",
         )
         adoptions_path.write_text(
-            render_adoptions(
-                vacancy_id=vacancy_id,
-                strengths=strengths,
-                permanent_candidates=permanent_candidates,
-                open_questions=(gaps[:2] + follow_up_questions[:2])[:4],
-                master_resume_recommendations=master_resume_recommendations,
-                profile_updates=profile_updates,
-                competency_updates=competency_updates,
-                experience_updates=experience_updates,
-            ),
+            render_adoptions(vacancy_id=vacancy_id, selected_resume=selected_resume, analysis_package=analysis_package),
             encoding="utf-8",
             newline="\n",
         )
@@ -271,6 +332,8 @@ class AnalyzeVacancyWorkflow:
         meta["selected_resume"] = selected_resume
         meta["target_mode"] = target_mode
         meta["include_employer_channels"] = include_employer_channels
+        meta["llm_provider"] = request.llm_provider
+        meta["llm_model"] = llm_model or "n/a"
         meta["status"] = "analyzed"
         meta["analyzed_at"] = datetime.now(timezone.utc).isoformat()
         write_simple_yaml(meta_path, meta)
@@ -284,15 +347,814 @@ class AnalyzeVacancyWorkflow:
                 started_at=started_at,
                 completed_at=datetime.now(timezone.utc).isoformat(),
                 artifacts=artifacts,
-                summary=f"Собран стартовый анализ вакансии {vacancy_id} на основе резюме {selected_resume}.",
+                summary=f"Собран глубокий анализ вакансии {vacancy_id} на основе резюме {selected_resume}.",
             )
         )
         return WorkflowResult(
             workflow=self.name,
             status="completed",
-            summary=f"Подготовлен анализ вакансии {vacancy_id} с резюме {selected_resume}.",
+            summary=f"Подготовлен глубокий анализ вакансии {vacancy_id} с резюме {selected_resume}.",
             artifacts=artifacts,
         )
+
+
+def load_role_profiles(layout: WorkspaceLayout) -> tuple[list[RoleProfile], list[str]]:
+    roles_dir = layout.knowledge_dir / "roles"
+    diagnostics: list[str] = []
+    profiles: list[RoleProfile] = []
+    if not roles_dir.exists():
+        return profiles, [f"Каталог ролей не найден: {roles_dir}."]
+
+    for path in sorted(roles_dir.glob("*.md")):
+        if path.name.lower() == ROLE_README.lower():
+            continue
+        text = path.read_text(encoding="utf-8")
+        role_id = parse_role_id(text, path)
+        if not role_id:
+            diagnostics.append(f"Профиль роли {path.name} пропущен: не удалось определить Role.")
+            continue
+        profiles.append(
+            RoleProfile(
+                role_id=role_id,
+                path=path,
+                positioning_signals=extract_section_bullets(text, "## Positioning Signals"),
+                strong_evidence_patterns=extract_section_bullets(text, "## Strong Evidence Patterns"),
+                safe_emphasis_areas=extract_section_bullets(text, "## Safe Emphasis Areas"),
+                risky_claims=extract_section_bullets(text, "## Risky Claims"),
+                frequent_ats_terms=extract_section_bullets(text, "## Frequent ATS Terms"),
+                notes=extract_section_bullets(text, "## Notes From Processed Vacancies"),
+            )
+        )
+    return profiles, diagnostics
+
+
+def parse_role_id(text: str, path: Path) -> str:
+    for line in text.splitlines():
+        match = re.match(r"\s*-\s*Role:\s*(.+?)\s*$", line)
+        if match:
+            return match.group(1).strip()
+    return path.stem.strip()
+
+
+def build_role_candidates(*, layout: WorkspaceLayout, profiles: list[RoleProfile]) -> list[RoleCandidate]:
+    candidates: list[RoleCandidate] = []
+    for profile in profiles:
+        resume_path = layout.resumes_dir / f"{profile.role_id}.md"
+        if not resume_path.exists():
+            continue
+        candidates.append(RoleCandidate(profile.role_id, resume_path, profile, 0, "", []))
+    return candidates
+
+
+def candidate_diagnostics(*, role_profiles: list[RoleProfile], candidates: list[RoleCandidate]) -> list[str]:
+    candidate_ids = {candidate.role_id for candidate in candidates}
+    return [
+        f"Роль `{profile.role_id}` исключена из выбора: нет файла `resumes/{profile.role_id}.md`."
+        for profile in role_profiles
+        if profile.role_id not in candidate_ids
+    ]
+
+
+def resolve_selected_resume(
+    *,
+    explicit_resume: str,
+    position: str,
+    source_text: str,
+    candidates: list[RoleCandidate],
+    requirements: list[str],
+    master_text: str,
+) -> tuple[str, str]:
+    if explicit_resume.strip():
+        candidate_ids = {candidate.role_id for candidate in candidates}
+        selected = explicit_resume.strip()
+        if selected not in candidate_ids:
+            raise AnalyzeVacancyError(f"Selected resume '{selected}' has no valid role profile and matching resume.")
+        return selected, f"Выбор резюме вручную переопределён параметром `--selected-resume {selected}`."
+    ranked = rank_role_candidates(
+        position=position,
+        source_text=source_text,
+        candidates=candidates,
+        requirements=requirements,
+        master_text=master_text,
+    )
+    return ranked[0].role_id, ""
+
+
+def require_candidate(candidates: list[RoleCandidate], role_id: str) -> RoleCandidate:
+    for candidate in candidates:
+        if candidate.role_id == role_id:
+            return candidate
+    raise AnalyzeVacancyError(f"Role candidate '{role_id}' is not available.")
+
+
+def rank_role_candidates(
+    *,
+    position: str,
+    source_text: str,
+    candidates: list[RoleCandidate],
+    requirements: list[str],
+    master_text: str,
+) -> list[RoleCandidate]:
+    ranked: list[RoleCandidate] = []
+    combined = f"{position}\n{source_text}"
+    for candidate in candidates:
+        resume_text = candidate.resume_path.read_text(encoding="utf-8")
+        assessments = [assess_requirement(requirement, resume_text, master_text=master_text) for requirement in requirements]
+        fit = compute_fit_result(assessments)
+        profile_score = role_profile_match_score(candidate.profile, combined)
+        title_score = title_match_score(candidate.role_id, position)
+        scope_score = senior_scope_alignment_score(candidate.profile, combined)
+        risky_penalty = risky_claim_penalty(candidate.profile, combined)
+        score = fit.score + profile_score + scope_score + title_score - risky_penalty
+        rationale = (
+            f"fit={fit.score}, role_profile={profile_score}, scope_alignment={scope_score}, title_signal={title_score}, "
+            f"risky_claim_penalty={risky_penalty}"
+        )
+        ranked.append(RoleCandidate(candidate.role_id, candidate.resume_path, candidate.profile, score, rationale, candidate.diagnostics))
+    return sorted(ranked, key=lambda item: (-item.score, item.role_id))
+
+
+def role_profile_match_score(profile: RoleProfile, text: str) -> int:
+    text_tokens = tokenize(text)
+    score = 0
+    for signal in profile.positioning_signals + profile.strong_evidence_patterns + profile.frequent_ats_terms:
+        signal_tokens = tokenize(signal)
+        if not signal_tokens:
+            continue
+        matches = text_tokens & signal_tokens
+        if len(matches) >= min(2, len(signal_tokens)):
+            score += 3
+        elif matches:
+            score += 1
+    return min(score, 20)
+
+
+def title_match_score(role_id: str, position: str) -> int:
+    lower = position.lower()
+    mapping = {
+        "cio": ("cio", "директор по ит", "руководитель ит"),
+        "cto": ("cto", "технический директор", "директор по технологиям"),
+        "hoe": ("head of engineering", "vp engineering", "engineering director"),
+        "hod": ("head of development", "руководитель разработки", "директор по разработке"),
+        "em": ("engineering manager", "team lead"),
+    }
+    return 2 if any(marker in lower for marker in mapping.get(role_id.lower(), (role_id.lower(),))) else 0
+
+
+def senior_scope_alignment_score(profile: RoleProfile, text: str) -> int:
+    text_tokens = tokenize(text)
+    scope_tokens = {
+        "organization",
+        "engineering",
+        "engineer",
+        "culture",
+        "performance",
+        "onboarding",
+        "review",
+        "leadership",
+        "lead",
+        "manager",
+        "кластер",
+        "инженер",
+        "культура",
+        "культур",
+        "организац",
+        "организация",
+        "организации",
+        "тимлид",
+        "лидер",
+        "ментор",
+        "найм",
+    }
+    vacancy_scope_hits = text_tokens & scope_tokens
+    if not vacancy_scope_hits:
+        return 0
+
+    score = 0
+    profile_signals = (
+        profile.positioning_signals
+        + profile.strong_evidence_patterns
+        + profile.safe_emphasis_areas
+        + profile.notes
+    )
+    for signal in profile_signals:
+        signal_tokens = tokenize(signal)
+        if signal_tokens & scope_tokens and signal_tokens & text_tokens:
+            score += 2
+    return min(score, 12)
+
+
+def risky_claim_penalty(profile: RoleProfile, text: str) -> int:
+    text_tokens = tokenize(text)
+    penalty = 0
+    for claim in profile.risky_claims:
+        if tokenize(claim) & text_tokens:
+            penalty += 1
+    return min(penalty, 5)
+
+
+def extract_requirements(*, position: str, source_text: str) -> list[str]:
+    requirements: list[tuple[str, str]] = []
+    active_priority = "must"
+    for raw_line in source_text.splitlines():
+        line = normalize_requirement_line(raw_line)
+        if not line:
+            continue
+        lower = line.lower()
+        if any(marker in lower for marker in ("обязательно", "must", "requirements", "что ищем")):
+            active_priority = "must"
+            continue
+        if any(marker in lower for marker in ("будут плюсом", "nice to have", "preferred", "желательно")):
+            active_priority = "nice"
+            continue
+        if raw_line.strip().startswith(("-", "*")) and len(line) >= 12:
+            requirements.append((active_priority, line))
+
+    if not requirements:
+        chunks = re.split(r"[\n\r]+|(?<=[.!?])\s+", source_text)
+        for chunk in chunks:
+            line = normalize_requirement_line(chunk)
+            if len(line) >= 24 and looks_like_requirement(line):
+                requirements.append((classify_priority(line), line))
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for priority, requirement in requirements:
+        key = requirement.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(f"[{priority}] {requirement}")
+        if len(unique) >= 16:
+            break
+    return unique or [f"[must] Зона лидерства и ответственность за delivery для роли {position or 'целевой роли'}"]
+
+
+def normalize_requirement_line(value: str) -> str:
+    cleaned = value.strip()
+    cleaned = re.sub(r"^[#>\-\*\d\.\)\s]+", "", cleaned)
+    cleaned = cleaned.replace("**", "")
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip(" :;")
+
+
+def looks_like_requirement(line: str) -> bool:
+    lower = line.lower()
+    markers = (
+        "опыт",
+        "управ",
+        "руковод",
+        "архитект",
+        "delivery",
+        "ci/cd",
+        "docker",
+        "kubernetes",
+        "java",
+        "команд",
+        "stakeholder",
+        "required",
+        "must",
+    )
+    return any(marker in lower for marker in markers)
+
+
+def assess_requirement(requirement: str, resume_text: str, master_text: str = "") -> RequirementAssessment:
+    priority, text = split_requirement_priority(requirement)
+    selected_evidence = find_evidence(text, resume_text)
+    master_evidence = find_evidence(text, master_text) if master_text else ""
+
+    if selected_evidence and master_evidence:
+        coverage = "full"
+    elif selected_evidence and len(extract_keywords(text)) <= 4:
+        coverage = "full"
+    elif selected_evidence or master_evidence:
+        coverage = "partial"
+    else:
+        coverage = "none"
+
+    evidence = selected_evidence or master_evidence or "Подтверждение не найдено в выбранном резюме или MASTER."
+    if coverage == "full":
+        notes = "Требование убедительно покрыто подтверждёнными фактами."
+        action = "Оставить как сильный аргумент."
+    elif coverage == "partial":
+        notes = "Покрытие частичное или косвенное; формулировку нужно усилить без добавления новых фактов."
+        action = "Усилить через подтверждённый опыт из выбранного резюме или MASTER."
+    else:
+        notes = "Покрытия нет; не добавлять как факт без подтверждения."
+        action = "Отметить как gap или NEW DATA NEEDED."
+
+    return RequirementAssessment(
+        source_requirement=text,
+        requirement=text,
+        priority=priority,
+        evidence=evidence,
+        coverage=coverage,
+        notes=notes,
+        selected_evidence=selected_evidence,
+        master_evidence=master_evidence,
+        action=action,
+    )
+
+
+def split_requirement_priority(requirement: str) -> tuple[str, str]:
+    match = re.match(r"^\[(must|nice)\]\s+(.+)$", requirement)
+    if match:
+        return match.group(1), match.group(2).strip()
+    return classify_priority(requirement), requirement
+
+
+def classify_priority(requirement: str) -> str:
+    lower = requirement.lower()
+    if any(marker in lower for marker in ("будет плюсом", "nice to have", "preferred", "желательно", "plus")):
+        return "nice"
+    return "must"
+
+
+def find_evidence(requirement: str, text: str) -> str:
+    if not text.strip():
+        return ""
+    keywords = extract_keywords(requirement)
+    best_line = ""
+    best_score = 0
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or len(line) < 20:
+            continue
+        tokens = tokenize(line)
+        score = sum(1 for keyword in keywords if keyword in tokens or any(keyword in token or token in keyword for token in tokens))
+        if any(char.isdigit() for char in line) and any(keyword in tokens for keyword in ("команд", "team", "lead", "метрик", "metric")):
+            score += 1
+        if score > best_score:
+            best_score = score
+            best_line = trim_markdown_bullet(line)
+    if best_score >= 2 or (best_score == 1 and len(keywords) <= 3):
+        return best_line
+    return ""
+
+
+def extract_keywords(text: str) -> list[str]:
+    words = re.findall(r"[a-zA-Zа-яА-ЯёЁ][a-zA-Zа-яА-ЯёЁ0-9/\-\+\.]{1,}", text.lower())
+    result: list[str] = []
+    for word in words:
+        normalized = normalize_token(word)
+        if len(normalized) < 3 or normalized in STOPWORDS or normalized in result:
+            continue
+        result.append(normalized)
+    return result[:8]
+
+
+def tokenize(text: str) -> set[str]:
+    return {normalize_token(token) for token in re.findall(r"[a-zA-Zа-яА-ЯёЁ][a-zA-Zа-яА-ЯёЁ0-9/\-\+\.]{1,}", text.lower())} - {""}
+
+
+def normalize_token(token: str) -> str:
+    normalized = token.lower().strip("-+.,:;()[]{} ")
+    aliases = {
+        "teams": "team",
+        "managers": "manager",
+        "managed": "manage",
+        "managing": "manage",
+        "leading": "lead",
+        "led": "lead",
+        "processes": "process",
+        "services": "service",
+        "metrics": "metric",
+        "engineers": "engineer",
+        "командами": "команд",
+        "команды": "команд",
+        "командам": "команд",
+        "руководил": "руковод",
+        "руководство": "руковод",
+        "управления": "управ",
+        "управлял": "управ",
+        "метрики": "метрик",
+        "метрик": "метрик",
+        "архитектурные": "архитект",
+        "архитектурных": "архитект",
+        "процессы": "процесс",
+        "процессов": "процесс",
+    }
+    if normalized in aliases:
+        return aliases[normalized]
+    if len(normalized) > 4 and normalized.endswith("ами"):
+        normalized = normalized[:-3]
+    elif len(normalized) > 4 and normalized.endswith("ов"):
+        normalized = normalized[:-2]
+    elif len(normalized) > 4 and normalized.endswith("ы"):
+        normalized = normalized[:-1]
+    elif len(normalized) > 4 and normalized.endswith("s"):
+        normalized = normalized[:-1]
+    return aliases.get(normalized, normalized)
+
+
+def compute_fit_result(assessments: list[RequirementAssessment]) -> FitResult:
+    if not assessments:
+        return FitResult(0, "Weak fit", "low", "Нет требований для расчёта.")
+    max_score = 0.0
+    actual = 0.0
+    for item in assessments:
+        if item.priority == "nice":
+            max_score += 0.5
+            actual += {"full": 0.5, "partial": 0.25, "none": 0.0, "unclear": 0.0}.get(item.coverage, 0.0)
+        else:
+            max_score += 1.0
+            actual += {"full": 1.0, "partial": 0.5, "none": 0.0, "unclear": 0.0}.get(item.coverage, 0.0)
+    score = round((actual / max_score) * 100) if max_score else 0
+    if score >= 85:
+        verdict = "Strong fit"
+    elif score >= 68:
+        verdict = "Good fit with gaps"
+    elif score >= 50:
+        verdict = "Borderline fit"
+    else:
+        verdict = "Weak fit"
+    full_count = sum(1 for item in assessments if item.coverage == "full")
+    unknown_count = sum(1 for item in assessments if item.coverage in {"none", "unclear"})
+    if full_count >= len(assessments) * 0.65 and unknown_count <= 1:
+        confidence = "high"
+    elif unknown_count <= len(assessments) * 0.45:
+        confidence = "medium"
+    else:
+        confidence = "low"
+    rationale = (
+        f"Расчёт: обязательные требования дают до 1 балла, плюсы до 0.5; "
+        f"полное покрытие={full_count}, пробелы/неясно={unknown_count}."
+    )
+    return FitResult(score, verdict, confidence, rationale)
+
+
+def build_evidence_pack(
+    *,
+    vacancy_id: str,
+    company: str,
+    position: str,
+    language: str,
+    target_mode: str,
+    selected_resume: str,
+    selected_resume_text: str,
+    selected_profile: RoleProfile,
+    ranked_candidates: list[RoleCandidate],
+    role_diagnostics: list[str],
+    override_note: str,
+    requirements: list[str],
+    assessments: list[RequirementAssessment],
+    fit: FitResult,
+    master_text: str,
+    raw_source: str,
+) -> dict[str, Any]:
+    return {
+        "vacancy_id": vacancy_id,
+        "company": company,
+        "position": position,
+        "language": language,
+        "target_mode": target_mode,
+        "selected_resume": selected_resume,
+        "selected_profile": asdict_without_path(selected_profile),
+        "role_candidates": [
+            {
+                "role_id": candidate.role_id,
+                "score": candidate.score,
+                "rationale": candidate.rationale,
+            }
+            for candidate in ranked_candidates
+        ],
+        "role_diagnostics": role_diagnostics,
+        "override_note": override_note,
+        "requirements": [split_requirement_priority(item)[1] for item in requirements],
+        "assessments": [assessment_to_dict(item) for item in assessments],
+        "fit": asdict(fit),
+        "resume_highlights": extract_resume_highlights(selected_resume_text, limit=8),
+        "master_available": bool(master_text.strip()),
+        "forbidden_claims": build_forbidden_claims(assessments, selected_profile),
+        "raw_source_excerpt": raw_source[:3000],
+    }
+
+
+def asdict_without_path(profile: RoleProfile) -> dict[str, Any]:
+    payload = asdict(profile)
+    payload["path"] = str(profile.path)
+    return payload
+
+
+def assessment_to_dict(item: RequirementAssessment) -> dict[str, str]:
+    return {
+        "requirement": item.requirement,
+        "priority": item.priority,
+        "priority_ru": RU_PRIORITY.get(item.priority, item.priority),
+        "coverage": item.coverage,
+        "coverage_ru": RU_COVERAGE.get(item.coverage, item.coverage),
+        "selected_evidence": item.selected_evidence,
+        "master_evidence": item.master_evidence,
+        "notes": item.notes,
+        "action": item.action,
+    }
+
+
+def build_forbidden_claims(assessments: list[RequirementAssessment], profile: RoleProfile) -> list[str]:
+    claims = [item.requirement for item in assessments if item.coverage == "none"]
+    claims.extend(profile.risky_claims)
+    return unique_nonempty(claims)[:8]
+
+
+def build_llm_provider(name: str) -> LLMProvider:
+    normalized = (name or "openai").strip().lower()
+    if normalized == "fake":
+        return FakeLLMProvider()
+    if normalized == "openai":
+        return OpenAICompatibleProvider()
+    raise AnalyzeVacancyError(f"Unsupported llm_provider '{name}'. Supported providers: openai, fake.")
+
+
+def validate_llm_package(payload: dict[str, Any]) -> dict[str, Any]:
+    required = [
+        "why_this_resume",
+        "why_not_others",
+        "strengths",
+        "gaps",
+        "positioning",
+        "final_recommendation",
+        "cover_letter_standard",
+        "cover_letter_short",
+        "adaptation_overview",
+        "temp_signals",
+        "perm_signals",
+        "open_questions",
+        "profile_updates",
+        "competency_updates",
+        "experience_updates",
+    ]
+    missing = [key for key in required if key not in payload]
+    if missing:
+        raise AnalyzeVacancyError(f"LLM response is missing required keys: {', '.join(missing)}.")
+    normalized = dict(payload)
+    for key in required:
+        if key in {"cover_letter_standard", "cover_letter_short", "positioning", "final_recommendation", "adaptation_overview"}:
+            normalized[key] = str(normalized[key]).strip()
+        else:
+            normalized[key] = normalize_list(normalized[key])
+    return normalized
+
+
+def build_deterministic_llm_package(evidence_pack: dict[str, Any]) -> dict[str, Any]:
+    selected_resume = evidence_pack["selected_resume"]
+    company = evidence_pack.get("company") or "компании"
+    position = evidence_pack.get("position") or "целевой роли"
+    assessments = evidence_pack["assessments"]
+    full = [item for item in assessments if item["coverage"] == "full"]
+    partial = [item for item in assessments if item["coverage"] == "partial"]
+    gaps = [item for item in assessments if item["coverage"] in {"none", "unclear"}]
+    candidate_rows = evidence_pack.get("role_candidates", [])
+    alternatives = [
+        f"{row['role_id']}: слабее по совокупному score ({row['score']}) и role rationale: {row['rationale']}"
+        for row in candidate_rows
+        if row["role_id"] != selected_resume
+    ][:4]
+    strengths = [
+        f"{item['requirement']} - {item['selected_evidence'] or item['master_evidence']}"
+        for item in full[:5]
+    ] or [f"`{selected_resume}` даёт наиболее релевантный подтверждённый контур для роли."]
+    gap_items = [
+        f"{item['requirement']} - {item['notes']}"
+        for item in (gaps + partial)[:5]
+    ]
+    first_strength = trim_signal(strengths[0])
+    first_gap = trim_signal(gap_items[0]) if gap_items else "часть требований нужно уточнить по фактам"
+    fit = evidence_pack["fit"]
+    cover_standard = (
+        f"Здравствуйте.\n\n"
+        f"Рассматриваю роль {position}, потому что она близка к моему опыту управления инженерными командами, "
+        f"delivery и развитием критичных систем. В качестве основной версии резюме я бы использовал {selected_resume}: "
+        f"она лучше всего показывает тот контур, который важен для этой вакансии.\n\n"
+        f"Ключевой релевантный аргумент: {first_strength}. Это даёт рабочую основу для разговора о задачах {company}, "
+        f"особенно там, где важны предсказуемость поставки, качество инженерных решений и управляемость нескольких команд.\n\n"
+        f"Отдельные зоны стоит обсуждать аккуратно: {first_gap}. Я не стал бы дорисовывать неподтверждённый опыт, "
+        f"а показал бы смежные кейсы и готовность быстро закрыть контекст.\n\n"
+        f"Буду рад пообщаться по вакансии и ответить на ваши вопросы."
+    )
+    cover_short = (
+        f"Здравствуйте. Мне интересна роль {position}: по содержанию она близка к моему опыту управления инженерными "
+        f"командами, delivery и развитием критичных систем. Для отклика я бы выбрал резюме {selected_resume}, потому что "
+        f"оно лучше всего показывает релевантный управленческий и инженерный контур.\n\n"
+        f"Главный аргумент для первого контакта: {first_strength}. Спорные зоны лучше обозначить честно и связать со "
+        f"смежным подтверждённым опытом. Буду рад обсудить вакансию."
+    )
+    profile_updates = [
+        f"| Short Summary | {selected_resume}.md :: profile | Руководитель инженерной функции для роли {position}: {first_strength} | TEMP | selected resume / MASTER | Не добавлять неподтверждённый домен или стек. |",
+        f"| Extended Summary | {selected_resume}.md :: profile | Расширить профиль вокруг multi-team leadership, delivery, architecture/reliability и измеримых результатов под контекст {company}. | TEMP | selected resume / MASTER | Держать факты в границах evidence matrix. |",
+    ]
+    competency_updates = [
+        f"| Поднять выше | {selected_resume}.md :: skills | {item['requirement']} | TEMP | {item['selected_evidence'] or item['master_evidence']} | Только если формулировка уже подтверждена. |"
+        for item in (full + partial)[:5]
+    ]
+    experience_updates = [
+        f"| {item['selected_evidence'] or 'Нужен исходный bullet'} | {rewrite_experience_bullet(item, company)} | TEMP | {item['selected_evidence'] or item['master_evidence']} | Не добавлять новый факт, только переупаковать подтверждённый. |"
+        for item in (full + partial)[:6]
+    ]
+    return {
+        "why_this_resume": [
+            f"`{selected_resume}` набирает лучший совокупный score среди доступных role profiles.",
+            f"Fit score: {fit['score']}%; вердикт: {fit['verdict']}; уверенность: {fit['confidence']}.",
+            f"Главный доказательный сигнал: {first_strength}.",
+        ],
+        "why_not_others": alternatives or ["Ближайшие альтернативы не дали более сильного покрытия по must-have требованиям."],
+        "strengths": strengths,
+        "gaps": gap_items or ["Критичных gaps не найдено, но формулировки нужно держать в рамках подтверждённых фактов."],
+        "positioning": (
+            f"Для этой вакансии кандидат выглядит как {selected_resume}-профиль с сильной опорой на engineering leadership, "
+            f"delivery и управление изменениями. Это не означает идеальный доменный match, но даёт убедимую основу для отклика."
+        ),
+        "final_recommendation": f"Apply with caveats: score {fit['score']}%, {fit['verdict']}.",
+        "cover_letter_standard": cover_standard,
+        "cover_letter_short": cover_short,
+        "adaptation_overview": (
+            "В `adoptions.md` переданы draft-правки для summary, skills и experience. "
+            "Все спорные или неподтверждённые пункты помечены как NEW DATA NEEDED или factual boundary."
+        ),
+        "temp_signals": strengths[:4],
+        "perm_signals": [item for item in strengths[:3] if "не найдено" not in item.lower()],
+        "open_questions": [item["requirement"] for item in gaps[:4]] or ["Уточнить, какие требования являются решающими для shortlist."],
+        "profile_updates": profile_updates,
+        "competency_updates": competency_updates or ["| Проверить | selected resume :: skills | Поднять наиболее релевантные компетенции из матрицы требований. | TEMP | analysis matrix | Не добавлять новые claims. |"],
+        "experience_updates": experience_updates or ["| Нужен исходный bullet | Переписать релевантный bullet после подтверждения факта. | NEW DATA NEEDED | analysis matrix | Нельзя добавлять без evidence. |"],
+    }
+
+
+def rewrite_experience_bullet(item: dict[str, str], company: str) -> str:
+    evidence = item.get("selected_evidence") or item.get("master_evidence") or ""
+    requirement = item.get("requirement", "требование роли")
+    if not evidence:
+        return f"Добавить подтверждённый пример по теме: {requirement}"
+    return f"{trim_signal(evidence)}; в контексте отклика подсветить связь с требованием: {requirement}"
+
+
+def render_analysis(*, evidence_pack: dict[str, Any], analysis_package: dict[str, Any]) -> str:
+    fit = evidence_pack["fit"]
+    selected_resume = evidence_pack["selected_resume"]
+    lines = [
+        "# Анализ вакансии",
+        "",
+        "## 1. Анализ соответствия и выбор резюме",
+        "",
+        "### Сводка",
+        "",
+        f"- ID вакансии: {evidence_pack['vacancy_id']}",
+        f"- Компания: {evidence_pack.get('company') or 'нет данных'}",
+        f"- Позиция: {evidence_pack.get('position') or 'нет данных'}",
+        f"- Выбранное резюме: {selected_resume}",
+        f"- Fit score: {fit['score']}%",
+        f"- Вердикт: {fit['verdict']}",
+        f"- Уверенность: {RU_CONFIDENCE.get(fit['confidence'], fit['confidence'])}",
+        f"- Методика: {fit['rationale']}",
+    ]
+    if evidence_pack.get("override_note"):
+        lines.append(f"- Override: {evidence_pack['override_note']}")
+    if evidence_pack.get("role_diagnostics"):
+        lines.append(f"- Диагностика ролей: {'; '.join(evidence_pack['role_diagnostics'])}")
+
+    lines.extend(["", "### Почему это резюме", "", *format_bullets(analysis_package["why_this_resume"])])
+    lines.extend(["", "### Почему не другие", "", *format_bullets(analysis_package["why_not_others"])])
+    lines.extend(
+        [
+            "",
+            "### Матрица требований",
+            "",
+            "| Требование | Приоритет | Evidence in selected CV | Evidence in MASTER | Покрытие | Action |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+    for item in evidence_pack["assessments"]:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    escape_table(item["requirement"]),
+                    escape_table(item["priority_ru"]),
+                    escape_table(item["selected_evidence"] or "—"),
+                    escape_table(item["master_evidence"] or "—"),
+                    escape_table(item["coverage_ru"]),
+                    escape_table(item["action"]),
+                ]
+            )
+            + " |"
+        )
+    lines.extend(["", "### Сильные стороны", "", *format_bullets(analysis_package["strengths"])])
+    lines.extend(["", "### Пробелы и риски", "", *format_bullets(analysis_package["gaps"])])
+    lines.extend(["", "### Позиционирование", "", analysis_package["positioning"]])
+    lines.extend(["", "### Итоговая рекомендация", "", analysis_package["final_recommendation"]])
+    lines.extend(
+        [
+            "",
+            "## 2. Сопроводительное письмо",
+            "",
+            "### Standard version",
+            "",
+            analysis_package["cover_letter_standard"],
+            "",
+            "### Short version",
+            "",
+            analysis_package["cover_letter_short"],
+            "",
+            "## 3. Входные данные для адаптации резюме",
+            "",
+            analysis_package["adaptation_overview"],
+            "",
+            "### Что требует подтверждения",
+            "",
+            *format_bullets(analysis_package["open_questions"]),
+            "",
+            "### Что нельзя добавлять как факт",
+            "",
+            *format_bullets(evidence_pack["forbidden_claims"]),
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def render_adoptions(*, vacancy_id: str, selected_resume: str, analysis_package: dict[str, Any]) -> str:
+    return "\n".join(
+        [
+            "# Адаптации по вакансии",
+            "",
+            f"- ID вакансии: {vacancy_id}",
+            f"- Выбранное резюме: {selected_resume}",
+            "",
+            "## Временные сигналы",
+            "",
+            *format_bullets(analysis_package["temp_signals"]),
+            "",
+            "## Кандидаты в постоянные сигналы",
+            "",
+            *format_bullets(analysis_package["perm_signals"]),
+            "",
+            "## Открытые вопросы",
+            "",
+            *format_bullets(analysis_package["open_questions"]),
+            "",
+            "## Общие рекомендации по добавлению из MASTER в выбранную ролевую версию",
+            "",
+            "- Переносить только факты, подтверждённые в `MASTER` или выбранном ролевом резюме.",
+            "- Спорные требования оставлять в `NEW DATA NEEDED`, пока не появится подтверждение.",
+            "",
+            "## Обновление раздела `О себе (профиль)`",
+            "",
+            "| Change | Target | Draft | Status | Evidence | Factual Boundary |",
+            "| --- | --- | --- | --- | --- | --- |",
+            *format_table_lines(analysis_package["profile_updates"], 6),
+            "",
+            "## Обновление раздела `Ключевые компетенции`",
+            "",
+            "| Change | Target | Draft | Status | Evidence | Factual Boundary |",
+            "| --- | --- | --- | --- | --- | --- |",
+            *format_table_lines(analysis_package["competency_updates"], 6),
+            "",
+            "## Обновление раздела `Опыт работы`",
+            "",
+            "| Before | After | Status | Evidence | Factual Boundary |",
+            "| --- | --- | --- | --- | --- |",
+            *format_table_lines(analysis_package["experience_updates"], 5),
+            "",
+        ]
+    )
+
+
+def format_table_lines(items: list[str], columns: int) -> list[str]:
+    if not items:
+        return ["| " + " | ".join([""] * columns) + " |"]
+    result: list[str] = []
+    for item in items:
+        stripped = item.strip()
+        if stripped.startswith("|") and stripped.endswith("|"):
+            result.append(stripped)
+            continue
+        cells = [stripped] + [""] * (columns - 1)
+        result.append("| " + " | ".join(escape_table(cell) for cell in cells[:columns]) + " |")
+    return result
+
+
+def extract_resume_highlights(resume_text: str, limit: int) -> list[str]:
+    items: list[str] = []
+    for line in resume_text.splitlines():
+        cleaned = trim_markdown_bullet(line.strip())
+        lower = cleaned.lower()
+        if len(cleaned) < 30:
+            continue
+        if any(marker in lower for marker in ("руковод", "управ", "lead time", "flow efficiency", "deployment", "архитект", "команд")):
+            items.append(cleaned)
+    return unique_nonempty(items)[:limit]
+
+
+def read_optional(path: Path) -> str:
+    return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+def normalize_language(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized.startswith("en"):
+        return "en"
+    if normalized.startswith("es"):
+        return "es"
+    return "ru"
 
 
 def dedupe_paths(paths: list[str]) -> list[str]:
@@ -306,574 +1168,78 @@ def dedupe_paths(paths: list[str]) -> list[str]:
     return result
 
 
-def choose_resume(*, position: str, source_text: str) -> str:
-    combined = f"{position}\n{source_text}".lower()
-    position_lower = position.lower()
-    scores: dict[str, int] = {}
-    for role, hints in ROLE_HINTS.items():
-        position_hits = sum(3 for hint in hints if hint in position_lower)
-        text_hits = sum(1 for hint in hints if hint in combined)
-        scores[role] = position_hits + text_hits
-
-    best_role = max(scores, key=scores.get)
-    if scores[best_role] == 0:
-        if "cto" in position_lower or "technology" in position_lower:
-            return "CTO"
-        if "cio" in position_lower or "директор по ит" in position_lower:
-            return "CIO"
-        if "vp" in position_lower or "engineering" in position_lower:
-            return "HoE"
-        if "development" in position_lower or "разработк" in position_lower:
-            return "HoD"
-        return "EM"
-    return best_role
-
-
-def extract_requirements(*, position: str, source_text: str) -> list[str]:
-    candidates: list[tuple[int, str]] = []
-    raw_chunks = re.split(r"[\n\r]+|(?<=[.!?])\s+", source_text)
-    for chunk in raw_chunks:
-        cleaned = normalize_requirement_line(chunk)
-        if len(cleaned) < 24:
-            continue
-        lower = cleaned.lower()
-        score = 0
-        if any(marker in lower for marker in REQUIREMENT_MARKERS):
-            score += 4
-        if any(token in lower for token in position.lower().split()):
-            score += 1
-        if len(cleaned) <= 160:
-            score += 1
-        candidates.append((score, cleaned))
-
-    unique: list[str] = []
-    seen: set[str] = set()
-    for _, candidate in sorted(candidates, key=lambda item: (-item[0], item[1])):
-        key = candidate.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(candidate)
-        if len(unique) == 8:
-            break
-
-    if unique:
-        return unique
-
-    return [
-        f"Зона лидерства и ответственность за delivery для роли {position or 'целевой роли'}",
-        "Техническое принятие решений и влияние на архитектуру",
-        "Кросс-функциональное взаимодействие и связка с бизнесом",
-    ]
-
-
-def normalize_requirement_line(value: str) -> str:
-    cleaned = value.strip()
-    cleaned = re.sub(r"^[\-\*\d\.\)\s]+", "", cleaned)
-    cleaned = re.sub(r"\s+", " ", cleaned)
-    return cleaned
-
-
-def assess_requirement(requirement: str, resume_text: str) -> RequirementAssessment:
-    keywords = extract_keywords(requirement)
-    resume_lines = [line.strip() for line in resume_text.splitlines() if line.strip()]
-    matched_lines = [line for line in resume_lines if line_matches_keywords(line, keywords)]
-    display_requirement = localize_requirement(requirement)
-
-    if len(matched_lines) >= 2:
-        coverage = "strong"
-    elif len(matched_lines) == 1:
-        coverage = "partial"
-    else:
-        coverage = "gap"
-
-    evidence = matched_lines[0] if matched_lines else "Нужен явный сигнал в выбранном резюме."
-    priority = classify_priority(requirement)
-    if coverage == "strong":
-        notes = "Есть прямой сигнал в текущем резюме."
-    elif coverage == "partial":
-        notes = "Сигнал есть, но его стоит сделать заметнее и ближе к формулировке вакансии."
-    else:
-        notes = "Нужно либо добавить переносимый опыт, либо честно закрыть пробел в сопроводительном письме."
-
-    return RequirementAssessment(
-        source_requirement=requirement,
-        requirement=display_requirement,
-        priority=priority,
-        evidence=evidence,
-        coverage=coverage,
-        notes=notes,
-    )
-
-
-def extract_keywords(text: str) -> list[str]:
-    words = re.findall(r"[a-zA-Zа-яА-ЯёЁ][a-zA-Zа-яА-ЯёЁ\-\+]{2,}", text.lower())
-    keywords: list[str] = []
-    for word in words:
-        normalized = normalize_token(word)
-        if normalized in STOPWORDS or normalized in keywords:
-            continue
-        keywords.append(normalized)
-    return keywords[:6] or ["leadership", "delivery"]
-
-
-def line_matches_keywords(line: str, keywords: list[str]) -> bool:
-    tokens = {normalize_token(token) for token in re.findall(r"[a-zA-Zа-яА-ЯёЁ][a-zA-Zа-яА-ЯёЁ\-\+]{2,}", line.lower())}
-    tokens.discard("")
-    if not tokens:
-        return False
-    matched = [keyword for keyword in keywords if keyword in tokens]
-    return len(matched) >= 2 or (len(matched) == 1 and len(keywords) <= 3)
-
-
-def normalize_token(token: str) -> str:
-    normalized = token.lower().strip("-+ ")
-    english_aliases = {
-        "led": "lead",
-        "leading": "lead",
-        "built": "build",
-        "building": "build",
-        "driven": "drive",
-        "driving": "drive",
-        "drove": "drive",
-        "managing": "manage",
-        "managed": "manage",
-        "teams": "team",
-        "managers": "manager",
-        "partnerships": "partnership",
-        "processes": "process",
-        "services": "service",
-        "agents": "agent",
-        "years": "year",
-    }
-    if normalized in english_aliases:
-        return english_aliases[normalized]
-    if normalized.endswith("'s"):
-        normalized = normalized[:-2]
-    if len(normalized) > 4 and normalized.endswith("ies"):
-        normalized = normalized[:-3] + "y"
-    elif len(normalized) > 4 and normalized.endswith("es"):
-        normalized = normalized[:-2]
-    elif len(normalized) > 3 and normalized.endswith("s"):
-        normalized = normalized[:-1]
-    return english_aliases.get(normalized, normalized)
-
-
-def localize_requirement(requirement: str) -> str:
-    if contains_cyrillic(requirement):
-        return clean_requirement_text(requirement)
-
-    lowered = requirement.strip().rstrip(".")
-    replacements = [
-        ("As the Engineering Manager, you will ", ""),
-        ("What makes you a great fit:", ""),
-        ("Challenges that await you:", ""),
-        ("Lead the development and optimization of the workspace for collection and telesales agents", "Развитие и оптимизация рабочего пространства для команд collection и telesales"),
-        ("lead a cross-functional team working at high performance and reliability standards", "Руководство кросс-функциональной инженерной командой с высокими стандартами производительности и надёжности"),
-        ("years of experience leading engineering teams", "опыт управления инженерными командами"),
-        ("years of experience as a Go developer", "опыт разработки на Go"),
-        ("A strong technical background and development experience", "сильный технический бэкграунд и опыт разработки"),
-        ("Leading the team in hiring, planning, task decomposition, process improvements, and cross-team collaboration", "опыт найма, планирования, декомпозиции задач, улучшения процессов и кросс-командного взаимодействия"),
-        ("Excellent cross-team communication skills and the ability to build partnerships", "сильные навыки кросс-функциональной коммуникации и выстраивания партнёрств"),
-        ("Experience in building and optimizing development processes", "опыт построения и оптимизации процессов разработки"),
-        ("Drive platform strategy, architecture decisions, and delivery execution", "управление платформенной стратегией, архитектурными решениями и delivery"),
-        ("Partner with product and operations on company-wide priorities", "партнёрство с product- и operations-командами по общекомандным приоритетам"),
-        ("Build scalable engineering processes and hiring practices", "построение масштабируемых инженерных процессов и практик найма"),
-        ("Lead multiple engineering teams and managers", "руководство несколькими инженерными командами и менеджерами"),
-    ]
-
-    translated = lowered
-    for source, target in replacements:
-        translated = translated.replace(source, target)
-
-    translated = translated.strip(" :;-")
-    translated = re.sub(r"\b3\+\s*", "от 3 лет ", translated)
-    translated = re.sub(r"\b4\+\s*", "от 4 лет ", translated)
-    translated = re.sub(r"\s+", " ", translated).strip()
-
-    if translated and translated[0].islower():
-        translated = translated[0].upper() + translated[1:]
-    if translated and not translated.endswith("."):
-        translated += "."
-    return translated or clean_requirement_text(requirement)
-
-
-def contains_cyrillic(text: str) -> bool:
-    return bool(re.search(r"[а-яА-ЯёЁ]", text))
-
-
-def clean_requirement_text(text: str) -> str:
-    cleaned = text.strip()
-    cleaned = re.sub(r"^[#>\-\*\d\.\)\s]+", "", cleaned)
-    cleaned = re.sub(r"\s+", " ", cleaned)
-    return cleaned
-
-
-def classify_priority(requirement: str) -> str:
-    lower = requirement.lower()
-    if any(marker in lower for marker in LOW_PRIORITY_MARKERS):
-        return "low"
-    if any(marker in lower for marker in HIGH_PRIORITY_MARKERS):
-        return "high"
-    return "medium"
-
-
-def compute_fit_score(assessments: list[RequirementAssessment]) -> int:
-    if not assessments:
-        return 0
-    weight = {"strong": 1.0, "partial": 0.6, "gap": 0.2}
-    score = sum(weight[item.coverage] for item in assessments) / len(assessments)
-    return round(score * 100)
-
-
-def estimate_fit_delta(assessments: list[RequirementAssessment], target_mode: str) -> int:
-    base = sum(6 for item in assessments if item.coverage == "gap")
-    base += sum(3 for item in assessments if item.coverage == "partial")
-    mode_bonus = {"conservative": 0, "balanced": 4, "aggressive": 8}.get(target_mode, 4)
-    return min(25, base + mode_bonus)
-
-
-def build_strengths(assessments: list[RequirementAssessment], selected_resume: str) -> list[str]:
-    strengths = [
-        f"{item.requirement} -> подтверждается в `{selected_resume}.md`."
-        for item in assessments
-        if item.coverage == "strong"
-    ]
-    return strengths[:4] or [f"Выбранное резюме `{selected_resume}.md` даёт базовый управленческий контур для роли."]
-
-
-def build_gaps(assessments: list[RequirementAssessment]) -> list[str]:
-    gaps = [
-        f"{item.requirement} -> нужен более явный сигнал или честное позиционирование."
-        for item in assessments
-        if item.coverage != "strong"
-    ]
-    return gaps[:4] or ["Критичных пробелов в стартовом проходе не найдено, но формулировки можно сделать точнее."]
-
-
-def build_cover_letter_notes(company: str, position: str, strengths: list[str], gaps: list[str]) -> list[str]:
-    notes = [f"Открыть письмо через контекст роли `{position}` и ценность для `{company or 'компании'}`."]
-    if strengths:
-        notes.append(f"Подсветить один сильный аргумент из анализа соответствия: {trim_signal(strengths[0])}")
-    if gaps:
-        notes.append(f"Один спорный пункт заранее переупаковать как переносимый опыт: {trim_signal(gaps[0])}")
-    return notes
-
-
-def build_resume_edit_notes(gaps: list[str], selected_resume: str) -> list[str]:
-    notes = [f"Проверить, можно ли добавить в `{selected_resume}.md`: {trim_signal(gap)}" for gap in gaps[:3]]
-    if not notes:
-        notes.append(f"В `{selected_resume}.md` можно сделать формулировки ближе к языку вакансии.")
-    return notes
-
-
-def build_contact_channels(meta: dict[str, object], include_employer_channels: bool) -> list[str]:
-    if not include_employer_channels:
-        return ["Каналы работодателя не запрашивались в этом запуске."]
-
-    channels = []
-    source_url = str(meta.get("source_url", "") or "").strip()
-    source_channel = str(meta.get("source_channel", "") or "").strip()
-    if source_channel:
-        channels.append(f"Исходный канал вакансии: {source_channel}.")
-    if source_url and source_url != "null":
-        channels.append(f"Проверить актуальность карточки по ссылке: {source_url}.")
-    channels.append("Сверить, есть ли прямой контакт рекрутера или нанимающего руководителя до отправки отклика.")
-    return channels
-
-
-def build_follow_up_questions(meta: dict[str, object], raw_source: str, gaps: list[str]) -> list[str]:
-    questions: list[str] = []
-    if not raw_source.strip():
-        questions.append("Нужен полный текст вакансии или хотя бы блок требований и задач.")
-    if is_unspecified(str(meta.get("country", "")).strip()):
-        questions.append("Уточнить географию и ожидания по юридическим ограничениям и релокации.")
-    if is_unspecified(str(meta.get("work_mode", "")).strip()):
-        questions.append("Уточнить формат работы: офис / гибрид / удалённо.")
-    if gaps:
-        questions.append(f"Проверить, действительно ли обязателен пункт: {trim_signal(gaps[0])}")
-    return questions or ["Дополнительных уточнений для стартового прохода пока нет."]
-
-
-def build_permanent_candidates(strengths: list[str]) -> list[str]:
-    candidates = [trim_signal(item) for item in strengths[:3]]
-    return candidates or ["Сильные сигналы проявятся после нескольких обработанных вакансий."]
-
-
-def build_master_resume_recommendations(assessments: list[RequirementAssessment], selected_resume: str) -> list[str]:
-    covered = [item.requirement.rstrip(".") for item in assessments if item.coverage != "gap"][:3]
-    gaps = [item.requirement.rstrip(".") for item in assessments if item.coverage == "gap"][:2]
-    recommendations = [
-        f"Переносить из `MASTER` в `{selected_resume}.md` только подтверждённые сигналы, которые напрямую поддерживают целевую роль.",
-    ]
-    if covered:
-        recommendations.append(f"В первую очередь усиливать уже релевантные сигналы: {', '.join(covered)}.")
-    if gaps:
-        recommendations.append(f"Пробелы закрывать через точную адаптацию формулировок и фактов из `MASTER`: {', '.join(gaps)}.")
-    recommendations.append("Не добавлять в ролевую версию неподтверждённый опыт; спорные зоны выносить в аккуратное позиционирование и сопроводительное письмо.")
-    return recommendations
-
-
-def build_profile_updates(position: str, company: str, strengths: list[str], gaps: list[str]) -> list[str]:
-    recommendations = [
-        f"Переписать блок `О себе (профиль)` под роль `{position}` и контекст компании `{company or 'работодателя'}`.",
-    ]
-    if strengths:
-        recommendations.append(f"В первой фразе профиля отразить главный сильный сигнал: {trim_signal(strengths[0])}.")
-    if gaps:
-        recommendations.append(f"Во второй части профиля аккуратно сблизить позиционирование с вакансией через формулировку: {trim_signal(gaps[0])}.")
-    recommendations.append("Профиль должен звучать как короткое русскоязычное позиционирование, а не как список английских требований из вакансии.")
-    return recommendations
-
-
-def build_competency_updates(assessments: list[RequirementAssessment]) -> list[str]:
-    competencies = collect_competencies(assessments)
-    if not competencies:
-        return ["Обновить `Ключевые компетенции` под лексику вакансии и убрать второстепенные пункты."]
-    return [
-        f"Поднять выше в `Ключевых компетенциях`: {', '.join(competencies[:6])}.",
-        "Оставлять только те компетенции, которые реально подтверждаются опытом и пригодятся именно для этой вакансии.",
-    ]
-
-
-def build_experience_updates(assessments: list[RequirementAssessment], selected_resume: str) -> list[str]:
-    strong = [item.requirement.rstrip(".") for item in assessments if item.coverage == "strong"][:2]
-    partial = [item.requirement.rstrip(".") for item in assessments if item.coverage == "partial"][:2]
-    gaps = [item.requirement.rstrip(".") for item in assessments if item.coverage == "gap"][:2]
-    recommendations = [f"В разделе `Опыт работы` пересобрать bullets в `{selected_resume}.md` вокруг самых релевантных кейсов и измеримого результата."]
-    if strong:
-        recommendations.append(f"Поднять выше подтверждённые кейсы по темам: {', '.join(strong)}.")
-    if partial:
-        recommendations.append(f"Сделать явнее уже присутствующие, но недокрученные сигналы: {', '.join(partial)}.")
-    if gaps:
-        recommendations.append(f"Проверить, есть ли в `MASTER` факты для усиления тем: {', '.join(gaps)}.")
-    return recommendations
-
-
-def collect_competencies(assessments: list[RequirementAssessment]) -> list[str]:
-    competencies: list[str] = []
-    patterns = [
-        ("найм", "найм и развитие команды"),
-        ("инженерн", "инженерный менеджмент"),
-        ("процесс", "процессы разработки"),
-        ("архитект", "архитектура решений"),
-        ("go", "Go"),
-        ("платформ", "платформенное развитие"),
-        ("delivery", "delivery-управление"),
-        ("кросс", "кросс-функциональное взаимодействие"),
-        ("коммуникац", "коммуникация со стейкхолдерами"),
-        ("партнёр", "выстраивание партнёрств"),
-        ("надёжност", "надёжность и стабильность"),
-        ("масштаб", "масштабирование команд и процессов"),
-    ]
-    token_sets = [
-        {normalize_token(token) for token in re.findall(r"[a-zA-Zа-яА-ЯёЁ][a-zA-Zа-яА-ЯёЁ\-\+]{2,}", item.requirement.lower())}
-        for item in assessments
-    ]
-    for marker, label in patterns:
-        if marker == "go":
-            matched = any("go" in token_set for token_set in token_sets)
-        else:
-            matched = any(any(marker in token for token in token_set) for token_set in token_sets)
-        if matched and label not in competencies:
-            competencies.append(label)
-    return competencies
-
-
-def render_analysis(
-    *,
-    vacancy_id: str,
-    selected_resume: str,
-    target_mode: str,
-    language: str,
-    include_employer_channels: bool,
-    current_fit: int,
-    projected_fit: int,
-    delta: int,
-    assessments: list[RequirementAssessment],
-    strengths: list[str],
-    gaps: list[str],
-    cover_letter_notes: list[str],
-    resume_edit_notes: list[str],
-    contact_channels: list[str],
-    follow_up_questions: list[str],
-) -> str:
-    lines = [
-        "# Анализ вакансии",
-        "",
-        "## Сводка",
-        "",
-        f"- ID вакансии: {vacancy_id}",
-        f"- Выбранное резюме: {selected_resume}",
-        f"- Режим адаптации: {format_target_mode(target_mode)}",
-        f"- Язык: {language}",
-        f"- Каналы работодателя: {render_boolean(include_employer_channels)}",
-        "",
-        "## Анализ соответствия: текущее резюме",
-        "",
-        f"- Общее соответствие: {current_fit}/100",
-        f"- Краткий вывод: Стартовая эвристика показывает опору на `{selected_resume}.md` и {coverage_summary(assessments)}.",
-        "",
-        "## Анализ соответствия: после предложенных правок",
-        "",
-        f"- Прогноз соответствия: {projected_fit}/100",
-        f"- Прирост: +{delta}",
-        "- Комментарий: Прогноз построен по тем пунктам, где формулировки можно приблизить к языку вакансии без искажения опыта.",
-        "",
-        "## Матрица требований",
-        "",
-        "| Требование | Приоритет | Подтверждение | Покрытие | Комментарий |",
-        "| --- | --- | --- | --- | --- |",
-    ]
-    for item in assessments:
-        lines.append(
-            f"| {escape_table(item.requirement)} | {format_priority(item.priority)} | {escape_table(item.evidence)} | {format_coverage(item.coverage)} | {escape_table(item.notes)} |"
-        )
-
-    lines.extend(
-        [
-            "",
-            "## Сильные стороны",
-            "",
-            *format_bullets(strengths),
-            "",
-            "## Пробелы",
-            "",
-            *format_bullets(gaps),
-            "",
-            "## Заметки для сопроводительного письма",
-            "",
-            *format_bullets(cover_letter_notes),
-            "",
-            "## Заметки по правкам резюме",
-            "",
-            *format_bullets(resume_edit_notes),
-            "",
-            "## Каналы связи с работодателем",
-            "",
-            *format_bullets(contact_channels),
-            "",
-            "## Вопросы на уточнение",
-            "",
-            *format_bullets(follow_up_questions),
-            "",
-        ]
-    )
-    return "\n".join(lines)
-
-
-def render_adoptions(
-    *,
-    vacancy_id: str,
-    strengths: list[str],
-    permanent_candidates: list[str],
-    open_questions: list[str],
-    master_resume_recommendations: list[str],
-    profile_updates: list[str],
-    competency_updates: list[str],
-    experience_updates: list[str],
-) -> str:
-    return "\n".join(
-        [
-            "# Адаптации по вакансии",
-            "",
-            f"- ID вакансии: {vacancy_id}",
-            "",
-            "## Временные сигналы",
-            "",
-            *format_bullets(strengths[:3]),
-            "",
-            "## Кандидаты в постоянные сигналы",
-            "",
-            *format_bullets(permanent_candidates),
-            "",
-            "## Открытые вопросы",
-            "",
-            *format_bullets(open_questions),
-            "",
-            "## Общие рекомендации по добавлению из MASTER в выбранную ролевую версию",
-            "",
-            *format_bullets(master_resume_recommendations),
-            "",
-            "## Обновление раздела `О себе (профиль)`",
-            "",
-            *format_bullets(profile_updates),
-            "",
-            "## Обновление раздела `Ключевые компетенции`",
-            "",
-            *format_bullets(competency_updates),
-            "",
-            "## Обновление раздела `Опыт работы`",
-            "",
-            *format_bullets(experience_updates),
-            "",
-        ]
-    )
-
-
-def format_bullets(items: list[str]) -> list[str]:
-    return [f"- {item}" for item in items] or ["- "]
-
-
-def trim_signal(value: str) -> str:
-    trimmed = value
-    for suffix in (
-        " -> подтверждается в `CIO.md`.",
-        " -> подтверждается в `CTO.md`.",
-        " -> подтверждается в `HoE.md`.",
-        " -> подтверждается в `HoD.md`.",
-        " -> подтверждается в `EM.md`.",
-        " -> нужен более явный сигнал или честное позиционирование.",
-    ):
-        trimmed = trimmed.replace(suffix, "")
-    return trimmed.strip().rstrip(".")
-
-
-def coverage_summary(assessments: list[RequirementAssessment]) -> str:
-    strong = sum(1 for item in assessments if item.coverage == "strong")
-    partial = sum(1 for item in assessments if item.coverage == "partial")
-    gaps = sum(1 for item in assessments if item.coverage == "gap")
-    return f"{strong} сильных / {partial} частичных / {gaps} пробелов"
-
-
-def format_priority(priority: str) -> str:
-    mapping = {
-        "high": "высокий",
-        "medium": "средний",
-        "low": "низкий",
-    }
-    return mapping.get(priority, priority)
-
-
-def format_coverage(coverage: str) -> str:
-    mapping = {
-        "strong": "сильное",
-        "partial": "частичное",
-        "gap": "пробел",
-    }
-    return mapping.get(coverage, coverage)
-
-
-def render_boolean(value: bool) -> str:
-    return "да" if value else "нет"
-
-
-def format_target_mode(target_mode: str) -> str:
-    mapping = {
-        "conservative": "консервативный",
-        "balanced": "сбалансированный",
-        "aggressive": "агрессивный",
-    }
-    return mapping.get(target_mode, target_mode)
-
-
-def escape_table(value: str) -> str:
-    return value.replace("|", "\\|").replace("\n", " ")
-
-
 def extract_raw_source(path: Path) -> str:
     text = path.read_text(encoding="utf-8")
     for marker in ("## Исходный текст", "## Raw Text"):
         if marker in text:
             return text.split(marker, maxsplit=1)[1].strip()
     return text.strip()
+
+
+def extract_section_bullets(markdown: str, heading: str) -> list[str]:
+    if heading not in markdown:
+        return []
+    section = markdown.split(heading, maxsplit=1)[1]
+    match = re.search(r"\n##\s", section)
+    if match:
+        section = section[: match.start()]
+    items: list[str] = []
+    for raw_line in section.splitlines():
+        line = raw_line.strip()
+        if line.startswith("- "):
+            items.append(trim_markdown_bullet(line))
+    return unique_nonempty(items)
+
+
+def normalize_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        return [line.strip("- ").strip() for line in value.splitlines() if line.strip("- ").strip()]
+    return [str(value).strip()] if value else []
+
+
+def format_bullets(items: list[str]) -> list[str]:
+    return [f"- {item}" for item in items] or ["- "]
+
+
+def trim_markdown_bullet(value: str) -> str:
+    cleaned = re.sub(r"^[\-\*\d\.\)\s]+", "", value.strip())
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip().rstrip(".")
+
+
+def trim_signal(value: str) -> str:
+    return trim_markdown_bullet(value)
+
+
+def unique_nonempty(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        cleaned = trim_signal(str(item))
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(cleaned)
+    return result
+
+
+def escape_table(value: str) -> str:
+    return str(value).replace("|", "\\|").replace("\n", " ").strip()
+
+
+def choose_resume(*, position: str, source_text: str) -> str:
+    combined = f"{position}\n{source_text}".lower()
+    if "head of engineering" in combined or "engineering organization" in combined:
+        return "HoE"
+    if "head of development" in combined or "руководитель разработки" in combined:
+        return "HoD"
+    if "cto" in combined or "технический директор" in combined:
+        return "CTO"
+    if "cio" in combined or "директор по ит" in combined:
+        return "CIO"
+    return "EM"

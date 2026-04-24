@@ -14,16 +14,20 @@ class _FakeRegistry:
     def __init__(self, result: WorkflowResult) -> None:
         self._result = result
         self.requested: list[str] = []
+        self.last_run_kwargs: dict[str, object] = {}
 
     def get(self, name: str):
         self.requested.append(name)
+
+        registry = self
 
         class _FakeWorkflow:
 
             def __init__(self, result: WorkflowResult) -> None:
                 self._result = result
 
-            def run(self, **_: object) -> WorkflowResult:
+            def run(self, **kwargs: object) -> WorkflowResult:
+                registry.last_run_kwargs = kwargs
                 return self._result
         return _FakeWorkflow(self._result)
 
@@ -73,6 +77,24 @@ class TestCli:
         payload = json.loads(stdout.getvalue())
         assert payload['workflow'] == 'prepare-screening'
         assert 'screening' in payload['summary']
+
+    def test_analyze_cli_passes_llm_options_and_manual_resume_override(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f'cli-analyze-{uuid.uuid4().hex}'
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+        result = WorkflowResult(workflow='analyze-vacancy', status='completed', summary='Analyzed vacancy.', artifacts=[str(workspace_dir / 'vacancies' / 'v' / 'analysis.md')])
+        registry = _FakeRegistry(result)
+        stdout = io.StringIO()
+        with patch('application_agent.cli.build_default_registry', return_value=registry), patch.object(sys, 'argv', ['run_agent.py', '--root', str(workspace_dir), 'analyze-vacancy', '--vacancy-id', '20260424-example', '--selected-resume', 'HoE', '--llm-provider', 'fake', '--llm-model', 'test-model', '--llm-temperature', '0.1']), patch('sys.stdout', new=stdout):
+            exit_code = main()
+        request = registry.last_run_kwargs['request']
+        assert exit_code == 0
+        assert registry.requested == ['analyze-vacancy']
+        assert request.selected_resume == 'HoE'
+        assert request.llm_provider == 'fake'
+        assert request.llm_model == 'test-model'
+        assert request.llm_temperature == 0.1
 
     def test_intake_adoptions_cli_routes_to_intake_workflow(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'

@@ -16,6 +16,7 @@ class TestPrepareScreeningWorkflow:
 
     def test_prepare_screening_creates_artifact_and_updates_memory(self) -> None:
         workspace_dir, layout, store = build_workspace('prepare-screening')
+        write_role_profile(layout, 'HoD')
         write_resume(workspace_dir, 'HoD', ['# HoD Resume', '', '## О себе (профиль)', '', 'Руковожу инженерными командами и выстраиваю delivery-процессы в критичных бизнес-системах.', '', '## Опыт работы', '', '- Руководил четырьмя командами разработки через лидов и улучшил предсказуемость поставки.', '- Сократил срок вывода изменений в работу на 30% и выстроил взаимодействие с бизнесом.', '- Настраивал архитектурные решения и развитие платформенных контуров.'])
         ingest = IngestVacancyWorkflow()
         prepare = PrepareScreeningWorkflow()
@@ -24,7 +25,7 @@ class TestPrepareScreeningWorkflow:
         vacancy_id = store.load_task_memory().active_vacancy_id
         assert vacancy_id is not None
         from application_agent.workflows.analyze_vacancy import AnalyzeVacancyWorkflow
-        AnalyzeVacancyWorkflow().run(layout=layout, store=store, request=AnalyzeVacancyRequest(vacancy_id=vacancy_id))
+        AnalyzeVacancyWorkflow().run(layout=layout, store=store, request=AnalyzeVacancyRequest(vacancy_id=vacancy_id, llm_provider='fake', llm_model='test'))
         result = prepare.run(layout=layout, store=store, request=PrepareScreeningRequest(vacancy_id=vacancy_id or ''))
         screening_path = layout.vacancy_dir(vacancy_id or '') / 'screening.md'
         meta_path = layout.vacancy_dir(vacancy_id or '') / 'meta.yml'
@@ -47,6 +48,7 @@ class TestPrepareScreeningWorkflow:
     def test_prepare_screening_works_with_placeholder_analysis(self) -> None:
         workspace_dir, layout, store = build_workspace('prepare-screening-placeholder')
         write_resume(workspace_dir, 'HoD', ['# HoD Resume', '', '## О себе (профиль)', '', 'Управляю командами разработки и улучшаю процессы поставки.', '', '## Опыт работы', '', '- Руководил командой разработки и выстраивал процессы планирования.', '- Улучшал надёжность сервисов и взаимодействие с бизнесом.'])
+        write_role_profile(layout, 'HoD')
         with patch('application_agent.workflows.ingest_vacancy.validate_response_monitoring_workbook', return_value=None), patch('application_agent.workflows.ingest_vacancy.append_ingest_record', return_value=11):
             IngestVacancyWorkflow().run(layout=layout, store=store, request=IngestVacancyRequest(company='Финтехробот', position='Head of Development', source_text='\n'.join(['What makes you a great fit:', '- Lead multiple engineering teams and improve delivery processes.', '- Partner with product and operations.'])))
         vacancy_id = store.load_task_memory().active_vacancy_id
@@ -79,3 +81,9 @@ def write_resume(workspace_dir: Path, role: str, lines: list[str]) -> None:
     resumes_dir = workspace_dir / 'resumes'
     resumes_dir.mkdir(parents=True, exist_ok=True)
     (resumes_dir / f'{role}.md').write_text('\n'.join(lines) + '\n', encoding='utf-8', newline='\n')
+
+
+def write_role_profile(layout: WorkspaceLayout, role: str) -> None:
+    role_path = layout.knowledge_dir / 'roles' / f'{role}.md'
+    role_path.parent.mkdir(parents=True, exist_ok=True)
+    role_path.write_text('\n'.join(['# HoD', '', f'- Role: {role}', '', '## Positioning Signals', '- head of development', '- delivery', '', '## Strong Evidence Patterns', '- engineering leadership', '', '## Safe Emphasis Areas', '- confirmed leadership evidence', '', '## Risky Claims', '- unsupported domain claims', '', '## Frequent ATS Terms', '- architecture', '- delivery', '', '## Notes From Processed Vacancies', '- fixture']) + '\n', encoding='utf-8', newline='\n')

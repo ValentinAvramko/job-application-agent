@@ -188,7 +188,7 @@ def collect_strength_signals(analysis_text: str, assessments: list[RequirementAs
     items = extract_section_bullets(analysis_text, "## Сильные стороны")
     if items:
         return items[:4]
-    derived = [trim_signal(item.evidence) for item in assessments if item.coverage == "strong"]
+    derived = [trim_signal(item.evidence) for item in assessments if item.coverage == "full"]
     return unique_nonempty(derived)[:4] or ["Резюме уже даёт базовый управленческий и delivery-контур для первого разговора."]
 
 
@@ -196,7 +196,7 @@ def collect_gap_signals(analysis_text: str, assessments: list[RequirementAssessm
     items = extract_section_bullets(analysis_text, "## Пробелы")
     if items:
         return items[:4]
-    derived = [item.requirement for item in assessments if item.coverage != "strong"]
+    derived = [item.requirement for item in assessments if item.coverage != "full"]
     return unique_nonempty(derived)[:4] or ["Критичных пробелов для первичного разговора не найдено, но формулировки стоит уточнять по ходу интервью."]
 
 
@@ -207,7 +207,7 @@ def build_recruiter_questions(
     questions: list[str] = []
     for item in assessments[:limit]:
         if output_language == "en":
-            if item.coverage == "strong":
+            if item.coverage == "full":
                 questions.append(
                     f"Question: Tell us about your experience with {trim_signal(item.requirement)}. "
                     f"Anchor: {trim_signal(item.evidence)}."
@@ -219,7 +219,7 @@ def build_recruiter_questions(
                 )
             continue
 
-        if item.coverage == "strong":
+        if item.coverage == "full":
             questions.append(
                 f"Вопрос: расскажите про опыт в зоне «{trim_signal(item.requirement)}». "
                 f"Опора для ответа: {trim_signal(item.evidence)}."
@@ -502,12 +502,15 @@ def extract_profile_summary(resume_text: str) -> str:
 
 
 def extract_section_bullets(markdown: str, heading: str) -> list[str]:
-    if heading not in markdown:
+    heading_text = heading.lstrip("#").strip()
+    pattern = re.compile(rf"^#+\s+{re.escape(heading_text)}(?:\s+.*)?$", re.MULTILINE)
+    match = pattern.search(markdown)
+    if not match:
         return []
-    section = markdown.split(heading, maxsplit=1)[1]
-    match = re.search(r"\n##\s", section)
-    if match:
-        section = section[: match.start()]
+    section = markdown[match.end() :]
+    next_heading = re.search(r"\n#+\s", section)
+    if next_heading:
+        section = section[: next_heading.start()]
     items: list[str] = []
     for raw_line in section.splitlines():
         line = raw_line.strip()

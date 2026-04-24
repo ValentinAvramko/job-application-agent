@@ -43,6 +43,8 @@ class TestIntakeAdoptionsWorkflow:
         assert '## TEMP' in inbox_text
         assert '## PERM' in inbox_text
         assert '## NEW DATA NEEDED' in inbox_text
+        assert 'Change: Short Summary' in inbox_text
+        assert 'Factual Boundary:' in inbox_text
         assert '## Pending' in questions_text
         assert vacancy_id in questions_text
         assert 'pending' in questions_text
@@ -73,12 +75,15 @@ class TestIntakeAdoptionsWorkflow:
 def seed_analyzed_vacancy(*, layout: WorkspaceLayout, store: JsonMemoryStore) -> str:
     ingest = IngestVacancyWorkflow()
     analyze = AnalyzeVacancyWorkflow()
+    role_path = layout.knowledge_dir / 'roles' / 'HoD.md'
+    if not role_path.exists():
+        role_path.write_text('\n'.join(['# HoD', '', '- Role: HoD', '', '## Positioning Signals', '- head of development', '- delivery', '', '## Strong Evidence Patterns', '- engineering leadership', '', '## Safe Emphasis Areas', '- confirmed leadership evidence', '', '## Risky Claims', '- unsupported domain claims', '', '## Frequent ATS Terms', '- architecture', '- delivery', '', '## Notes From Processed Vacancies', '- fixture']) + '\n', encoding='utf-8', newline='\n')
     with patch('application_agent.workflows.ingest_vacancy.validate_response_monitoring_workbook', return_value=None), patch('application_agent.workflows.ingest_vacancy.append_ingest_record', return_value=13):
         ingest.run(layout=layout, store=store, request=IngestVacancyRequest(company='ПримерТех', position='Руководитель разработки', source_text='\n'.join(['Чем предстоит заниматься:', '- Руководить несколькими командами разработки.', '- Улучшать delivery, процессы и архитектурные решения.', '- Плотно взаимодействовать с бизнесом и смежными подразделениями.'])))
     vacancy_id = store.load_task_memory().active_vacancy_id
     if not vacancy_id:
         raise AssertionError('Expected active vacancy id after ingest.')
-    analyze.run(layout=layout, store=store, request=AnalyzeVacancyRequest(vacancy_id=vacancy_id))
+    analyze.run(layout=layout, store=store, request=AnalyzeVacancyRequest(vacancy_id=vacancy_id, llm_provider='fake', llm_model='test'))
     return vacancy_id
 
 def build_workspace(prefix: str) -> tuple[Path, WorkspaceLayout, JsonMemoryStore]:
