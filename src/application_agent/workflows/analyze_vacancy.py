@@ -377,12 +377,24 @@ def load_role_profiles(layout: WorkspaceLayout) -> tuple[list[RoleProfile], list
             RoleProfile(
                 role_id=role_id,
                 path=path,
-                positioning_signals=extract_section_bullets(text, "## Positioning Signals"),
-                strong_evidence_patterns=extract_section_bullets(text, "## Strong Evidence Patterns"),
-                safe_emphasis_areas=extract_section_bullets(text, "## Safe Emphasis Areas"),
-                risky_claims=extract_section_bullets(text, "## Risky Claims"),
-                frequent_ats_terms=extract_section_bullets(text, "## Frequent ATS Terms"),
-                notes=extract_section_bullets(text, "## Notes From Processed Vacancies"),
+                positioning_signals=extract_role_section_bullets(
+                    text, "## Сигналы позиционирования", "## Positioning Signals"
+                ),
+                strong_evidence_patterns=extract_role_section_bullets(
+                    text, "## Сильные доказательные паттерны", "## Strong Evidence Patterns"
+                ),
+                safe_emphasis_areas=extract_role_section_bullets(
+                    text, "## Безопасные акценты", "## Safe Emphasis Areas"
+                ),
+                risky_claims=extract_role_section_bullets(
+                    text, "## Рискованные утверждения", "## Risky Claims"
+                ),
+                frequent_ats_terms=extract_role_section_bullets(
+                    text, "## Частые ATS-термины", "## Frequent ATS Terms"
+                ),
+                notes=extract_role_section_bullets(
+                    text, "## Заметки по обработанным вакансиям", "## Notes From Processed Vacancies"
+                ),
             )
         )
     return profiles, diagnostics
@@ -390,7 +402,7 @@ def load_role_profiles(layout: WorkspaceLayout) -> tuple[list[RoleProfile], list
 
 def parse_role_id(text: str, path: Path) -> str:
     for line in text.splitlines():
-        match = re.match(r"\s*-\s*Role:\s*(.+?)\s*$", line)
+        match = re.match(r"\s*-\s*(?:Role|Роль):\s*(.+?)\s*$", line, flags=re.IGNORECASE)
         if match:
             return match.group(1).strip()
     return path.stem.strip()
@@ -1189,6 +1201,14 @@ def extract_section_bullets(markdown: str, heading: str) -> list[str]:
         if line.startswith("- "):
             items.append(trim_markdown_bullet(line))
     return unique_nonempty(items)
+
+
+def extract_role_section_bullets(markdown: str, *headings: str) -> list[str]:
+    for heading in headings:
+        items = extract_section_bullets(markdown, heading)
+        if items:
+            return items
+    return []
 
 
 def normalize_list(value: Any) -> list[str]:

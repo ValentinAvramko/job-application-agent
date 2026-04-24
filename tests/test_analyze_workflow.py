@@ -198,6 +198,50 @@ def test_missing_real_llm_config_fails_after_evidence_validation(monkeypatch: py
         )
 
 
+def test_role_catalog_supports_russian_headings() -> None:
+    _, layout, _ = build_workspace("analyze-russian-role-profile")
+    role_path = layout.knowledge_dir / "roles" / "HoE.md"
+    role_path.write_text(
+        "\n".join(
+            [
+                "# Ролевой профиль: HoE",
+                "",
+                "## Роль",
+                "",
+                "- Роль: HoE",
+                "",
+                "## Сигналы позиционирования",
+                "- Руководство инженерной организацией",
+                "",
+                "## Сильные доказательные паттерны",
+                "- Управление несколькими командами через лидов",
+                "",
+                "## Безопасные акценты",
+                "- Предсказуемость поставки",
+                "",
+                "## Рискованные утверждения",
+                "- Неподтверждённый fintech-домен",
+                "",
+                "## Частые ATS-термины",
+                "- engineering organization",
+                "",
+                "## Заметки по обработанным вакансиям",
+                "- Использовать для ролей масштаба engineering organization",
+            ]
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+    from application_agent.workflows.analyze_vacancy import load_role_profiles
+
+    profiles, diagnostics = load_role_profiles(layout)
+
+    assert diagnostics == []
+    assert profiles[0].role_id == "HoE"
+    assert profiles[0].positioning_signals == ["Руководство инженерной организацией"]
+    assert profiles[0].risky_claims == ["Неподтверждённый fintech-домен"]
+
+
 def test_scoring_methodology_is_explainable_and_russian_terms_are_stable() -> None:
     assessments = [
         RequirementAssessment("[must] A", "A", "must", "evidence", "full", "ok"),

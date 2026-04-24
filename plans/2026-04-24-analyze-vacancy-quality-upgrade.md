@@ -166,6 +166,7 @@
 - `2026-04-24 00:00` - Новая validation использует pytest. - Проект уже мигрировал с unittest на pytest. - Все новые test commands используют `python -m pytest`.
 - `2026-04-24 01:00` - Scoring для senior IT leadership использует гибридную модель: requirement fit является главным, role profile и scope alignment вторичны, title является слабым сигналом. - Это не даёт формулировке `Head of Development` перебить engineering-organization роль вроде Fintehrobot. - Selection остаётся data-driven через role profile signals, а не через фиксированный список ролей.
 - `2026-04-24 01:20` - Plan должен быть русскоязычным. - Предыдущая версия была написана на английском из-за ошибки оформления. - План переведён на русский без изменения technical scope.
+- `2026-04-24 01:35` - Role profiles и role template должны быть русскоязычными. - Knowledge-артефакты являются пользовательским слоем, а не внутренним кодовым контрактом. - Parser поддерживает русские и английские headings для обратной совместимости.
 
 ## Progress log
 
@@ -173,6 +174,7 @@
 - `2026-04-24 00:10` - M1 завершён: добавлены начальные root role profiles и обновлён analyze-vacancy workflow contract. - Validation: `Get-ChildItem ..\..\knowledge\roles -File`; `Get-Content -Raw ..\..\agent_memory\workflows\analyze-vacancy.md`. - Status: `in_progress`.
 - `2026-04-24 01:05` - M2-M4 завершены: реализованы LLM-backed analyze pipeline, rich adoptions intake, screening compatibility и CLI LLM options. - Validation: `python -m pytest tests/test_analyze_workflow.py`; `python -m pytest tests/test_adoptions_intake_workflow.py tests/test_prepare_screening_workflow.py tests/test_cli.py`; `python -m pytest tests`; real smoke for analyze/intake/prepare-screening on Fintehrobot. - Status: `done`.
 - `2026-04-24 01:20` - План переведён на русский язык. - Scope и validation results не изменены. - Status: `done`.
+- `2026-04-24 01:35` - Ролевые профили и template переведены на русский; `analyze_vacancy.py` получил bilingual role-profile parser. - Validation: `python -m pytest tests/test_analyze_workflow.py`. - Status: `done`.
 
 ## Current state
 
