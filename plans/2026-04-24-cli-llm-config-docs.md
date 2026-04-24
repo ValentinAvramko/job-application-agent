@@ -4,7 +4,7 @@
 - Slug: `2026-04-24-cli-llm-config-docs`
 - Owner: `Codex`
 - Created: `2026-04-24`
-- Last updated: `2026-04-24 10:45`
+- Last updated: `2026-04-24 10:50`
 - Overall status: `done`
 
 ## Objective
@@ -97,12 +97,13 @@ The user hit `AnalyzeVacancyError: OPENAI_API_KEY is required for llm_provider=o
 - `2026-04-24 10:39` - Plan created. Status: `in_progress`.
 - `2026-04-24 10:44` - Implemented config support and CLI tests. `python -m pytest tests/test_cli.py`: 12 passed.
 - `2026-04-24 10:45` - Updated README and root runbook. `python -m pytest tests`: 84 passed.
+- `2026-04-24 10:50` - Published submodule commit `46aebad` and root commit `3dd7696`; left unrelated root untracked file `archive/analyze_01.md` untouched.
 
 ## Current state
 
 - Current milestone: `M2`
 - Current status: `done`
-- Next step: `Check git status and publish changes if required.`
+- Next step: `No further action; task is complete.`
 - Active blockers:
   - нет
 - Open questions:
