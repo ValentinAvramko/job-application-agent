@@ -50,6 +50,31 @@ python -m pip install -e .
 job-application-agent --root ../.. list-workflows
 ```
 
+На Windows `pip` может поставить `job-application-agent.exe` в user Scripts directory, который не добавлен в `PATH`. В этом случае PowerShell покажет warning вида:
+
+```text
+The scripts ... are installed in 'C:\Users\<user>\AppData\Roaming\Python\Python314\Scripts' which is not on PATH.
+```
+
+Проверить команду сразу можно по полному пути:
+
+```powershell
+& "$env:APPDATA\Python\Python314\Scripts\job-application-agent.exe" --root ../.. list-workflows
+```
+
+Чтобы команда работала в новых терминалах без полного пути, добавь Scripts directory в пользовательский `PATH`:
+
+```powershell
+$scripts = "$env:APPDATA\Python\Python314\Scripts"
+[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";$scripts", "User")
+```
+
+После этого открой новый PowerShell и проверь:
+
+```powershell
+job-application-agent --root ../.. list-workflows
+```
+
 ## Настройка LLM для `analyze-vacancy`
 
 `analyze-vacancy` по умолчанию использует `llm_provider=openai` и OpenAI Responses API. Для реального запуска обязательны:

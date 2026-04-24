@@ -5,3 +5,4 @@ __pycache__/
 .tmp-tests/
 build/
 dist/
+*.egg-info/
