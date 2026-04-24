@@ -7,6 +7,7 @@ import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +42,15 @@ LLM_PACKAGE_REQUIRED_KEYS = [
 RU_PRIORITY = {"must": "Обязательное", "nice": "Плюс"}
 RU_COVERAGE = {"full": "Полное", "partial": "Частичное", "none": "Нет", "unclear": "Неясно"}
 RU_CONFIDENCE = {"high": "Высокая", "medium": "Средняя", "low": "Низкая"}
+COVER_LETTER_SIGNATURE = "Валентин Аврамко\nTelegram: @ValentinAvramko"
+PROMPT_BUNDLE_KEY = "_prompt_bundle"
+ANALYZE_PROMPT_FILES = {
+    "system_prompt": "system.ru.md",
+    "task_prompt": "task.ru.md",
+    "cover_letter_contract": "cover-letter-contract.ru.md",
+}
+DEFAULT_RUSSIAN_TEXT_SKILL_RELATIVE_PATH = Path(".agents") / "skills" / "humanize-russian-business-text" / "SKILL.md"
+FALLBACK_RUSSIAN_TEXT_SKILL_RELATIVE_PATH = Path(".codex") / "skills" / "humanize-russian-business-text" / "SKILL.md"
 
 STOPWORDS = {
     "and",
@@ -96,6 +106,7 @@ class AnalyzeVacancyRequest:
     llm_text_verbosity: str = ""
     llm_api_key: str = ""
     llm_base_url: str = ""
+    russian_text_skill_path: str = ""
 
 
 @dataclass(frozen=True)
@@ -119,6 +130,15 @@ class RoleProfile:
     risky_claims: list[str]
     frequent_ats_terms: list[str]
     notes: list[str]
+
+
+@dataclass(frozen=True)
+class AnalyzePromptBundle:
+    system_prompt: str
+    task_prompt: str
+    cover_letter_contract: str
+    russian_text_skill: str
+    russian_text_skill_path: str
 
 
 @dataclass(frozen=True)
@@ -173,6 +193,8 @@ class OpenAICompatibleProvider(LLMProvider):
         if not config.model:
             raise AnalyzeVacancyError("llm_model is required for llm_provider=openai. Pass --llm-model or set a default.")
 
+        prompt_bundle = prompt_bundle_from_evidence_pack(evidence_pack)
+        public_evidence_pack = public_evidence_pack_payload(evidence_pack)
         payload = {
             "model": config.model,
             "input": [
@@ -181,11 +203,7 @@ class OpenAICompatibleProvider(LLMProvider):
                     "content": [
                         {
                             "type": "input_text",
-                            "text": (
-                                "You are a career editor for senior IT leadership roles. "
-                                "Return only valid JSON matching the requested analysis package. "
-                                "Do not invent facts; use only the evidence pack."
-                            ),
+                            "text": prompt_bundle.system_prompt,
                         }
                     ],
                 },
@@ -196,10 +214,13 @@ class OpenAICompatibleProvider(LLMProvider):
                             "type": "input_text",
                             "text": json.dumps(
                                 {
-                                    "task": "Create a rich vacancy analysis, two cover letters and resume adaptation draft inputs.",
-                                    "language": evidence_pack.get("language", "ru"),
-                                    "required_json_keys": LLM_PACKAGE_REQUIRED_KEYS,
-                                    "evidence_pack": evidence_pack,
+                                    "задача": prompt_bundle.task_prompt,
+                                    "язык": public_evidence_pack.get("language", "ru"),
+                                    "обязательные_json_ключи": LLM_PACKAGE_REQUIRED_KEYS,
+                                    "контракт_сопроводительного_письма": prompt_bundle.cover_letter_contract,
+                                    "обязательный_skill_humanize_russian_business_text": prompt_bundle.russian_text_skill,
+                                    "путь_к_skill": prompt_bundle.russian_text_skill_path,
+                                    "evidence_pack": public_evidence_pack,
                                 },
                                 ensure_ascii=False,
                             ),
@@ -290,6 +311,91 @@ def extract_response_output_text(raw: dict[str, Any]) -> str:
             if isinstance(content.get("text"), str):
                 return content["text"]
     return ""
+
+
+def prompt_bundle_from_evidence_pack(evidence_pack: dict[str, Any]) -> AnalyzePromptBundle:
+    raw = evidence_pack.get(PROMPT_BUNDLE_KEY)
+    if not isinstance(raw, dict):
+        raise AnalyzeVacancyError("Analyze prompt bundle is missing from evidence pack.")
+    return AnalyzePromptBundle(
+        system_prompt=str(raw.get("system_prompt", "")).strip(),
+        task_prompt=str(raw.get("task_prompt", "")).strip(),
+        cover_letter_contract=str(raw.get("cover_letter_contract", "")).strip(),
+        russian_text_skill=str(raw.get("russian_text_skill", "")).strip(),
+        russian_text_skill_path=str(raw.get("russian_text_skill_path", "")).strip(),
+    )
+
+
+def public_evidence_pack_payload(evidence_pack: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in evidence_pack.items() if key != PROMPT_BUNDLE_KEY}
+
+
+def load_analyze_prompt_bundle(
+    *,
+    layout: WorkspaceLayout,
+    language: str,
+    russian_text_skill_path: str,
+) -> AnalyzePromptBundle:
+    prompts = {
+        key: load_analyze_prompt_text(layout=layout, filename=filename)
+        for key, filename in ANALYZE_PROMPT_FILES.items()
+    }
+    skill_text = ""
+    skill_path = ""
+    if is_russian_language(language):
+        resolved_skill_path = resolve_russian_text_skill_path(russian_text_skill_path)
+        if resolved_skill_path is None or not resolved_skill_path.exists():
+            raise AnalyzeVacancyError(
+                "Russian text generation requires skill "
+                "`humanize-russian-business-text`. Configure `russian_text_skill_path` or install the skill."
+            )
+        skill_path = str(resolved_skill_path)
+        skill_text = resolved_skill_path.read_text(encoding="utf-8").strip()
+        if not skill_text:
+            raise AnalyzeVacancyError(f"Russian text skill is empty: {resolved_skill_path}")
+    return AnalyzePromptBundle(
+        system_prompt=prompts["system_prompt"],
+        task_prompt=prompts["task_prompt"],
+        cover_letter_contract=prompts["cover_letter_contract"],
+        russian_text_skill=skill_text,
+        russian_text_skill_path=skill_path,
+    )
+
+
+def load_analyze_prompt_text(*, layout: WorkspaceLayout, filename: str) -> str:
+    root_override = layout.agent_memory_dir / "prompts" / "analyze-vacancy" / filename
+    if root_override.exists():
+        return root_override.read_text(encoding="utf-8").strip()
+    package_file = resources.files("application_agent.data").joinpath("prompts", "analyze-vacancy", filename)
+    return package_file.read_text(encoding="utf-8").strip()
+
+
+def resolve_russian_text_skill_path(configured_path: str) -> Path | None:
+    if configured_path.strip():
+        return resolve_user_path(configured_path)
+    env_path = os.environ.get("APPLICATION_AGENT_RUSSIAN_TEXT_SKILL_PATH", "").strip()
+    if env_path:
+        return resolve_user_path(env_path)
+    candidates: list[Path] = []
+    candidates.extend(
+        [
+            Path.home() / DEFAULT_RUSSIAN_TEXT_SKILL_RELATIVE_PATH,
+            Path.home() / FALLBACK_RUSSIAN_TEXT_SKILL_RELATIVE_PATH,
+        ]
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0] if candidates else None
+
+
+def resolve_user_path(raw_path: str) -> Path:
+    return Path(os.path.expandvars(raw_path)).expanduser()
+
+
+def is_russian_language(language: str) -> bool:
+    normalized = (language or "ru").strip().lower()
+    return normalized in {"ru", "rus", "russian", "русский", "рус"}
 
 
 class AnalyzeVacancyWorkflow:
@@ -401,6 +507,13 @@ class AnalyzeVacancyWorkflow:
             master_text=master_text,
             raw_source=raw_source,
         )
+        evidence_pack[PROMPT_BUNDLE_KEY] = asdict(
+            load_analyze_prompt_bundle(
+                layout=layout,
+                language=language,
+                russian_text_skill_path=request.russian_text_skill_path,
+            )
+        )
         provider = self.provider or build_llm_provider(request.llm_provider)
         llm_config = build_llm_runtime_config(request)
         llm_package = provider.generate(evidence_pack=evidence_pack, config=llm_config)
@@ -425,6 +538,9 @@ class AnalyzeVacancyWorkflow:
         meta["llm_reasoning_effort"] = request.llm_reasoning_effort or "n/a"
         meta["llm_reasoning_summary"] = request.llm_reasoning_summary or "n/a"
         meta["llm_text_verbosity"] = request.llm_text_verbosity or "n/a"
+        meta["russian_text_skill_path"] = (
+            evidence_pack[PROMPT_BUNDLE_KEY].get("russian_text_skill_path") or "n/a"
+        )
         meta["status"] = "analyzed"
         meta["analyzed_at"] = datetime.now(timezone.utc).isoformat()
         write_simple_yaml(meta_path, meta)
@@ -975,11 +1091,22 @@ def validate_llm_package(payload: dict[str, Any]) -> dict[str, Any]:
         raise AnalyzeVacancyError(f"LLM response is missing required keys: {', '.join(missing)}.")
     normalized = dict(payload)
     for key in required:
-        if key in {"cover_letter_standard", "cover_letter_short", "positioning", "final_recommendation", "adaptation_overview"}:
+        if key in {"cover_letter_standard", "cover_letter_short"}:
+            normalized[key] = ensure_cover_letter_signature(str(normalized[key]).strip())
+        elif key in {"positioning", "final_recommendation", "adaptation_overview"}:
             normalized[key] = str(normalized[key]).strip()
         else:
             normalized[key] = normalize_list(normalized[key])
     return normalized
+
+
+def ensure_cover_letter_signature(text: str) -> str:
+    stripped = text.strip()
+    if not stripped:
+        return COVER_LETTER_SIGNATURE
+    if COVER_LETTER_SIGNATURE in stripped:
+        return stripped
+    return f"{stripped}\n\n{COVER_LETTER_SIGNATURE}"
 
 
 def build_deterministic_llm_package(evidence_pack: dict[str, Any]) -> dict[str, Any]:
@@ -1009,21 +1136,21 @@ def build_deterministic_llm_package(evidence_pack: dict[str, Any]) -> dict[str, 
     fit = evidence_pack["fit"]
     cover_standard = (
         f"Здравствуйте.\n\n"
-        f"Рассматриваю роль {position}, потому что она близка к моему опыту управления инженерными командами, "
-        f"delivery и развитием критичных систем. В качестве основной версии резюме я бы использовал {selected_resume}: "
-        f"она лучше всего показывает тот контур, который важен для этой вакансии.\n\n"
-        f"Ключевой релевантный аргумент: {first_strength}. Это даёт рабочую основу для разговора о задачах {company}, "
-        f"особенно там, где важны предсказуемость поставки, качество инженерных решений и управляемость нескольких команд.\n\n"
-        f"Отдельные зоны стоит обсуждать аккуратно: {first_gap}. Я не стал бы дорисовывать неподтверждённый опыт, "
-        f"а показал бы смежные кейсы и готовность быстро закрыть контекст.\n\n"
+        f"Меня заинтересовала роль {position}: по содержанию она близка к моему опыту управления инженерными командами, "
+        f"delivery и развитием критичных систем. В похожих задачах я работал с предсказуемостью поставки, качеством "
+        f"инженерных решений и управляемостью нескольких команд.\n\n"
+        f"Для первого разговора я бы опирался на такой факт: {first_strength}. В контексте {company} это может быть полезно "
+        f"там, где нужно не только поддерживать разработку, но и выстраивать понятный ритм изменений, ответственность и "
+        f"техническую устойчивость.\n\n"
+        f"Если для роли критична зона, где мой опыт ближе к смежному, я бы обозначил это прямо: {first_gap}. Вместо "
+        f"неподтверждённых утверждений готов обсуждать реальные кейсы и то, как они применимы к вашим задачам.\n\n"
         f"Буду рад пообщаться по вакансии и ответить на ваши вопросы."
     )
     cover_short = (
-        f"Здравствуйте. Мне интересна роль {position}: по содержанию она близка к моему опыту управления инженерными "
-        f"командами, delivery и развитием критичных систем. Для отклика я бы выбрал резюме {selected_resume}, потому что "
-        f"оно лучше всего показывает релевантный управленческий и инженерный контур.\n\n"
-        f"Главный аргумент для первого контакта: {first_strength}. Спорные зоны лучше обозначить честно и связать со "
-        f"смежным подтверждённым опытом. Буду рад обсудить вакансию."
+        f"Здравствуйте. Меня заинтересовала роль {position}: она близка к моему опыту управления инженерными командами, "
+        f"delivery и развитием критичных систем.\n\n"
+        f"Для первого контакта я бы выделил такой факт: {first_strength}. Если часть требований требует уточнения, я "
+        f"предпочитаю обсуждать это прямо и связывать со смежным подтверждённым опытом. Буду рад обсудить вакансию."
     )
     profile_updates = [
         f"| Short Summary | {selected_resume}.md :: profile | Руководитель инженерной функции для роли {position}: {first_strength} | TEMP | selected resume / MASTER | Не добавлять неподтверждённый домен или стек. |",

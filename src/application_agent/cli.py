@@ -80,6 +80,7 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--llm-reasoning-effort", default=None)
     analyze.add_argument("--llm-reasoning-summary", default=None)
     analyze.add_argument("--llm-text-verbosity", default=None)
+    analyze.add_argument("--russian-text-skill-path", default=None)
     analyze.add_argument("--include-employer-channels", action="store_true", default=None)
 
     prepare = subparsers.add_parser(
@@ -265,6 +266,7 @@ def main() -> int:
             llm_text_verbosity=config_value(args, analyze_config, "llm_text_verbosity", default=""),
             llm_api_key=str(secrets.get("OPENAI_API_KEY", "")).strip(),
             llm_base_url=str(secrets.get("OPENAI_BASE_URL", "")).strip(),
+            russian_text_skill_path=config_value(args, analyze_config, "russian_text_skill_path", default=""),
             include_employer_channels=bool(
                 config_value(args, analyze_config, "include_employer_channels", default=False)
             ),

@@ -96,6 +96,10 @@ def test_analyze_creates_rich_package_and_selects_hoe_for_fintehrobot(monkeypatc
     assert "### Позиционирование" in analysis_text
     assert "Standard version" in analysis_text
     assert "Short version" in analysis_text
+    assert analysis_text.count("Валентин Аврамко") == 2
+    assert analysis_text.count("Telegram: @ValentinAvramko") == 2
+    assert "В качестве основной версии резюме" not in analysis_text
+    assert "Для отклика я бы выбрал резюме" not in analysis_text
     assert "selected_resume: HoE" in meta_text
     assert "llm_provider: fake" in meta_text
     assert "## Обновление раздела `О себе (профиль)`" in adoptions_text
@@ -201,6 +205,78 @@ def test_missing_real_llm_config_fails_after_evidence_validation(monkeypatch: py
         )
 
 
+def test_russian_generation_requires_humanize_skill(monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace_dir, layout, store = build_workspace("analyze-missing-ru-skill")
+    seed_role_profile(layout, "HoD", ["head of development"], ["delivery"])
+    seed_resume(layout, "HoD", ["# HoD", "- Руководил разработкой и delivery."])
+    vacancy_id = ingest_vacancy_fixture(
+        layout=layout,
+        store=store,
+        monkeypatch=monkeypatch,
+        company="Example",
+        position="Head of Development",
+        source_text="- Lead engineering teams and improve delivery.",
+    )
+
+    missing_skill = workspace_dir / "missing-skill.md"
+    with pytest.raises(AnalyzeVacancyError, match="humanize-russian-business-text"):
+        AnalyzeVacancyWorkflow().run(
+            layout=layout,
+            store=store,
+            request=AnalyzeVacancyRequest(
+                vacancy_id=vacancy_id,
+                llm_provider="fake",
+                llm_model="test",
+                russian_text_skill_path=str(missing_skill),
+            ),
+        )
+
+
+def test_prompt_bundle_uses_root_prompt_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    _, layout, store = build_workspace("analyze-prompt-override")
+    seed_role_profile(layout, "HoD", ["head of development"], ["delivery"])
+    seed_resume(layout, "HoD", ["# HoD", "- Руководил разработкой и delivery."])
+    skill_path = layout.agent_memory_dir / "skills" / "humanize-russian-business-text" / "SKILL.md"
+    skill_path.parent.mkdir(parents=True, exist_ok=True)
+    skill_path.write_text("# Humanize Russian Business Text\n\nТестовые правила skill.", encoding="utf-8")
+    prompt_dir = layout.agent_memory_dir / "prompts" / "analyze-vacancy"
+    prompt_dir.mkdir(parents=True, exist_ok=True)
+    (prompt_dir / "system.ru.md").write_text("ROOT SYSTEM PROMPT RU", encoding="utf-8")
+    (prompt_dir / "task.ru.md").write_text("ROOT TASK PROMPT RU", encoding="utf-8")
+    (prompt_dir / "cover-letter-contract.ru.md").write_text("ROOT COVER CONTRACT RU", encoding="utf-8")
+    vacancy_id = ingest_vacancy_fixture(
+        layout=layout,
+        store=store,
+        monkeypatch=monkeypatch,
+        company="Example",
+        position="Head of Development",
+        source_text="- Lead engineering teams and improve delivery.",
+    )
+    captured: dict[str, object] = {}
+
+    class CapturingProvider:
+        def generate(self, *, evidence_pack: dict[str, object], config: LLMRuntimeConfig) -> dict[str, object]:
+            captured["prompt_bundle"] = evidence_pack["_prompt_bundle"]
+            return {key: "text value" if key in {"positioning", "final_recommendation", "cover_letter_standard", "cover_letter_short", "adaptation_overview"} else ["item"] for key in LLM_PACKAGE_REQUIRED_KEYS}
+
+    AnalyzeVacancyWorkflow(provider=CapturingProvider()).run(
+        layout=layout,
+        store=store,
+        request=AnalyzeVacancyRequest(
+            vacancy_id=vacancy_id,
+            llm_provider="fake",
+            llm_model="test",
+            russian_text_skill_path=str(skill_path),
+        ),
+    )
+
+    prompt_bundle = captured["prompt_bundle"]
+    assert prompt_bundle["system_prompt"] == "ROOT SYSTEM PROMPT RU"
+    assert prompt_bundle["task_prompt"] == "ROOT TASK PROMPT RU"
+    assert prompt_bundle["cover_letter_contract"] == "ROOT COVER CONTRACT RU"
+    assert "Humanize Russian Business Text" in prompt_bundle["russian_text_skill"]
+
+
 def test_openai_provider_uses_responses_api_with_reasoning(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
     package = {
@@ -228,7 +304,17 @@ def test_openai_provider_uses_responses_api_with_reasoning(monkeypatch: pytest.M
     monkeypatch.setattr("application_agent.workflows.analyze_vacancy.urllib.request.urlopen", fake_urlopen)
 
     result = OpenAICompatibleProvider().generate(
-        evidence_pack={"language": "ru", "vacancy_id": "v"},
+        evidence_pack={
+            "language": "ru",
+            "vacancy_id": "v",
+            "_prompt_bundle": {
+                "system_prompt": "Системная инструкция на русском языке.",
+                "task_prompt": "Создай пакет анализа вакансии.",
+                "cover_letter_contract": "# Контракт сопроводительного письма\n\nНе упоминай имена файлов резюме.",
+                "russian_text_skill": "# Humanize Russian Business Text\n\nПравила skill.",
+                "russian_text_skill_path": "C:/skills/humanize-russian-business-text/SKILL.md",
+            },
+        },
         config=LLMRuntimeConfig(
             model="gpt-5.4-mini",
             api_key="test-key",
@@ -247,6 +333,13 @@ def test_openai_provider_uses_responses_api_with_reasoning(monkeypatch: pytest.M
     assert payload["reasoning"] == {"effort": "medium", "summary": "auto"}
     assert payload["text"]["verbosity"] == "medium"
     assert payload["text"]["format"]["type"] == "json_schema"
+    assert payload["input"][0]["content"][0]["text"] == "Системная инструкция на русском языке."
+    user_payload = json.loads(payload["input"][1]["content"][0]["text"])
+    assert user_payload["задача"] == "Создай пакет анализа вакансии."
+    assert "Контракт сопроводительного письма" in user_payload["контракт_сопроводительного_письма"]
+    assert "Humanize Russian Business Text" in user_payload["обязательный_skill_humanize_russian_business_text"]
+    assert user_payload["путь_к_skill"] == "C:/skills/humanize-russian-business-text/SKILL.md"
+    assert "_prompt_bundle" not in user_payload["evidence_pack"]
     assert "temperature" not in payload
 
 

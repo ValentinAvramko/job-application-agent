@@ -23,7 +23,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-"application_agent.data" = ["*.json"]
+"application_agent.data" = ["*.json", "prompts/analyze-vacancy/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

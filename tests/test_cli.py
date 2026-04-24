@@ -115,6 +115,7 @@ class TestCli:
                         'llm_reasoning_effort': 'medium',
                         'llm_reasoning_summary': 'auto',
                         'llm_text_verbosity': 'medium',
+                        'russian_text_skill_path': 'C:/skills/humanize-russian-business-text/SKILL.md',
                         'include_employer_channels': True,
                     }
                 }
@@ -135,6 +136,7 @@ class TestCli:
         assert request.llm_reasoning_effort == 'medium'
         assert request.llm_reasoning_summary == 'auto'
         assert request.llm_text_verbosity == 'medium'
+        assert request.russian_text_skill_path == 'C:/skills/humanize-russian-business-text/SKILL.md'
         assert request.include_employer_channels is True
 
     def test_analyze_cli_loads_openai_secrets_config(self) -> None:
@@ -167,13 +169,14 @@ class TestCli:
         result = WorkflowResult(workflow='analyze-vacancy', status='completed', summary='Analyzed vacancy.', artifacts=[])
         registry = _FakeRegistry(result)
         stdout = io.StringIO()
-        with patch('application_agent.cli.build_default_registry', return_value=registry), patch.object(sys, 'argv', ['run_agent.py', '--root', str(workspace_dir), 'analyze-vacancy', '--vacancy-id', '20260424-example', '--llm-provider', 'fake', '--llm-model', 'cli-model', '--llm-temperature', '0.1']), patch('sys.stdout', new=stdout):
+        with patch('application_agent.cli.build_default_registry', return_value=registry), patch.object(sys, 'argv', ['run_agent.py', '--root', str(workspace_dir), 'analyze-vacancy', '--vacancy-id', '20260424-example', '--llm-provider', 'fake', '--llm-model', 'cli-model', '--llm-temperature', '0.1', '--russian-text-skill-path', 'C:/cli-skill/SKILL.md']), patch('sys.stdout', new=stdout):
             exit_code = main()
         request = registry.last_run_kwargs['request']
         assert exit_code == 0
         assert request.llm_provider == 'fake'
         assert request.llm_model == 'cli-model'
         assert request.llm_temperature == 0.1
+        assert request.russian_text_skill_path == 'C:/cli-skill/SKILL.md'
 
     def test_cli_reports_invalid_json_config(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'

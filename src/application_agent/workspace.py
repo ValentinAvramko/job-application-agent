@@ -45,6 +45,10 @@ class WorkspaceLayout:
         return self.agent_memory_dir / "workflows"
 
     @property
+    def prompts_dir(self) -> Path:
+        return self.agent_memory_dir / "prompts"
+
+    @property
     def schema_dir(self) -> Path:
         return self.agent_memory_dir / "schemas"
 
@@ -62,6 +66,7 @@ class WorkspaceLayout:
             self.profile_dir,
             self.config_dir,
             self.workflow_specs_dir,
+            self.prompts_dir / "analyze-vacancy",
             self.schema_dir,
             self.runtime_memory_dir,
         ]

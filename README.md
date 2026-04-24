@@ -110,6 +110,7 @@ job-application-agent --root ../.. list-workflows
 | `llm_text_verbosity` | string | `""` | Verbosity текстового ответа Responses API. Для этого workflow рекомендуется `medium`: достаточно подробно, но без лишней воды. |
 | `target_mode` | string | `""` | Режим позиционирования: `conservative`, `balanced`, `aggressive`. Если не задан, workflow берёт значение из `meta.yml` или использует `balanced` при ingest. |
 | `selected_resume` | string | `""` | Ручной override выбора резюме. Обычно лучше не задавать глобально, чтобы workflow сам выбирал роль под вакансию. |
+| `russian_text_skill_path` | string | `""` | Путь к обязательному skill `humanize-russian-business-text` для русскоязычной генерации. Если не задан, используются `APPLICATION_AGENT_RUSSIAN_TEXT_SKILL_PATH`, `~/.agents/skills/...`, затем `~/.codex/skills/...`. |
 | `include_employer_channels` | boolean | `false` | Включает employer-facing каналы в анализ там, где workflow это учитывает. Для обычного анализа вакансии рекомендуется `false`. |
 
 Рекомендованный текущий набор `llm_*`:
@@ -120,7 +121,8 @@ job-application-agent --root ../.. list-workflows
   "llm_model": "gpt-5.4-mini",
   "llm_reasoning_effort": "medium",
   "llm_reasoning_summary": "auto",
-  "llm_text_verbosity": "medium"
+  "llm_text_verbosity": "medium",
+  "russian_text_skill_path": "C:\\Users\\avramko\\.agents\\skills\\humanize-russian-business-text\\SKILL.md"
 }
 ```
 
@@ -130,6 +132,15 @@ job-application-agent --root ../.. list-workflows
 - `gpt-5.4-mini` выбран как стартовый баланс качества, стоимости и скорости для регулярного анализа вакансий.
 - `llm_reasoning_effort=medium` даёт модели достаточно reasoning для сопоставления требований и фактов, но не делает каждый запуск максимально дорогим.
 - `llm_text_verbosity=medium` подходит для `analysis.md` и `adoptions.md`: результат должен быть содержательным, но не расползаться.
+- Для русского результата `analyze-vacancy` обязательно загружает skill `humanize-russian-business-text` и передаёт его текст модели. Без доступного skill workflow должен завершиться ошибкой.
+
+Prompt-тексты `analyze-vacancy` лежат вне Python-кода. Приоритет:
+
+1. `agent_memory/prompts/analyze-vacancy/system.ru.md`
+2. `agent_memory/prompts/analyze-vacancy/task.ru.md`
+3. `agent_memory/prompts/analyze-vacancy/cover-letter-contract.ru.md`
+
+Если root-файла нет, используется packaged default из `src/application_agent/data/prompts/analyze-vacancy/`.
 
 Секреты в `application-agent.json` не записываются. Для локального API key используется `agent_memory/config/secrets.json`, который должен быть в `.gitignore`:
 
