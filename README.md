@@ -56,13 +56,40 @@ python run_agent.py --root ../.. show-memory
 {
   "analyze-vacancy": {
     "llm_provider": "openai",
-    "llm_model": "gpt-4.1-mini",
+    "llm_model": "gpt-4.1",
     "llm_temperature": 0.2,
     "target_mode": "balanced",
     "include_employer_channels": false
   }
 }
 ```
+
+Текущая версия `application-agent` поддерживает в `application-agent.json` только секцию `analyze-vacancy`.
+
+| Ключ | Тип | Значение по умолчанию | Описание |
+| --- | --- | --- | --- |
+| `llm_provider` | string | `openai` | LLM-provider для анализа. Поддерживаются `openai` и `fake`; `fake` нужен для локального smoke-теста без сетевого вызова. |
+| `llm_model` | string | `""` | Модель для реального LLM-запуска. Для `llm_provider=openai` обязательна: через config, `--llm-model` или `APPLICATION_AGENT_LLM_MODEL`. |
+| `llm_temperature` | number | `0.2` | Температура генерации. Для этого workflow лучше держать низкой, потому что результат должен быть evidence-bound и воспроизводимым. |
+| `target_mode` | string | `""` | Режим позиционирования: `conservative`, `balanced`, `aggressive`. Если не задан, workflow берёт значение из `meta.yml` или использует `balanced` при ingest. |
+| `selected_resume` | string | `""` | Ручной override выбора резюме. Обычно лучше не задавать глобально, чтобы workflow сам выбирал роль под вакансию. |
+| `include_employer_channels` | boolean | `false` | Включает employer-facing каналы в анализ там, где workflow это учитывает. Для обычного анализа вакансии рекомендуется `false`. |
+
+Рекомендованный текущий набор `llm_*`:
+
+```json
+{
+  "llm_provider": "openai",
+  "llm_model": "gpt-4.1",
+  "llm_temperature": 0.2
+}
+```
+
+Почему так:
+
+- `analyze-vacancy` сейчас использует OpenAI-compatible Chat Completions endpoint, `response_format: {"type": "json_object"}` и параметр `temperature`; это делает `gpt-4.1` наиболее консервативным default для текущей реализации.
+- Задача workflow — не creative writing, а доказательный fit-анализ, выбор ролевого резюме и draft-правки с factual boundary. Поэтому `llm_temperature=0.2` снижает разброс формулировок и риск лишних claims.
+- Более новые reasoning-модели семейства GPT-5.4 могут быть лучше для сложного reasoning, но перед тем как ставить их default здесь, стоит мигрировать provider на Responses API и явно добавить поддержку reasoning-настроек. Сейчас ключи вроде `llm_reasoning_effort` не читаются кодом.
 
 Секреты в этот файл не записываются. API key задаётся только через окружение:
 
