@@ -1,11 +1,11 @@
-# Улучшение качества `analyze-vacancy`
+﻿# Улучшение качества `analyze-vacancy`
 
-- Title: `улучшение качества analyze-vacancy`
+- Название: `улучшение качества analyze-vacancy`
 - Slug: `2026-04-24-analyze-vacancy-quality-upgrade`
-- Owner: `Codex`
-- Created: `2026-04-24`
-- Last updated: `2026-04-24 01:20`
-- Overall status: `done`
+- Ответственный: `Codex`
+- Создан: `2026-04-24`
+- Обновлен: `2026-04-24 01:20`
+- Общий статус: `done`
 
 ## Цель
 
@@ -30,7 +30,7 @@
 
 Текущий test runner проекта - `pytest`; новая валидация должна использовать `python -m pytest`.
 
-## Scope
+## Границы
 
 ### Входит в scope
 
@@ -51,7 +51,7 @@
 - Полный redesign review-процесса для adoptions.
 - Замена `prepare-screening` логикой `analyze-vacancy`.
 
-## Предположения
+## Допущения
 
 - `knowledge/roles/` является source of truth для доступных role profiles.
 - Роли `CIO`, `CTO`, `HoE`, `HoD`, `EM` остаются начальными профилями, а не захардкоженным списком workflow.
@@ -73,48 +73,48 @@
 - `C:\Users\avramko\OneDrive\Documents\Career\agent_memory\workflows\analyze-vacancy.md` - обновление: operator-facing workflow contract.
 - `C:\Users\avramko\OneDrive\Documents\Career\vacancies\` - генерация/обновление: richer `analysis.md` и `adoptions.md`.
 
-## Milestones
+## Этапы
 
 ### M1. План, role catalog и baseline contract
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - Создать план, добавить начальные role profiles и обновить contract `analyze-vacancy`.
-- Deliverables:
+- Артефакты:
   - `knowledge/roles/CIO.md`, `CTO.md`, `HoE.md`, `HoD.md`, `EM.md`
   - обновлённый `agent_memory/workflows/analyze-vacancy.md`
   - этот план
-- Acceptance criteria:
+- Критерии приемки:
   - role profiles существуют для текущих ролевых резюме;
   - plan и workflow docs описывают data-driven role selection и rich output contract;
   - production code changes не начинаются до фиксации baseline.
-- Validation commands:
+- Команды валидации:
   - `Get-ChildItem ..\..\knowledge\roles -File`
   - `Get-Content -Raw ..\..\agent_memory\workflows\analyze-vacancy.md`
-- Notes / discoveries:
+- Заметки / находки:
   - добавлены начальные profiles для пяти существующих role resumes;
   - `agent_memory/workflows/analyze-vacancy.md` теперь описывает rich analysis и role catalog contract.
 
 ### M2. Evidence, scoring, LLM boundary и rendering анализа
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - Заменить shallow heuristic analysis на role-profile evidence, explainable scoring и LLM-backed package rendering.
-- Deliverables:
+- Артефакты:
   - обновлённый `analyze_vacancy.py`
   - LLM provider boundary
   - CLI options для LLM settings
   - pytest coverage для role catalog, scoring, selection и LLM boundary
-- Acceptance criteria:
+- Критерии приемки:
   - роли загружаются из `knowledge/roles/*.md`;
   - роль без matching resume исключается и попадает в diagnostic notes;
   - отсутствие валидных role profiles даёт explicit error;
   - real OpenAI-compatible provider требует API key/model;
   - fake provider детерминированно создаёт structured analysis для tests;
   - `analysis.md` содержит три больших блока.
-- Validation commands:
+- Команды валидации:
   - `python -m pytest tests/test_analyze_workflow.py`
-- Notes / discoveries:
+- Заметки / находки:
   - implemented role catalog loading from `knowledge/roles/*.md`, `README.md` игнорируется;
   - real provider OpenAI-compatible через stdlib HTTP и явно падает без `OPENAI_API_KEY` / model;
   - fake provider создаёт deterministic structured packages для tests и smoke runs;
@@ -122,44 +122,44 @@
 
 ### M3. Rich adoptions intake и совместимость screening
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - Сохранить richer `adoptions.md` через intake и оставить `prepare-screening` совместимым с новым analysis contract.
-- Deliverables:
+- Артефакты:
   - обновлённый `intake_adoptions.py`
   - обновлённый `prepare_screening.py`
   - pytest coverage для richer adoptions и screening compatibility
-- Acceptance criteria:
+- Критерии приемки:
   - `intake-adoptions` сохраняет draft edits для summary, skills и experience;
   - `NEW DATA NEEDED` продолжает синхронизироваться в questions ledger;
   - `prepare-screening` читает полезные signals из нового analysis format.
-- Validation commands:
+- Команды валидации:
   - `python -m pytest tests/test_adoptions_intake_workflow.py tests/test_prepare_screening_workflow.py`
-- Notes / discoveries:
+- Заметки / находки:
   - `intake-adoptions` импортирует bullet lists и richer markdown table rows из vacancy-local `adoptions.md`;
   - `prepare-screening` читает новые `###` subsections и использует coverage semantics `full/partial/none/unclear`.
 
 ### M4. Full validation и real scenario check
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - Проверить upgraded workflow на full pytest suite и реальной вакансии с fake или configured LLM provider.
-- Deliverables:
+- Артефакты:
   - обновлённый plan status и completion summary
   - финальная синхронизация docs/tests при необходимости
-- Acceptance criteria:
+- Критерии приемки:
   - full pytest suite проходит;
   - real vacancy smoke run создаёт rich `analysis.md` и `adoptions.md` с configured provider;
   - остаточные риски задокументированы.
-- Validation commands:
+- Команды валидации:
   - `python -m pytest tests`
   - `python run_agent.py --root ../.. analyze-vacancy --vacancy-id 20260423-fintehrobot-head-of-development-rukovoditel-razrabotki --llm-provider fake --llm-model test`
-- Notes / discoveries:
+- Заметки / находки:
   - full pytest suite passed: `80 passed`;
   - real Fintehrobot smoke run с fake provider выбрал `HoE` после добавления scope-alignment scoring;
   - intake и prepare-screening smoke runs завершились на той же реальной вакансии.
 
-## Decision log
+## Журнал решений
 
 - `2026-04-24 00:00` - `knowledge/roles/*.md` является source of truth для role catalog. - Пользователь уточнил, что список ролей не фиксирован и должен браться из role profiles. - Реализация должна убрать hardcoded role selection как источник истины.
 - `2026-04-24 00:00` - Scoring должен использовать русскоязычные output-термины и быть зафиксирован в реализации. - Пользователь запросил дополнительный анализ методики, а не слепое копирование baseline formula. - Выбранная модель закреплена в tests и output labels.
@@ -169,26 +169,26 @@
 - `2026-04-24 01:35` - Role profiles и role template должны быть русскоязычными. - Knowledge-артефакты являются пользовательским слоем, а не внутренним кодовым контрактом. - Parser поддерживает русские и английские headings для обратной совместимости.
 - `2026-04-24 01:50` - В role profiles добавлено поле `Описание:` и снижена доля английских фраз вне ATS-раздела. - Пользователь уточнил, что английский нужен только для устоявшихся терминов. - README теперь фиксирует языковое правило и предлагает будущий workflow `review-role-profiles`.
 
-## Progress log
+## Журнал прогресса
 
-- `2026-04-24 00:00` - План создан по approved implementation request. - Validation pending. - Status: `in_progress`.
-- `2026-04-24 00:10` - M1 завершён: добавлены начальные root role profiles и обновлён analyze-vacancy workflow contract. - Validation: `Get-ChildItem ..\..\knowledge\roles -File`; `Get-Content -Raw ..\..\agent_memory\workflows\analyze-vacancy.md`. - Status: `in_progress`.
-- `2026-04-24 01:05` - M2-M4 завершены: реализованы LLM-backed analyze pipeline, rich adoptions intake, screening compatibility и CLI LLM options. - Validation: `python -m pytest tests/test_analyze_workflow.py`; `python -m pytest tests/test_adoptions_intake_workflow.py tests/test_prepare_screening_workflow.py tests/test_cli.py`; `python -m pytest tests`; real smoke for analyze/intake/prepare-screening on Fintehrobot. - Status: `done`.
-- `2026-04-24 01:20` - План переведён на русский язык. - Scope и validation results не изменены. - Status: `done`.
-- `2026-04-24 01:35` - Ролевые профили и template переведены на русский; `analyze_vacancy.py` получил bilingual role-profile parser. - Validation: `python -m pytest tests/test_analyze_workflow.py`. - Status: `done`.
-- `2026-04-24 01:50` - Ролевые профили дошлифованы: добавлено поле `Описание:`, русифицированы лишние англоязычные фразы, README описывает формат, языковое правило и proposed workflow пересмотра ролей. - Validation: `python -m pytest tests`; smoke `analyze-vacancy` по Fintehrobot с fake provider. - Status: `done`.
+- `2026-04-24 00:00` - План создан по approved implementation request. - Validation pending. - Статус: `in_progress`.
+- `2026-04-24 00:10` - M1 завершён: добавлены начальные root role profiles и обновлён analyze-vacancy workflow contract. - Валидация: `Get-ChildItem ..\..\knowledge\roles -File`; `Get-Content -Raw ..\..\agent_memory\workflows\analyze-vacancy.md`. - Статус: `in_progress`.
+- `2026-04-24 01:05` - M2-M4 завершены: реализованы LLM-backed analyze pipeline, rich adoptions intake, screening compatibility и CLI LLM options. - Валидация: `python -m pytest tests/test_analyze_workflow.py`; `python -m pytest tests/test_adoptions_intake_workflow.py tests/test_prepare_screening_workflow.py tests/test_cli.py`; `python -m pytest tests`; real smoke for analyze/intake/prepare-screening on Fintehrobot. - Статус: `done`.
+- `2026-04-24 01:20` - План переведён на русский язык. - Scope и validation results не изменены. - Статус: `done`.
+- `2026-04-24 01:35` - Ролевые профили и template переведены на русский; `analyze_vacancy.py` получил bilingual role-profile parser. - Валидация: `python -m pytest tests/test_analyze_workflow.py`. - Статус: `done`.
+- `2026-04-24 01:50` - Ролевые профили дошлифованы: добавлено поле `Описание:`, русифицированы лишние англоязычные фразы, README описывает формат, языковое правило и proposed workflow пересмотра ролей. - Валидация: `python -m pytest tests`; smoke `analyze-vacancy` по Fintehrobot с fake provider. - Статус: `done`.
 
-## Current state
+## Текущее состояние
 
-- Current milestone: `M4`
-- Current status: `done`
-- Next step: `Implementation steps по этому плану не осталось; следующий non-fake analyze-vacancy run нужно просмотреть на качество тона и factual boundaries.`
-- Active blockers:
-  - none
-- Open questions:
-  - none
+- Текущий milestone: `M4`
+- Текущий статус: `done`
+- Следующий шаг: `Implementation steps по этому плану не осталось; следующий non-fake analyze-vacancy run нужно просмотреть на качество тона и factual boundaries.`
+- Активные блокеры:
+  - нет
+- Открытые вопросы:
+  - нет
 
-## Completion summary
+## Итог завершения
 
 - Поставлены data-driven role catalog selection, explainable scoring, LLM provider boundary, rich `analysis.md`, full draft `adoptions.md`, intake table preservation и screening compatibility.
 - Валидация выполнена только через pytest: targeted analyze/intake/prepare/CLI tests и full `python -m pytest tests` (`80 passed`).

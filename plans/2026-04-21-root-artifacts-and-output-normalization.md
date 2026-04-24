@@ -1,13 +1,13 @@
 ﻿# Root Artifacts And Output Normalization
 
-- Title: `Root artifacts and output normalization`
+- Название: `Root artifacts and output normalization`
 - Slug: `2026-04-21-root-artifacts-and-output-normalization`
-- Owner: `Codex`
-- Created: `2026-04-21`
-- Last updated: `2026-04-22 09:10`
-- Overall status: `done`
+- Ответственный: `Codex`
+- Создан: `2026-04-21`
+- Обновлен: `2026-04-22 09:10`
+- Общий статус: `done`
 
-## Objective
+## Цель
 
 Превратить root workspace из смеси active, partial, historical и manual-only артефактов в понятный data/template/output layer с явными source-of-truth правилами и одновременно:
 
@@ -15,7 +15,7 @@
 - убрать конкурирующие источники истины по структуре workspace и workflow roadmap;
 - подготовить удаление старых root plan/spec files после миграции.
 
-## Background and context
+## Контекст
 
 Разведка root показала несколько слоёв артефактов:
 
@@ -42,9 +42,9 @@
 - source-of-truth rules: `resumes/MASTER.md` — главный facts source, role resumes — производные, contact/profile overlays должны жить отдельно от resume text;
 - целевая root topology: `resumes/`, `vacancies/`, `knowledge/`, `adoptions/`, `profile/`, `agent_memory/`, `templates/`, `employers/`, `archive/`.
 
-## Scope
+## Границы
 
-### In scope
+### Входит в scope
 
 - source-of-truth map для значимых root directories и file families;
 - нормализация ролей каталогов `resumes/`, `profile/`, `knowledge/`, `adoptions/`, `vacancies/`, `templates/`, `employers/`, `archive/`, `promts/`;
@@ -52,28 +52,28 @@
 - migration superseded root planning artifacts в актуальные plan files;
 - удаление старых root plan/spec files после переноса содержательных решений.
 
-### Out of scope
+### Не входит в scope
 
 - изменение core-кода workflow без отдельного workstream-плана;
 - генерация новых PDF/DOCX/LinkedIn материалов;
 - редактирование фактического содержимого resume/profile data;
 - удаление исторических output artifacts без явной retention policy.
 
-## Assumptions
+## Допущения
 
 - `resumes/MASTER.md` остаётся главным facts source для candidate profile;
 - role resumes представляют производные ролевые представления, а не независимые источники истины;
 - missing/empty files в `knowledge/`, `profile/`, `adoptions/` означают незавершённый data layer, а не intentional final state;
 - superseded root planning artifacts можно удалять после того, как их целевые решения явно встроены в active plans.
 
-## Risks and unknowns
+## Риски и неизвестные
 
 - часть naming/schema conventions уже расходится между templates, кодом и manual artifacts;
 - неясно, какой процент legacy prompt/doc corpus должен стать tests/specs, а какой можно оставить historical-only;
 - при migration старых planning artifacts легко потерять полезный target intent по topology и workflow roadmap;
 - неясно, где в итоге должен жить окончательный export pipeline: в public agent, private root или в hybrid scheme.
 
-## External touchpoints
+## Внешние точки касания
 
 - `C:\Users\avramko\OneDrive\Documents\Career\resumes\` — чтение / проверка — master и role resumes, версии и facts source;
 - `C:\Users\avramko\OneDrive\Documents\Career\profile\` — чтение / возможное обновление / проверка — contact regions и metadata;
@@ -169,28 +169,28 @@
 - Active plans and runtime stores remain the only current sources of truth; the legacy corpus must not be edited to represent live workflow behavior.
 - Reusable rules mined from the legacy corpus should move into one of three destinations only: active plans, future templates/spec artifacts, or eval/example fixtures.
 
-## Milestones
+## Этапы
 
 ### M1. Root Artifact Inventory And Migration Map
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - собрать inventory matrix, где для каждого root-слоя указаны назначение, producer, consumer, status и проблемы;
   - составить migration map для superseded root planning artifacts.
-- Deliverables:
+- Артефакты:
   - inventory matrix по `resumes/`, `profile/`, `knowledge/`, `adoptions/`, `vacancies/`, `templates/`, `promts/`, `employers/`, `archive/`, historical root `plans/`, `response-monitoring.xlsx`, `agent_memory/`;
   - классификация артефактов: canonical / generated / template / historical / manual-only / stale;
   - mapping `old artifact -> new active plan/doc destination`.
-- Acceptance criteria:
+- Критерии приемки:
   - для каждого крупного каталога понятна его роль и связь с submodule;
   - отдельно отмечены пустые, отсутствующие, дублирующиеся и legacy-only области;
   - для `plans/resume-agent-spec.md` и `plans/repository-topology.md` определено, куда именно мигрирует их содержимое.
-- Validation commands:
+- Команды валидации:
   - `Get-ChildItem resumes,templates,profile,knowledge,adoptions,employers,archive -Recurse -File`
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\plans"`
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\profile\contact-regions.yml"`
   - `Get-ChildItem vacancies -Directory`
-- Notes / discoveries:
+- Заметки / находки:
   - `profile/contact-regions.yml` отсутствует.
   - `knowledge/roles` и `adoptions/accepted|inbox` пока не выполняют заявленную роль постоянной базы.
   - Current code активно читает/пишет только `resumes/`, `vacancies/`, `agent_memory/` и `response-monitoring.xlsx`; `profile/`, `knowledge/`, `adoptions/` остаются target stores, а не active workflow stores.
@@ -199,23 +199,23 @@
 
 ### M2. Canonical Root Contract Decisions
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - определить, какие root-артефакты являются источником истины, какие производными, а какие историческими;
   - встроить migrated target intent из старых root docs в новую структуру планов.
-- Deliverables:
+- Артефакты:
   - canonical contract map для `resumes`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel и templates;
   - решения по naming, location и schema drift;
   - явное распределение migrated intent из старых root docs по актуальным plan files.
-- Acceptance criteria:
+- Критерии приемки:
   - для каждого долгоживущего root store есть owner, expected shape и update path;
   - противоречия вида `vacancy-local adoptions.md` vs `adoptions/inbox/<vacancy_id>.md`, `promts/` vs skill-first docs, missing `contact-regions.yml` либо сняты, либо явно задокументированы;
   - target topology и source-of-truth rules из старых root docs больше не требуют отдельных файлов-источников.
-- Validation commands:
+- Команды валидации:
   - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\2026-04-21-repository-reconstruction-and-backlog.md`
   - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\templates\excel\response-monitoring-mapping.md`
   - `Get-ChildItem C:\Users\avramko\OneDrive\Documents\Career\adoptions -Recurse -File`
-- Notes / discoveries:
+- Заметки / находки:
   - migrated target intent должен жить в active plans, а не в отдельном superseded root plan corpus;
   - M1 показал, что root contract decisions надо принимать относительно реального runtime graph, а не относительно только README/шаблонов.
   - `resumes/MASTER.md` сохранён как единственный durable facts source; `knowledge/` и `profile/` признаны вспомогательными canonical stores, но не заменой `MASTER`.
@@ -224,22 +224,22 @@
 
 ### M3. Output Pipeline Migration Path
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - определить, как manual employer-specific и historical outputs переводятся в поддерживаемый pipeline для resume export, LinkedIn, screening prep и related artifacts.
-- Deliverables:
+- Артефакты:
   - migration path для ручных PDF/DOCX/export scripts;
   - target placement rules для будущих output artifacts;
   - решение, какие employer-specific traces сохраняются как examples/tests/reference.
-- Acceptance criteria:
+- Критерии приемки:
   - manual renderer и архивные outputs не остаются без статуса;
   - для каждого важного output family понятно, где он должен жить и чем генерироваться;
   - определены границы между reusable pipeline и one-off artifacts.
-- Validation commands:
+- Команды валидации:
   - `Get-ChildItem C:\Users\avramko\OneDrive\Documents\Career\employers -Recurse -File`
   - `Get-ChildItem C:\Users\avramko\OneDrive\Documents\Career\archive -File`
   - `Get-ChildItem C:\Users\avramko\OneDrive\Documents\Career\resumes\versions -File`
-- Notes / discoveries:
+- Заметки / находки:
   - `employers/TaxDome/render_resume_pdf.py` is a manual-only reference path.
   - `resumes/versions/` is a manual historical text-version archive and is not used by runtime or agent workflows.
   - `archive/` is a manual historical archive for specialized versions and related artifacts, not a runtime sink.
@@ -248,30 +248,30 @@
 
 ### M4. Legacy Prompt And Superseded Plan Distillation
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - превратить накопленные prompt/doc/plan materials в управляемый knowledge/spec layer;
   - удалить superseded plan artifacts после переноса их содержательных решений.
-- Deliverables:
+- Артефакты:
   - список prompt/doc artifacts, которые надо перенести в планы, tests, templates или workflow specs;
   - список artifacts, которые можно оставить historical-only;
   - deletion list для superseded root planning artifacts после migration;
   - обновлённые active plans, в которые встроены topology, workflow roadmap и source-of-truth rules из старых root docs.
-- Acceptance criteria:
+- Критерии приемки:
   - для `promts/*.md`, `responses.md`, `adoptions_00.md` определён дальнейший статус;
   - содержимое `plans/resume-agent-spec.md` и `plans/repository-topology.md` мигрировано в актуальные plan files;
   - superseded root planning artifacts удалены из репозитория.
-- Validation commands:
+- Команды валидации:
   - `Get-ChildItem C:\Users\avramko\OneDrive\Documents\Career\promts -File`
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\plans\resume-agent-spec.md"`
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\plans\repository-topology.md"`
-- Notes / discoveries:
+- Заметки / находки:
   - `promts/*.md` распались на четыре будущих workflow направления: analyze/respond, rebuild-master, rebuild-role-resume и build-linkedin.
   - `responses.md` — это исторический vacancy corpus/manual evidence bank, полезный для future eval/spec work, но не runtime input.
   - `adoptions_00.md` — это исторический банк role-specific adoption suggestions; он не конкурирует с canonical root `adoptions/`, а может служить только reference/examples corpus.
   - Superseded root plan/spec artifacts уже удалены; M4 зафиксировал, что дальнейшая работа состоит не в дополнительных удалениях, а в controlled reuse legacy corpus.
 
-## Decision log
+## Журнал решений
 
 - `2026-04-21 16:43` — Root data/template/output layer выделен в отдельный workstream. — Найденные проблемы относятся к source-of-truth и artifact ownership, а не только к логике workflow. — Это уменьшает риск смешать cleanup и feature implementation.
 - `2026-04-21 16:43` — Legacy prompt corpus рассматривается как valuable input, но не как финальная форма хранения бизнес-правил. — Он уже пересекается со спецификациями и частично дублирует их. — Нужна управляемая distillation.
@@ -282,28 +282,28 @@
 - `2026-04-21 20:33` — Output placement зафиксирован как разделение между runtime-owned vacancy-local artifacts и manual-only historical/reference layers. — Это снимает конфликт между `resumes/versions/`, `archive/` и `employers/`: все три пути остаются ручными архивными слоями вне productized pipeline. — M3 считается закрытым, следующий фокус смещается на legacy corpus distillation.
 - `2026-04-22 09:10` — Legacy corpus зафиксирован как read-only historical/reference layer с явным distillation map по будущим workflow-направлениям. — Это снимает неопределённость вокруг `promts/`, `responses.md` и `adoptions_00.md`: полезное содержимое можно переиспользовать только через active plans, templates/specs или eval/examples, но не как live contract. — Workstream root normalization считается завершённым.
 
-## Progress log
+## Журнал прогресса
 
-- `2026-04-21 16:43` — Подтверждено, что `resumes/` насыщен версиями, а `profile/`, `knowledge/`, `adoptions/` остаются в основном скелетными. — Проверка файловой структуры выявила отсутствие `profile/contact-regions.yml` и пустые long-lived stores. — Status: `planned`.
-- `2026-04-21 16:43` — Найдены manual output traces в `employers/` и `archive/`, а также крупный legacy prompt corpus в `promts/`, `responses.md`, `adoptions_00.md`. — Это указывает на незавершенную миграцию от prompt-first/manual workflows к tool-driven pipeline. — Status: `planned`.
-- `2026-04-21 19:51` — План переприоритизирован в следующий активный этап master plan и расширен migration/removal задачей для superseded root planning artifacts. — Следующий фокус: inventory + migration map, а не feature work. — Status: `in_progress`.
-- `2026-04-21 19:51` — Содержательные решения superseded root planning artifacts перенесены в active plans, а сами root files удалены. — Дальнейший focus смещается с migration/removal на оставшиеся root contracts и producer/consumer inventory. — Status: `in_progress`.
-- `2026-04-21 20:35` — В план добавлены M1 inventory matrix и migration map по реальным root artifacts, включая `response-monitoring.xlsx`, `agent_memory/`, legacy corpus и уже удаленный root `plans/`. — Проверка кода показала, что runtime сегодня реально работает через `resumes/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores; validation confirmed `Test-Path root/plans = False`, `Test-Path profile/contact-regions.yml = False`, `vacancies/` currently contains 3 directories. — Status: `done`.
-- `2026-04-21 21:02` — M2 canonical contract map добавлен в workstream-план и зафиксировал роли для `resumes`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel, templates, legacy corpus и manual output traces. — Ключевые решения: `resumes/MASTER.md` остается единственным durable facts source, root `adoptions/` — long-lived review layer, а vacancy-local `adoptions.md` — generated staging artifact. — Status: `done`.
-- `2026-04-21 20:33` — M3 output placement rules добавлены в workstream plan и закрепили, что vacancy-scoped generation живет в `vacancies/<id>/`, а `resumes/versions/`, `archive/` и `employers/` остаются manual-only historical/reference layers вне runtime и agent workflows. — Валидация подтвердила фактическое contents `employers/`, `archive/` и `resumes/versions/`, включая one-off renderer script и historical artifacts. — Status: `done`.
-- `2026-04-22 09:10` — M4 закрыт: добавлена distillation map для `promts/*.md`, `responses.md` и `adoptions_00.md`, а legacy corpus закреплён как historical/reference layer без права конкурировать с active plans и runtime stores. — Review структуры файлов показал четыре будущих workflow направления в `promts/`, исторический vacancy corpus в `responses.md` и historical adoption bank в `adoptions_00.md`; старые root plan/spec files по-прежнему отсутствуют. — Status: `done`.
+- `2026-04-21 16:43` — Подтверждено, что `resumes/` насыщен версиями, а `profile/`, `knowledge/`, `adoptions/` остаются в основном скелетными. — Проверка файловой структуры выявила отсутствие `profile/contact-regions.yml` и пустые long-lived stores. — Статус: `planned`.
+- `2026-04-21 16:43` — Найдены manual output traces в `employers/` и `archive/`, а также крупный legacy prompt corpus в `promts/`, `responses.md`, `adoptions_00.md`. — Это указывает на незавершенную миграцию от prompt-first/manual workflows к tool-driven pipeline. — Статус: `planned`.
+- `2026-04-21 19:51` — План переприоритизирован в следующий активный этап master plan и расширен migration/removal задачей для superseded root planning artifacts. — Следующий фокус: inventory + migration map, а не feature work. — Статус: `in_progress`.
+- `2026-04-21 19:51` — Содержательные решения superseded root planning artifacts перенесены в active plans, а сами root files удалены. — Дальнейший focus смещается с migration/removal на оставшиеся root contracts и producer/consumer inventory. — Статус: `in_progress`.
+- `2026-04-21 20:35` — В план добавлены M1 inventory matrix и migration map по реальным root artifacts, включая `response-monitoring.xlsx`, `agent_memory/`, legacy corpus и уже удаленный root `plans/`. — Проверка кода показала, что runtime сегодня реально работает через `resumes/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores; validation confirmed `Test-Path root/plans = False`, `Test-Path profile/contact-regions.yml = False`, `vacancies/` currently contains 3 directories. — Статус: `done`.
+- `2026-04-21 21:02` — M2 canonical contract map добавлен в workstream-план и зафиксировал роли для `resumes`, `profile`, `knowledge`, `adoptions`, `vacancies`, Excel, templates, legacy corpus и manual output traces. — Ключевые решения: `resumes/MASTER.md` остается единственным durable facts source, root `adoptions/` — long-lived review layer, а vacancy-local `adoptions.md` — generated staging artifact. — Статус: `done`.
+- `2026-04-21 20:33` — M3 output placement rules добавлены в workstream plan и закрепили, что vacancy-scoped generation живет в `vacancies/<id>/`, а `resumes/versions/`, `archive/` и `employers/` остаются manual-only historical/reference layers вне runtime и agent workflows. — Валидация подтвердила фактическое contents `employers/`, `archive/` и `resumes/versions/`, включая one-off renderer script и historical artifacts. — Статус: `done`.
+- `2026-04-22 09:10` — M4 закрыт: добавлена distillation map для `promts/*.md`, `responses.md` и `adoptions_00.md`, а legacy corpus закреплён как historical/reference layer без права конкурировать с active plans и runtime stores. — Review структуры файлов показал четыре будущих workflow направления в `promts/`, исторический vacancy corpus в `responses.md` и historical adoption bank в `adoptions_00.md`; старые root plan/spec files по-прежнему отсутствуют. — Статус: `done`.
 
-## Current state
+## Текущее состояние
 
-- Current milestone: `M4`
-- Current status: `done`
-- Next step: `Перейти к master milestone M4 и зафиксировать current workflow completion gate для `bootstrap`, `ingest-vacancy` и `analyze-vacancy`.`
-- Active blockers:
-  - none
-- Open questions:
-  - none
+- Текущий milestone: `M4`
+- Текущий статус: `done`
+- Следующий шаг: `Перейти к master milestone M4 и зафиксировать current workflow completion gate для `bootstrap`, `ingest-vacancy` и `analyze-vacancy`.`
+- Активные блокеры:
+  - нет
+- Открытые вопросы:
+  - нет
 
-## Completion summary
+## Итог завершения
 
 - Поставлена полная карта root artifact contracts: active runtime stores, target long-lived stores, manual historical layers и legacy reference corpus.
 - Провалидированы и закрыты M1-M4: inventory/migration map, canonical contracts, output placement и distillation legacy corpus.

@@ -1,13 +1,13 @@
-# Rebuild Master Workflow
+﻿# Rebuild Master Workflow
 
-- Title: `rebuild-master workflow`
+- Название: `rebuild-master workflow`
 - Slug: `2026-04-22-rebuild-master-workflow`
-- Owner: `Codex`
-- Created: `2026-04-22`
-- Last updated: `2026-04-22 18:49`
-- Overall status: `done`
+- Ответственный: `Codex`
+- Создан: `2026-04-22`
+- Обновлен: `2026-04-22 18:49`
+- Общий статус: `done`
 
-## Objective
+## Цель
 
 Подготовить и реализовать исполнимый workflow `rebuild-master`, который обновляет `resumes/MASTER.md` из подтверждённых постоянных сигналов так, чтобы:
 
@@ -15,7 +15,7 @@
 - approved permanent signals не терялись между `adoptions/accepted/MASTER.md`, `resumes/MASTER.md` и downstream workflow family;
 - будущие `rebuild-role-resume` и `build-linkedin` читали уже согласованный `MASTER`, а не сырой vacancy corpus.
 
-## Background and context
+## Контекст
 
 После закрытия `prepare-screening` и upstream workflow family `analyze-vacancy -> intake-adoptions -> agent-guided review` следующим downstream этапом стал `rebuild-master`.
 
@@ -33,9 +33,9 @@
 - approved signals нужно проецировать в отдельный managed section внутри `resumes/MASTER.md`;
 - direct rescanning `vacancies/`, `adoptions/inbox/` и `questions/open.md` не нужен, потому что upstream review уже дистиллировал vacancy corpus в `adoptions/accepted/MASTER.md`.
 
-## Scope
+## Границы
 
-### In scope
+### Входит в scope
 
 - current-state inventory для `resumes/MASTER.md`, `adoptions/accepted/`, `knowledge/roles/` и runtime trail;
 - contract decisions для accepted signals, managed section и change report;
@@ -44,7 +44,7 @@
 - workflow/CLI wiring и runtime artifact generation;
 - docs and downstream handoff после реализации.
 
-### Out of scope
+### Не входит в scope
 
 - full narrative rewrite `resumes/MASTER.md` через LLM или ad-hoc text synthesis в первой версии;
 - автоматическое обновление `resumes/versions/`;
@@ -52,7 +52,7 @@
 - direct merge из raw vacancy drafts, `adoptions/inbox/` или `questions/open.md`;
 - изменение `knowledge/roles/` внутри `rebuild-master`.
 
-## Assumptions
+## Допущения
 
 - `resumes/MASTER.md` остаётся единственным durable factual source для профиля кандидата.
 - `adoptions/accepted/MASTER.md` хранит current-state approved signals, а не history log.
@@ -60,14 +60,14 @@
 - baseline-версия пишет change report в `agent_memory/runtime/rebuild-master/`, а не рядом с `resumes/MASTER.md`.
 - downstream workflow family сможет читать managed section в `resumes/MASTER.md` до появления более сложного editorial merge.
 
-## Risks and unknowns
+## Риски и неизвестные
 
 - если merge strategy станет слишком агрессивной, workflow превратится в опасный auto-editor для `MASTER.md`;
 - если accepted-signal contract изменится без синхронизации с `rebuild-master`, появится новый contract drift;
 - dedicated managed section безопасен для baseline, но позже может понадобиться отдельный editorial pass, чтобы естественно встроить approved signals в narrative sections;
 - для будущих версий остаётся open question: нужен ли richer signal schema с section/priority mapping.
 
-## External touchpoints
+## Внешние точки касания
 
 - `C:\Users\avramko\OneDrive\Documents\Career\resumes\MASTER.md` — чтение / обновление / проверка — canonical target;
 - `C:\Users\avramko\OneDrive\Documents\Career\adoptions\accepted\MASTER.md` — чтение / проверка — canonical approved input store;
@@ -75,128 +75,128 @@
 - `C:\Users\avramko\OneDrive\Documents\Career\knowledge\roles\` — чтение / проверка — downstream-only non-input layer;
 - `C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\2026-04-22-implement-adoptions-review-and-acceptance-workflow.md` — чтение / проверка — upstream handoff contract.
 
-## Milestones
+## Этапы
 
 ### M1. Source-Of-Truth Baseline For Master Rebuild
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - собрать baseline inventory по `MASTER`, `accepted`, `knowledge` и зафиксировать главный contract gap.
-- Deliverables:
+- Артефакты:
   - dedicated plan;
   - baseline inventory;
   - явный blocker по permanent-signal destination.
-- Acceptance criteria:
+- Критерии приемки:
   - plan описывает существующие слои и нехватку contract clarity для безопасного `rebuild-master`;
   - следующий шаг после baseline сводится к одному contract decision.
-- Validation commands:
+- Команды валидации:
   - `Test-Path C:\Users\avramko\OneDrive\Documents\Career\resumes\MASTER.md`
   - `Get-ChildItem C:\Users\avramko\OneDrive\Documents\Career\adoptions -Recurse`
   - `Get-ChildItem C:\Users\avramko\OneDrive\Documents\Career\knowledge -Recurse`
-- Notes / discoveries:
+- Заметки / находки:
   - baseline показал наличие intended stores, но не дал safe answer, кто является canonical input для merge в `MASTER`.
 
 ### M2. Permanent Signal Contract Decision
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - закрепить, где живут accepted permanent signals и как они переходят в `resumes/MASTER.md`.
-- Deliverables:
+- Артефакты:
   - owner-level destination/store decision;
   - обновлённый workflow contract для `rebuild-master`;
   - снятый blocker на implementation planning.
-- Acceptance criteria:
+- Критерии приемки:
   - однозначно определён input source для `rebuild-master`;
   - разделены роли `adoptions/accepted/`, `knowledge/roles/` и `resumes/MASTER.md`;
   - решение достаточно конкретно для перехода к implementation milestones.
-- Validation commands:
+- Команды валидации:
   - `Get-Content -Raw plans\2026-04-22-rebuild-master-workflow.md`
-- Notes / discoveries:
+- Заметки / находки:
   - canonical approved staging layer закреплён как `adoptions/accepted/MASTER.md`;
   - `knowledge/roles/` не является direct input для `rebuild-master`;
   - role resumes остаются строго downstream от обновлённого `MASTER`.
 
 ### M3. Implementation-Ready Rebuild-Master Plan
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - разложить `rebuild-master` на исполнимые code-facing milestones.
-- Deliverables:
+- Артефакты:
   - updated plan с milestones M4-M6;
   - зафиксированная merge strategy для baseline implementation;
   - handoff в execution cycle.
-- Acceptance criteria:
+- Критерии приемки:
   - следующий инженер может начать реализацию `rebuild-master` только по этому plan;
   - в плане больше нет product ambiguity по report location, batching и baseline merge surface.
-- Validation commands:
+- Команды валидации:
   - `Get-Content -Raw plans\2026-04-22-rebuild-master-workflow.md`
-- Notes / discoveries:
+- Заметки / находки:
   - baseline implementation поддерживает dedicated managed section внутри `resumes/MASTER.md`;
   - change report живёт в `agent_memory/runtime/rebuild-master/`;
   - batching в первой версии не нужен: input already current-state and full-set.
 
 ### M4. Managed Signals Projection For MASTER
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - реализовать deterministic helper layer, который читает `resumes/MASTER.md` и `adoptions/accepted/MASTER.md`, синхронизирует managed approved-signals section и считает change set.
-- Deliverables:
+- Артефакты:
   - helper module для load/render/write managed section;
   - change-set model и renderer для runtime report;
   - targeted tests на empty store, no-op и idempotency semantics.
-- Acceptance criteria:
+- Критерии приемки:
   - отсутствие `adoptions/accepted/MASTER.md` обрабатывается как valid empty input;
   - повторный rebuild с тем же accepted set не меняет `resumes/MASTER.md`;
   - helper layer не трогает `knowledge/roles/`, role resumes, `adoptions/inbox/` и `adoptions/questions/`.
-- Validation commands:
+- Команды валидации:
   - `python -m unittest tests.test_rebuild_master_helpers`
-- Notes / discoveries:
+- Заметки / находки:
   - managed block должен иметь явные begin/end markers;
   - report должен явно перечислять `added`, `updated`, `removed`, `unchanged` signals и outcome `changed` / `no-op`;
   - helper implementation оформлен отдельным модулем `application_agent.master_rebuild`, чтобы M5 обернул уже готовую merge/report logic без дублирования.
 
 ### M5. Workflow, CLI And Runtime Wiring
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - добавить executable workflow `rebuild-master` в runtime catalog с детерминированными side effects на `resumes/MASTER.md` и runtime report.
-- Deliverables:
+- Артефакты:
   - workflow module и request/result contract;
   - wiring в `registry`, `cli`, `config`;
   - runtime artifact output under `agent_memory/runtime/rebuild-master/`;
   - workflow/CLI tests.
-- Acceptance criteria:
+- Критерии приемки:
   - `python run_agent.py --root ../.. list-workflows` показывает `rebuild-master`;
   - successful run обновляет только `resumes/MASTER.md`, runtime report artifact и workflow memory trail;
   - workflow не мутирует `resumes/CIO.md`, `resumes/CTO.md`, `resumes/HoE.md`, `resumes/HoD.md`, `resumes/EM.md`, `knowledge/roles/`, `adoptions/questions/open.md`.
-- Validation commands:
+- Команды валидации:
   - `python -m unittest tests.test_rebuild_master_helpers tests.test_rebuild_master_workflow tests.test_cli tests.test_memory_store`
   - `python run_agent.py --root ../.. list-workflows`
-- Notes / discoveries:
+- Заметки / находки:
   - request в первой версии минимальный: без `vacancy_id`, потому что input source full-set;
   - runtime report path держится deterministic: `agent_memory/runtime/rebuild-master/latest.md`.
 
 ### M6. Integration Validation And Downstream Resume Handoff
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - синхронизировать docs, full validation baseline и downstream handoff после реализации `rebuild-master`.
-- Deliverables:
+- Артефакты:
   - README / runtime docs updates;
   - full validation baseline;
   - updated downstream references для `rebuild-role-resume`.
-- Acceptance criteria:
+- Критерии приемки:
   - docs явно описывают managed-section strategy и runtime report;
   - full relevant tests проходят;
   - downstream workflow family может читать `MASTER` без ambiguity, где живут approved permanent signals.
-- Validation commands:
+- Команды валидации:
   - `python -m unittest discover -s tests`
   - `python run_agent.py --root ../.. list-workflows`
   - `python run_agent.py --root ../.. show-memory`
-- Notes / discoveries:
+- Заметки / находки:
   - этот milestone закрыл не только `rebuild-master`, но и ambiguity для следующего workflow family.
 
-## Decision log
+## Журнал решений
 
 - `2026-04-22 11:18` — Следующим workflow после `prepare-screening` выбран `rebuild-master`, но без отдельного plan стартовать реализацию нельзя. — Причина: backlog уже фиксировал dependency gate по permanent-signal store. — Сначала открыт dedicated planning artifact.
 - `2026-04-22 11:42` — Принят owner-level contract: approved permanent signals сначала живут в `adoptions/accepted/MASTER.md`, а попадание в `resumes/MASTER.md` является отдельным downstream шагом. — Это жёстко разделяет review/approval layer и canonical resume mutation layer. — `rebuild-master` больше не должен напрямую зависеть от raw vacancy drafts.
@@ -205,28 +205,28 @@
 - `2026-04-22 18:02` — Для first executable version выбран deterministic managed-section contract внутри `resumes/MASTER.md`, а не попытка full narrative rewrite. — Причина: current accepted store не несёт section mapping, и безопасный baseline merge должен быть строго deterministic. — Это делает M4/M5 исполнимыми без нового product drift.
 - `2026-04-22 18:02` — Change report вынесен в `agent_memory/runtime/rebuild-master/`, а accepted signals обрабатываются full-set без batching. — Причина: report не должен становиться новым canonical resume artifact, а current-state semantics accepted store уже делают slicing ненужным в baseline. — Это закрывает последние open questions.
 
-## Progress log
+## Журнал прогресса
 
-- `2026-04-22 11:18` — Создан dedicated plan и закрыт baseline milestone M1 по текущему состоянию `resumes/MASTER.md`, `adoptions/` и `knowledge/`. — Status: `blocked`.
-- `2026-04-22 11:42` — M2 contract decision закрыт: canonical approved staging layer — `adoptions/accepted/MASTER.md`, а `knowledge/roles/` не является direct input для `rebuild-master`. — Status: `blocked`.
-- `2026-04-22 13:50` — Upstream plan review/acceptance снял session-shape ambiguity; `rebuild-master` остаётся blocked только на upstream completion. — Status: `blocked`.
-- `2026-04-22 17:21` — Upstream workflow family закрыт до стабильного `inbox/questions/accepted` contract и handoff зафиксирован в public/runtime docs. — `rebuild-master` больше не blocked. — Status: `in_progress`.
-- `2026-04-22 18:02` — M3 planning milestone закрыт: plan получил explicit milestones M4-M6, managed-section merge contract, runtime report location и baseline no-batching semantics. — Следующий шаг уже чисто implementation-oriented. — Status: `in_progress`.
-- `2026-04-22 18:18` — M4 helper milestone закрыт: добавлен модуль `application_agent.master_rebuild` с deterministic managed-section projection, begin/end markers и runtime report generation; новые tests `tests.test_rebuild_master_helpers` закрывают empty-store, insert+idempotency и update/remove diff semantics. — Validation: `python -m unittest tests.test_rebuild_master_helpers` -> `OK`. — Status: `in_progress`.
-- `2026-04-22 18:36` — M5 wiring milestone закрыт: добавлен executable workflow `rebuild-master`, он подключен в `registry`, `cli` и runtime workflow catalog, а tests `tests.test_rebuild_master_workflow`, `tests.test_cli`, `tests.test_memory_store` зафиксировали deterministic side effects только на `resumes/MASTER.md`, runtime report и workflow memory trail. — Validation: `python -m unittest tests.test_rebuild_master_helpers tests.test_rebuild_master_workflow tests.test_cli tests.test_memory_store` -> `OK`; `python run_agent.py --root ../.. list-workflows` -> shows `rebuild-master`. — Status: `in_progress`.
-- `2026-04-22 18:49` — M6 integration milestone закрыт: `README.md` now documents `rebuild-master`, managed-section strategy, runtime report path and downstream sequencing for `rebuild-role-resume` / `build-linkedin`; full validation baseline passed. — Validation: `python -m unittest discover -s tests` -> `OK (57 tests)`; `python run_agent.py --root ../.. list-workflows` shows `rebuild-master`; `python run_agent.py --root ../.. show-memory` executes successfully. — Status: `done`.
+- `2026-04-22 11:18` — Создан dedicated plan и закрыт baseline milestone M1 по текущему состоянию `resumes/MASTER.md`, `adoptions/` и `knowledge/`. — Статус: `blocked`.
+- `2026-04-22 11:42` — M2 contract decision закрыт: canonical approved staging layer — `adoptions/accepted/MASTER.md`, а `knowledge/roles/` не является direct input для `rebuild-master`. — Статус: `blocked`.
+- `2026-04-22 13:50` — Upstream plan review/acceptance снял session-shape ambiguity; `rebuild-master` остаётся blocked только на upstream completion. — Статус: `blocked`.
+- `2026-04-22 17:21` — Upstream workflow family закрыт до стабильного `inbox/questions/accepted` contract и handoff зафиксирован в public/runtime docs. — `rebuild-master` больше не blocked. — Статус: `in_progress`.
+- `2026-04-22 18:02` — M3 planning milestone закрыт: plan получил explicit milestones M4-M6, managed-section merge contract, runtime report location и baseline no-batching semantics. — Следующий шаг уже чисто implementation-oriented. — Статус: `in_progress`.
+- `2026-04-22 18:18` — M4 helper milestone закрыт: добавлен модуль `application_agent.master_rebuild` с deterministic managed-section projection, begin/end markers и runtime report generation; новые tests `tests.test_rebuild_master_helpers` закрывают empty-store, insert+idempotency и update/remove diff semantics. — Валидация: `python -m unittest tests.test_rebuild_master_helpers` -> `OK`. — Статус: `in_progress`.
+- `2026-04-22 18:36` — M5 wiring milestone закрыт: добавлен executable workflow `rebuild-master`, он подключен в `registry`, `cli` и runtime workflow catalog, а tests `tests.test_rebuild_master_workflow`, `tests.test_cli`, `tests.test_memory_store` зафиксировали deterministic side effects только на `resumes/MASTER.md`, runtime report и workflow memory trail. — Валидация: `python -m unittest tests.test_rebuild_master_helpers tests.test_rebuild_master_workflow tests.test_cli tests.test_memory_store` -> `OK`; `python run_agent.py --root ../.. list-workflows` -> shows `rebuild-master`. — Статус: `in_progress`.
+- `2026-04-22 18:49` — M6 integration milestone закрыт: `README.md` now documents `rebuild-master`, managed-section strategy, runtime report path and downstream sequencing for `rebuild-role-resume` / `build-linkedin`; full validation baseline passed. — Валидация: `python -m unittest discover -s tests` -> `OK (57 tests)`; `python run_agent.py --root ../.. list-workflows` shows `rebuild-master`; `python run_agent.py --root ../.. show-memory` executes successfully. — Статус: `done`.
 
-## Current state
+## Текущее состояние
 
-- Current milestone: `completed`
-- Current status: `done`
-- Next step: `Вернуться в master plan `2026-04-21-repository-reconstruction-and-backlog.md` и открыть next remaining-workflow plan для `rebuild-role-resume`.`
-- Active blockers:
-  - none
-- Open questions:
-  - none
+- Текущий milestone: `completed`
+- Текущий статус: `done`
+- Следующий шаг: `Вернуться в master plan `2026-04-21-repository-reconstruction-and-backlog.md` и открыть next remaining-workflow plan для `rebuild-role-resume`.`
+- Активные блокеры:
+  - нет
+- Открытые вопросы:
+  - нет
 
-## Completion summary
+## Итог завершения
 
 Завершён executable downstream workflow `rebuild-master`: deterministic helper layer, runtime wiring, CLI/catalog exposure и docs handoff теперь согласованы вокруг одного контракта.
 

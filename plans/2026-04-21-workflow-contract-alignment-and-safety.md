@@ -1,17 +1,17 @@
-# Workflow Contract Alignment And Safety
+﻿# Workflow Contract Alignment And Safety
 
-- Title: `Workflow contract alignment and safety`
+- Название: `Workflow contract alignment and safety`
 - Slug: `2026-04-21-workflow-contract-alignment-and-safety`
-- Owner: `Codex`
-- Created: `2026-04-21`
-- Last updated: `2026-04-22 08:55`
-- Overall status: `done`
+- Ответственный: `Codex`
+- Создан: `2026-04-21`
+- Обновлен: `2026-04-22 08:55`
+- Общий статус: `done`
 
-## Objective
+## Цель
 
 Собрать единый, проверяемый контракт для уже реализованных workflow (`bootstrap`, `ingest-vacancy`, `analyze-vacancy`) и связанных side effects так, чтобы код, документация, runtime memory, Excel updates и git-публикация не противоречили друг другу и не создавали скрытых рисков для private workspace.
 
-## Background and context
+## Контекст
 
 На момент старта workstream в `tooling/application-agent/src` уже существовали:
 
@@ -39,9 +39,9 @@
 - содержательные результаты завершенного ingest refactor включены в этот plan как часть current state и completion summary, поэтому отдельный historical `ingest-refactor-plan.md` больше не нужен как активный источник истины;
 - ordered backlog remaining workflows, собранный в M4, теперь служит входом для master-plan sequencing, а не немедленным trigger для feature expansion.
 
-## Scope
+## Границы
 
-### In scope
+### Входит в scope
 
 - contract matrix для `bootstrap`, `ingest-vacancy`, `analyze-vacancy`;
 - правила мутаций root artifacts: `vacancies/`, `agent_memory/runtime/`, `response-monitoring.xlsx`;
@@ -49,27 +49,27 @@
 - политика работы со stale runtime state и отсутствующими vacancy artifacts;
 - ordered backlog remaining workflows после стабилизации safety boundary.
 
-### Out of scope
+### Не входит в scope
 
 - реализация новых feature workflows;
 - наполнение `knowledge/`, `profile/`, `adoptions/` реальными данными;
 - redesign PDF/LinkedIn output pipeline;
 - repository cleanup и migration/removal superseded planning artifacts.
 
-## Assumptions
+## Допущения
 
 - `unittest`, а не `pytest`, является текущим воспроизводимым validation baseline;
 - `src/` и `tests/` описывают current behavior точнее, чем superseded planning docs;
 - дальнейшее расширение workflow catalog безопасно только после стабилизации контрактов текущих трех команд.
 
-## Risks and unknowns
+## Риски и неизвестные
 
 - hidden publication behavior мог нарушать ожидания пользователя;
 - contract drift между кодом и operator docs мог ломать повседневный flow;
 - stale runtime history может требовать отдельной стратегии reconciliation в будущем;
 - canonical Excel mapping contract и degradable-mode policy для `response-monitoring.xlsx` остаются follow-up задачами.
 
-## External touchpoints
+## Внешние точки касания
 
 - `C:\Users\avramko\OneDrive\Documents\Career\vacancies\` — чтение / обновление / проверка — scaffold и analysis artifacts;
 - `C:\Users\avramko\OneDrive\Documents\Career\agent_memory\runtime\` — чтение / обновление / проверка — task/project/user memory и run history;
@@ -79,83 +79,83 @@
 - `C:\Users\avramko\OneDrive\Documents\Career\tooling\git\` — чтение / обновление / проверка — intended git flow;
 - `C:\Users\avramko\OneDrive\Documents\Career\tooling\run-ingest-analyze.md` и `tooling\git-workflow.md` — чтение / обновление / проверка — operator-facing contract.
 
-## Milestones
+## Этапы
 
 ### M1. Current Contract Matrix And Contradiction Ledger
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - описать current state для CLI-команд, workflow artifacts, memory updates, Excel writes и git-side effects;
   - зафиксировать подтвержденные противоречия между кодом, тестами и документацией.
-- Deliverables:
+- Артефакты:
   - matrix `command -> inputs -> outputs -> side effects -> validation -> contradictions`;
   - prioritized contradiction ledger;
   - список решений, требующих product/owner confirmation.
-- Acceptance criteria:
+- Критерии приемки:
   - для `bootstrap`, `ingest-vacancy`, `analyze-vacancy` перечислены все подтвержденные side effects;
   - явно отмечены конфликты по auto-publish, Excel contract, stale runtime и workflow catalog;
   - можно продолжать работу без повторного чтения всего репозитория.
-- Validation commands:
+- Команды валидации:
   - `python run_agent.py --root ../.. list-workflows`
   - `python run_agent.py --root ../.. show-memory`
   - `python -m unittest discover -s tests`
-- Notes / discoveries:
+- Заметки / находки:
   - source of truth для current behavior собирался из кода и тестов, а docs трактовались как expected operator contract.
 
 ### M2. Local-Only Publication Boundary
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - убрать скрытые git side effects и выровнять operator-facing contract.
-- Deliverables:
+- Артефакты:
   - CLI contract без auto-publish после `ingest-vacancy`;
   - синхронизированные docs/runbooks/private workflow docs.
-- Acceptance criteria:
+- Критерии приемки:
   - `ingest-vacancy` больше не делает скрытый publish;
   - документация описывает фактическую локальную mutation boundary;
   - validation baseline остается зеленым.
-- Validation commands:
+- Команды валидации:
   - `python -m unittest tests.test_cli tests.test_ingest_workflow tests.test_analyze_workflow`
   - `Get-Content -Raw ..\git-workflow.md`
   - `Get-Content -Raw ..\run-ingest-analyze.md`
-- Notes / discoveries:
+- Заметки / находки:
   - publication закреплена как отдельный manual step, а не workflow side effect.
 
 ### M3. Report-First Reconciliation For Runtime State
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - добавить безопасную диагностику stale runtime state без автоочистки истории.
-- Deliverables:
+- Артефакты:
   - reconciliation layer в `show-memory`;
   - guardrails для missing vacancy artifacts;
   - tests на stale runtime references.
-- Acceptance criteria:
+- Критерии приемки:
   - stale references явно показываются как stale/missing;
   - `analyze-vacancy` возвращает точную ошибку при отсутствии vacancy folder;
   - полный `unittest` baseline проходит.
-- Validation commands:
+- Команды валидации:
   - `python run_agent.py --root ../.. show-memory`
   - `python -m unittest discover -s tests`
-- Notes / discoveries:
+- Заметки / находки:
   - выбрана report-first strategy вместо автоочистки, чтобы не потерять audit trail.
 
 ### M4. Ordered Backlog After Safety Stabilization
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - превратить migrated target workflow catalog в ordered backlog с dependency gates и validation baseline.
-- Deliverables:
+- Артефакты:
   - ordered backlog для `prepare-screening`, `rebuild-master`, `rebuild-role-resume`, `build-linkedin`, `export-resume-pdf`;
   - dependency map между remaining workflows и уже существующим кодом.
-- Acceptance criteria:
+- Критерии приемки:
   - каждая будущая операция имеет минимальный input/output contract, external touchpoints и validation baseline;
   - очередь расширения не смешивает feature work с unresolved safety fixes.
-- Validation commands:
+- Команды валидации:
   - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\2026-04-21-repository-reconstruction-and-backlog.md`
   - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\2026-04-21-prepare-screening-workflow.md`
   - `Get-Content -Raw C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\2026-04-21-workflow-contract-alignment-and-safety.md`
-- Notes / discoveries:
+- Заметки / находки:
   - Ordered backlog after safety stabilization:
 
     | Priority | Workflow | Proposed minimal contract | External touchpoints | Dependency gate | Validation baseline |
@@ -171,7 +171,7 @@
     - для `export-resume-pdf` нужен отдельный rendering contract;
     - для всех новых workflows `bootstrap`/catalog boundary должен быть переосмыслен так, чтобы `list-workflows`, registry и `project_memory.workflow_catalog` описывали один и тот же набор операций.
 
-## Decision log
+## Журнал решений
 
 - `2026-04-21 16:43` — Текущий workflow stack рассматривается как отдельный workstream, а не как часть общего artifact cleanup. — Основные риски связаны с side effects и behavioral contracts. — Это позволяет сначала стабилизировать безопасную основу, а потом расширять функциональность.
 - `2026-04-21 16:43` — `unittest` принят как текущий validation baseline. — Он реально запускается в данном окружении, в отличие от `pytest`. — Все milestones этого плана используют воспроизводимые команды.
@@ -181,29 +181,29 @@
 - `2026-04-21 18:03` — M4 превратил migrated target workflow catalog в ordered backlog с dependency gates и validation baseline. — Remaining workflows получили минимальные contracts и hold points. — Это закрыло safety workstream, но не сделало feature expansion обязательным следующим шагом.
 - `2026-04-21 19:51` — После пересмотра master plan этот workstream больше не диктует немедленный старт `prepare-screening`. — Feature expansion отложена до repository cleanup и current workflow completion gate. — Следующий шаг по этому плану теперь reference-only и служит входом для master-plan sequencing.
 
-## Progress log
+## Журнал прогресса
 
-- `2026-04-21 16:43` — По коду, тестам и runbook подтверждено текущее поведение `bootstrap`, `ingest-vacancy`, `analyze-vacancy`, включая Excel integration и git-side effects в CLI. — `python -m unittest discover -s tests` -> `36 tests, OK`. — Status: `planned`.
-- `2026-04-21 17:08` — M1 собрал contract matrix, contradiction ledger и список owner-level решений. — `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory` и `python -m unittest discover -s tests` завершились успешно. — Status: `done`.
-- `2026-04-21 17:27` — M2 зафиксировал local-only publication boundary и синхронизировал operator docs с manual publish flow. — `python -m unittest tests.test_cli tests.test_ingest_workflow tests.test_analyze_workflow` -> `24 tests, OK`. — Status: `done`.
-- `2026-04-21 17:46` — M3 добавил reconciliation-слой в `show-memory`, новые tests на stale runtime references и более точные ошибки `analyze-vacancy`. — Полный `unittest` baseline остается зеленым. — Status: `done`.
-- `2026-04-21 18:03` — M4 зафиксировал ordered backlog remaining workflows и dependency gates. — Backlog теперь является planning input, а не командой к немедленному старту новой реализации. — Status: `done`.
-- `2026-04-21 19:51` — План синхронизирован с обновленным master plan и migration/removal superseded planning artifacts. — Дополнительной кодовой валидации не требовалось, так как обновлялась только плановая последовательность. — Status: `done`.
+- `2026-04-21 16:43` — По коду, тестам и runbook подтверждено текущее поведение `bootstrap`, `ingest-vacancy`, `analyze-vacancy`, включая Excel integration и git-side effects в CLI. — `python -m unittest discover -s tests` -> `36 tests, OK`. — Статус: `planned`.
+- `2026-04-21 17:08` — M1 собрал contract matrix, contradiction ledger и список owner-level решений. — `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory` и `python -m unittest discover -s tests` завершились успешно. — Статус: `done`.
+- `2026-04-21 17:27` — M2 зафиксировал local-only publication boundary и синхронизировал operator docs с manual publish flow. — `python -m unittest tests.test_cli tests.test_ingest_workflow tests.test_analyze_workflow` -> `24 tests, OK`. — Статус: `done`.
+- `2026-04-21 17:46` — M3 добавил reconciliation-слой в `show-memory`, новые tests на stale runtime references и более точные ошибки `analyze-vacancy`. — Полный `unittest` baseline остается зеленым. — Статус: `done`.
+- `2026-04-21 18:03` — M4 зафиксировал ordered backlog remaining workflows и dependency gates. — Backlog теперь является planning input, а не командой к немедленному старту новой реализации. — Статус: `done`.
+- `2026-04-21 19:51` — План синхронизирован с обновленным master plan и migration/removal superseded planning artifacts. — Дополнительной кодовой валидации не требовалось, так как обновлялась только плановая последовательность. — Статус: `done`.
 
-## Current state
+## Текущее состояние
 
-- Current milestone: `M4`
-- Current status: `done`
-- Next step: `Использовать findings этого плана как вход в master-plan sequence: сначала repository cleanup и migration/removal superseded plan artifacts, затем completion gate по текущему workflow-стеку, и только потом planning remaining workflows.`
-- Active blockers:
+- Текущий milestone: `M4`
+- Текущий статус: `done`
+- Следующий шаг: `Использовать findings этого плана как вход в master-plan sequence: сначала repository cleanup и migration/removal superseded plan artifacts, затем completion gate по текущему workflow-стеку, и только потом planning remaining workflows.`
+- Активные блокеры:
   - Feature expansion сознательно отложена master plan до завершения repository cleanup и current workflow completion gate.
   - Не согласован канонический Excel mapping contract и degradable-mode policy.
-- Open questions:
+- Открытые вопросы:
   - Должен ли `ingest-vacancy` уметь работать без `response-monitoring.xlsx`, если файла нет или он поврежден?
   - Должен ли `analyze-vacancy` по-прежнему писать vacancy-local `adoptions.md`, если проект перейдет к корневому `adoptions/inbox/<vacancy_id>.md`?
   - Какой набор existing workflows нужно считать "минимально готовым" до начала feature expansion?
 
-## Completion summary
+## Итог завершения
 
 - Поставлено:
   - M1: contract matrix и contradiction ledger для `bootstrap`, `ingest-vacancy`, `analyze-vacancy`;

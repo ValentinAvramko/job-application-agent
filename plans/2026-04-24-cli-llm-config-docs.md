@@ -1,136 +1,136 @@
-# CLI LLM Config And Docs
+﻿# CLI LLM config и docs
 
-- Title: `CLI LLM config and docs`
+- Название: `CLI LLM config и docs`
 - Slug: `2026-04-24-cli-llm-config-docs`
-- Owner: `Codex`
-- Created: `2026-04-24`
-- Last updated: `2026-04-24 10:50`
-- Overall status: `done`
+- Ответственный: `Codex`
+- Создан: `2026-04-24`
+- Обновлен: `2026-04-24 10:50`
+- Общий статус: `done`
 
-## Objective
+## Цель
 
-`analyze-vacancy` can be run with stable LLM defaults from a workspace config file, and the README / workflow runbook clearly explain required parameters, optional parameters, and LLM setup.
+`analyze-vacancy` можно запускать со стабильными LLM-дефолтами из workspace config-файла, а README и workflow runbook ясно объясняют обязательные параметры, опциональные параметры и LLM setup.
 
-## Background and context
+## Контекст
 
-Current CLI documents the quick start as `analyze-vacancy --vacancy-id ...`, but the default `llm_provider=openai` also requires `OPENAI_API_KEY` and an LLM model. The workflow code has an environment fallback for `APPLICATION_AGENT_LLM_MODEL`, but users cannot place runtime defaults in a workspace config file.
+До этой правки CLI документировал quick start как `analyze-vacancy --vacancy-id ...`, но default `llm_provider=openai` также требовал `OPENAI_API_KEY` и LLM model. В workflow-коде был environment fallback для `APPLICATION_AGENT_LLM_MODEL`, но пользователь не мог хранить runtime defaults в workspace config-файле.
 
-The user hit `AnalyzeVacancyError: OPENAI_API_KEY is required for llm_provider=openai.` after running `analyze-vacancy` with only `--vacancy-id`.
+Пользователь получил `AnalyzeVacancyError: OPENAI_API_KEY is required for llm_provider=openai.` после запуска `analyze-vacancy` только с `--vacancy-id`.
 
-## Scope
+## Границы
 
-### In scope
+### Входит в scope
 
-- Add a small CLI config loader for workflow defaults.
-- Support `analyze-vacancy` LLM defaults from a workspace config file.
-- Preserve explicit CLI options as higher priority than config values.
-- Update README and `agent_memory/workflows/analyze-vacancy.md` documentation.
-- Add tests for config loading / precedence.
+- Добавить небольшой CLI config loader для workflow defaults.
+- Поддержать LLM defaults для `analyze-vacancy` из workspace config-файла.
+- Сохранить более высокий приоритет явных CLI options над config values.
+- Обновить документацию в README и `agent_memory/workflows/analyze-vacancy.md`.
+- Добавить tests для config loading и precedence.
 
-### Out of scope
+### Не входит в scope
 
-- Secret storage or automatic API key management.
-- Changing the OpenAI request implementation.
-- Changing analysis output quality or prompt structure.
+- Secret storage или automatic API key management.
+- Изменение OpenAI request implementation.
+- Изменение качества analysis output или prompt structure.
 
-## Assumptions
+## Допущения
 
-- API keys remain environment variables, not committed config values.
-- A JSON config is enough because the CLI already uses JSON output and the stdlib parser needs no new dependency.
-- Default config path should live in the private workspace root, not inside the public tool repository.
+- API keys остаются environment variables, а не committed config values.
+- JSON config достаточно, потому что CLI уже использует JSON output, а stdlib parser не требует новой зависимости.
+- Default config path должен жить в private workspace root, а не внутри public tool repository.
 
-## Risks and unknowns
+## Риски и неизвестные
 
-- Existing users may rely on CLI defaults; defaults must remain backward compatible.
-- Config parsing errors must be explicit enough to diagnose quickly.
+- Existing users могут полагаться на CLI defaults; defaults должны остаться backward compatible.
+- Config parsing errors должны быть достаточно явными для быстрой диагностики.
 
-## External touchpoints
+## Внешние точки касания
 
-- `agent_memory/workflows/analyze-vacancy.md` in the root workspace - update documentation for the workflow contract.
-- `agent_memory/config/application-agent.json` in the root workspace - documented runtime config path, not created automatically with secrets.
+- `agent_memory/workflows/analyze-vacancy.md` в root workspace - обновление documentation для workflow contract.
+- `agent_memory/config/application-agent.json` в root workspace - documented runtime config path, не создается автоматически с secrets.
 
-## Milestones
+## Этапы
 
-### M1. CLI config support
+### M1. Поддержка CLI config
 
-- Status: `done`
-- Goal:
-  - Let `analyze-vacancy` consume LLM defaults from config.
-- Deliverables:
+- Статус: `done`
+- Цель:
+  - Позволить `analyze-vacancy` читать LLM defaults из config.
+- Артефакты:
   - CLI config loader.
-  - `--config` global option and default config lookup.
+  - Global option `--config` и default config lookup.
   - CLI tests.
-- Acceptance criteria:
-  - Explicit CLI values override config values.
-  - Missing config is allowed.
-  - Malformed config fails clearly.
-- Validation commands:
+- Критерии приемки:
+  - Явные CLI values переопределяют config values.
+  - Missing config допустим.
+  - Malformed config падает понятной ошибкой.
+- Команды валидации:
   - `python -m pytest tests/test_cli.py`
-- Notes / discoveries:
-  - Existing env fallback for `APPLICATION_AGENT_LLM_MODEL` remains in workflow layer.
-  - Config is loaded only for `analyze-vacancy`, so optional config issues do not block unrelated commands.
+- Заметки / находки:
+  - Existing env fallback для `APPLICATION_AGENT_LLM_MODEL` остается на workflow layer.
+  - Config загружается только для `analyze-vacancy`, поэтому optional config issues не блокируют unrelated commands.
 
-### M2. Documentation
+### M2. Документация
 
-- Status: `done`
-- Goal:
-  - Make required inputs and LLM setup visible before the user runs the command.
-- Deliverables:
-  - Updated `README.md`.
-  - Updated root workflow runbook.
-- Acceptance criteria:
-  - README shows `OPENAI_API_KEY`, model config, config file path, and a fake-provider smoke example.
-  - Workflow runbook separates required and optional parameters.
-- Validation commands:
+- Статус: `done`
+- Цель:
+  - Сделать required inputs и LLM setup видимыми до запуска команды.
+- Артефакты:
+  - Обновленный `README.md`.
+  - Обновленный root workflow runbook.
+- Критерии приемки:
+  - README показывает `OPENAI_API_KEY`, model config, config file path и fake-provider smoke example.
+  - Workflow runbook разделяет required и optional parameters.
+- Команды валидации:
   - `python -m pytest tests/test_cli.py`
-- Notes / discoveries:
-  - README now documents `OPENAI_API_KEY`, model sources, config path, CLI precedence, and fake-provider smoke runs.
-  - Root workflow runbook now separates required and optional inputs.
+- Заметки / находки:
+  - README теперь документирует `OPENAI_API_KEY`, model sources, config path, CLI precedence и fake-provider smoke runs.
+  - Root workflow runbook теперь разделяет required и optional inputs.
 
-## Decision log
+## Журнал решений
 
-- `2026-04-24 10:39` - Use workspace-local JSON config at `agent_memory/config/application-agent.json` so runtime defaults stay outside the public tool repo and require no new dependency.
-- `2026-04-24 10:45` - Keep API keys out of config; only provider/model/temperature and workflow defaults belong in the JSON file.
+- `2026-04-24 10:39` - Использовать workspace-local JSON config по пути `agent_memory/config/application-agent.json`, чтобы runtime defaults оставались вне public tool repo и не требовали новой зависимости.
+- `2026-04-24 10:45` - Не хранить API keys в config; в JSON file должны быть только provider/model/temperature и workflow defaults.
 
-## Progress log
+## Журнал прогресса
 
-- `2026-04-24 10:39` - Plan created. Status: `in_progress`.
-- `2026-04-24 10:44` - Implemented config support and CLI tests. `python -m pytest tests/test_cli.py`: 12 passed.
-- `2026-04-24 10:45` - Updated README and root runbook. `python -m pytest tests`: 84 passed.
-- `2026-04-24 10:50` - Published submodule commit `46aebad` and root commit `3dd7696`; left unrelated root untracked file `archive/analyze_01.md` untouched.
+- `2026-04-24 10:39` - План создан. Статус: `in_progress`.
+- `2026-04-24 10:44` - Реализованы config support и CLI tests. `python -m pytest tests/test_cli.py`: 12 passed.
+- `2026-04-24 10:45` - Обновлены README и root runbook. `python -m pytest tests`: 84 passed.
+- `2026-04-24 10:50` - Опубликованы submodule commit `46aebad` и root commit `3dd7696`; unrelated root untracked file `archive/analyze_01.md` оставлен нетронутым.
 
-## Current state
+## Текущее состояние
 
-- Current milestone: `M2`
-- Current status: `done`
-- Next step: `No further action; task is complete.`
-- Active blockers:
+- Текущий milestone: `M2`
+- Текущий статус: `done`
+- Следующий шаг: `Дальнейших действий по этому плану нет; задача завершена.`
+- Активные блокеры:
   - нет
-- Open questions:
+- Открытые вопросы:
   - нет
 
-## Completion summary
+## Итог завершения
 
-Delivered:
+Поставлено:
 
-- CLI support for workspace config defaults at `agent_memory/config/application-agent.json`.
-- `analyze-vacancy` LLM defaults can now come from config, while explicit CLI arguments still override config values.
-- README and root workflow documentation now explain required parameters and LLM setup.
-- Tests added for config defaults, CLI precedence, and invalid JSON config diagnostics.
+- CLI support для workspace config defaults по пути `agent_memory/config/application-agent.json`.
+- LLM defaults для `analyze-vacancy` теперь могут приходить из config; явные CLI arguments по-прежнему переопределяют config values.
+- README и root workflow documentation объясняют required parameters и LLM setup.
+- Добавлены tests для config defaults, CLI precedence и invalid JSON config diagnostics.
 
-Validated:
+Провалидировано:
 
-- `python -m pytest tests/test_cli.py` — 12 passed.
-- `python -m pytest tests` — 84 passed.
+- `python -m pytest tests/test_cli.py` - 12 passed.
+- `python -m pytest tests` - 84 passed.
 
-Follow-up tasks:
+Последующие задачи:
 
-- none
+- нет
 
-Residual risks:
+Остаточные риски:
 
-- `include_employer_channels` can be enabled by config or CLI flag; there is no explicit negative CLI flag to override a config value back to false.
+- `include_employer_channels` можно включить через config или CLI flag; явного negative CLI flag, чтобы переопределить config value обратно в false, нет.
 
-Root artifacts touched:
+Затронутые root-артефакты:
 
 - `agent_memory/workflows/analyze-vacancy.md`

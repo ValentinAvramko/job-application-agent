@@ -1,13 +1,13 @@
 ﻿# Repository Reconstruction And Backlog
 
-- Title: `Repository reconstruction and backlog`
+- Название: `Repository reconstruction and backlog`
 - Slug: `2026-04-21-repository-reconstruction-and-backlog`
-- Owner: `Codex`
-- Created: `2026-04-21`
-- Last updated: `2026-04-23 15:04`
-- Overall status: `done`
+- Ответственный: `Codex`
+- Создан: `2026-04-21`
+- Обновлен: `2026-04-23 15:04`
+- Общий статус: `done`
 
-## Objective
+## Цель
 
 Зафиксировать актуальную, исполнимую последовательность восстановления репозитория и дальнейшей работы так, чтобы:
 
@@ -15,7 +15,7 @@
 - старые plan/spec artifacts были содержательно перенесены в новую структуру, а затем удалены;
 - feature expansion не начиналась раньше, чем будет наведён порядок в репозитории и будет явно определено, что ещё не доведено в текущем workflow-стеке.
 
-## Background and context
+## Контекст
 
 Корень `Career/` остаётся private data/orchestration слоем. Код инструмента живёт в `tooling/application-agent/` и уже реализует:
 
@@ -47,9 +47,9 @@
 - root cleanup и migration старых плановых артефактов ещё не доведены до конца;
 - planning remaining workflows нельзя считать следующим шагом до completion gate по текущему стеку.
 
-## Scope
+## Границы
 
-### In scope
+### Входит в scope
 
 - синхронизация master plan с фактическим состоянием workstreams;
 - явная последовательность: repository cleanup -> current workflow completion gate -> planning remaining workflows;
@@ -57,28 +57,28 @@
 - удаление superseded plan artifacts после переноса содержимого;
 - фиксация dependency gates между cleanup, current workflow completion и future feature planning.
 
-### Out of scope
+### Не входит в scope
 
 - реализация новых workflows в рамках этого master plan;
 - изменение фактического содержимого `resumes/`, `knowledge/`, `profile/`, `adoptions/`;
 - генерация новых resume/PDF/LinkedIn outputs;
 - неограниченная перепись runtime и root данных без отдельного workstream-плана.
 
-## Assumptions
+## Допущения
 
 - `src/` и `tests/` в `tooling/application-agent` описывают текущее поведение точнее, чем superseded planning docs;
 - старые plan/spec artifacts можно удалять после того, как их содержательные решения явно распределены по актуальным plan files;
 - feature expansion допустима только после завершения cleanup и фиксации completion gate для текущего workflow-стека;
 - `unittest` остаётся текущим воспроизводимым validation baseline.
 
-## Risks and unknowns
+## Риски и неизвестные
 
 - часть важных root contracts пока существует только неявно или фрагментарно;
 - в old plan artifacts могли оставаться assumptions, которые не всплывут без аккуратной migration map;
 - без отдельного completion gate снова смешаются safety findings, repository cleanup и planning новых workflow;
 - если удалить старые plan artifacts без переноса их содержательных решений, можно потерять target intent по структуре workspace и очередности feature wave.
 
-## External touchpoints
+## Внешние точки касания
 
 - `C:\Users\avramko\OneDrive\Documents\Career\vacancies\` — чтение / проверка — фактические vacancy artifacts и рассинхронизация с runtime;
 - `C:\Users\avramko\OneDrive\Documents\Career\agent_memory\` — чтение / проверка — workflow contracts и runtime state;
@@ -87,123 +87,123 @@
 - `C:\Users\avramko\OneDrive\Documents\Career\plans\` — historical touchpoint; superseded root planning artifacts уже мигрированы и удалены;
 - `C:\Users\avramko\OneDrive\Documents\Career\tooling\run-ingest-analyze.md` и `tooling\git-workflow.md` — чтение / проверка — operator-facing contract.
 
-## Milestones
+## Этапы
 
 ### M1. Repository Evidence Baseline
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - зафиксировать подтвержденную карту репозитория, текущих подсистем и основных противоречий;
   - определить самостоятельные workstreams и опорный master plan для продолжения.
-- Deliverables:
+- Артефакты:
   - этот master plan;
   - список подтвержденных фактов, contradictions, assumptions, blockers и open questions;
   - разбиение дальнейшей работы на отдельные планы.
-- Acceptance criteria:
+- Критерии приемки:
   - master plan описывает текущую картину проекта без опоры на устные пояснения;
   - перечислены ключевые подсистемы, external touchpoints и подтвержденные несоответствия;
   - определен один конкретный `Next step` для следующей сессии.
-- Validation commands:
+- Команды валидации:
   - `Get-ChildItem vacancies -Directory`
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\vacancies\20260421-dinamichno-razvivayuschayasya-sudohodnaya-kompaniya-direktor-po-tsifrovomu-razvitiyu-i-tehnologiyam-cto-02"`
   - `python -m unittest discover -s tests`
-- Notes / discoveries:
+- Заметки / находки:
   - `unittest` проходит, `pytest` отсутствует.
   - runtime memory ссылается на несуществующие vacancy folders.
   - design intent, code и root artifacts заметно разошлись.
 
 ### M2. Workflow Contracts And Safety Alignment
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - привести текущие workflow, memory contracts и mutation/publication behavior к единой, проверяемой модели;
   - убрать скрытые side effects и зафиксировать safety boundary.
-- Deliverables:
+- Артефакты:
   - workstream plan: `2026-04-21-workflow-contract-alignment-and-safety.md`;
   - contract matrix current vs intended behavior;
   - backlog по core-логике и safety.
-- Acceptance criteria:
+- Критерии приемки:
   - для `bootstrap`, `ingest-vacancy`, `analyze-vacancy`, runtime memory, Excel и git-публикации есть единое описание current state;
   - зафиксированы решения по auto-publish, stale runtime и validation baseline.
-- Validation commands:
+- Команды валидации:
   - `python run_agent.py --root ../.. list-workflows`
   - `python run_agent.py --root ../.. show-memory`
   - `python -m unittest discover -s tests`
-- Notes / discoveries:
+- Заметки / находки:
   - workstream завершен отдельным планом и больше не должен трактоваться как автоматический trigger для немедленного старта нового workflow.
 
 ### M3. Repository Cleanup, Root Normalization, And Plan Artifact Migration
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - навести порядок в root data/template/output layer;
   - перенести содержимое superseded planning artifacts в актуальные plan files;
   - удалить старые plan/spec files после миграции.
-- Deliverables:
+- Артефакты:
   - workstream plan: `2026-04-21-root-artifacts-and-output-normalization.md`;
   - source-of-truth map для root-слоев и historical artifacts;
   - migration map для `plans/resume-agent-spec.md`, `plans/repository-topology.md`, `tooling/application-agent/plans/ingest-refactor-plan.md`;
   - удаление superseded planning artifacts после переноса содержательных решений.
-- Acceptance criteria:
+- Критерии приемки:
   - для ключевых root-каталогов и output families определены producer, consumer, status и canonical role;
   - содержимое старых plan/spec artifacts распределено по актуальным plans;
   - superseded plan/spec files удалены из репозитория без потери значимого target intent.
-- Validation commands:
+- Команды валидации:
   - `Get-Content -Raw plans\2026-04-21-root-artifacts-and-output-normalization.md`
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\plans\resume-agent-spec.md"`
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\plans\repository-topology.md"`
   - `Test-Path "C:\Users\avramko\OneDrive\Documents\Career\tooling\application-agent\plans\ingest-refactor-plan.md"`
-- Notes / discoveries:
+- Заметки / находки:
   - cleanup включает не только root data/output layer, но и migration/removal старых planning artifacts;
   - M1 workstream-шаг по inventory/migration map закрыт; M2 canonical root contracts тоже закрыт; M3 output-placement decisions тоже закрыты;
   - финальный cleanup substep по legacy prompt/doc distillation тоже закрыт, поэтому master M3 завершён полностью.
 
 ### M4. Current Workflow Completion Gate
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - после M3 явно определить, что именно еще не доведено в `bootstrap`, `ingest-vacancy`, `analyze-vacancy`;
   - отделить незавершенности текущего стека от planning remaining workflows.
-- Deliverables:
+- Артефакты:
   - completion gate для текущего workflow-стека;
   - отдельный plan/checklist по незакрытым задачам current workflow stack (`2026-04-22-current-workflow-completion-gate.md`);
   - обновленный `Current state` в master plan.
-- Acceptance criteria:
+- Критерии приемки:
   - однозначно зафиксировано, что считается "доделанным" для текущего workflow-стека;
   - у remaining workflows есть явный dependency gate;
   - `prepare-screening` больше не выглядит следующим шагом до завершения M4.
-- Validation commands:
+- Команды валидации:
   - `Get-Content -Raw plans\2026-04-21-repository-reconstruction-and-backlog.md`
   - `Get-Content -Raw plans\2026-04-21-workflow-contract-alignment-and-safety.md`
   - `python run_agent.py --root ../.. list-workflows`
-- Notes / discoveries:
+- Заметки / находки:
   - safety-план закрыл boundary и guardrails, но не дал ответа на вопрос, что считать минимально завершенным состоянием current workflow stack.
   - dedicated plan `2026-04-22-current-workflow-completion-gate.md` открыт как рабочий артефакт для этого milestone.
   - gate decisions уже приняты; текущий follow-up внутри master M4 — исполнить remediation plan `2026-04-22-current-stack-contract-remediation.md` и снять найденные blocker-ы.
 
 ### M5. Ordered Planning For Remaining Workflows
 
-- Status: `done`
-- Goal:
+- Статус: `done`
+- Цель:
   - только после M3 и M4 спланировать remaining workflows: `prepare-screening`, `rebuild-master`, `rebuild-role-resume`, `build-linkedin`, `export-resume-pdf`.
-- Deliverables:
+- Артефакты:
   - ordered planning backlog для remaining workflows;
   - feature plans, которые допустимо открывать после completion gate;
   - обновленная последовательность реализации без опоры на superseded docs.
-- Acceptance criteria:
+- Критерии приемки:
   - planning remaining workflows начинается только после repository cleanup и current workflow completion gate;
   - `prepare-screening` и остальные future workflows не стартуют раньше времени;
   - queue remaining workflows опирается на актуальные plans, а не на удаленные артефакты.
-- Validation commands:
+- Команды валидации:
   - `Get-Content -Raw plans\2026-04-21-repository-reconstruction-and-backlog.md`
   - `Get-Content -Raw plans\2026-04-21-root-artifacts-and-output-normalization.md`
   - `Get-Content -Raw plans\2026-04-21-prepare-screening-workflow.md`
-- Notes / discoveries:
+- Заметки / находки:
   - без M3 и M4 feature wave снова смешала бы roadmap, cleanup и текущие незавершенности;
   - sequencing remaining workflows закрыт полностью: `prepare-screening`, `rebuild-master`, `rebuild-role-resume`, `build-linkedin` и `export-resume-pdf` теперь имеют dedicated plans, executable runtime wiring и operator-facing docs;
   - после завершения `export-resume-pdf` этот master plan больше не содержит активного backlog внутри текущей workflow wave; следующая feature expansion требует нового dedicated/master plan.
 
-## Decision log
+## Журнал решений
 
 - `2026-04-21 16:43` — Главный план ведется в `tooling/application-agent/plans/`, потому что основная логика изменений относится к submodule-коду и его контрактам. — Это соответствует `AGENTS.md` в корне и в submodule. — Все root artifacts рассматриваются как external touchpoints.
 - `2026-04-21 16:43` — Работа разбита на самостоятельные workstreams по safety и root normalization. — Это уменьшает риск смешать cleanup, contract alignment и future features. — Master plan фиксирует их зависимость и порядок.
@@ -233,52 +233,52 @@
 - `2026-04-23 09:17` — В dedicated plan `build-linkedin` закрыт M3 helper milestone: deterministic builder `application_agent.linkedin_builder` теперь собирает per-role LinkedIn pack, уважает precedence `MASTER -> role resume -> optional profile metadata`, держит private contacts только во filling guide и маркирует missing EN/profile-surface inputs через `CHECK` / `GAP`. — Это снимает implementation blocker по helper layer и переводит execution focus master M5 на M4 workflow wiring для `build-linkedin`. — Следующий execution step снова чётко сводится к runtime integration.
 - `2026-04-23 15:04` — Последний remaining workflow `export-resume-pdf` завершён end-to-end: operator docs в `README.md` и root profile docs синхронизированы, full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (74 tests)`, `list-workflows`, `show-memory`), а dedicated plan переведён в `done`. — Это закрывает master M5 и весь backlog восстановления/доведения текущей workflow wave. — Следующий execution focus теперь может появиться только как новый отдельный workstream. 
 
-## Progress log
+## Журнал прогресса
 
-- `2026-04-21 16:43` — Проведена первичная разведка корня, `tooling/`, submodule-кода, тестов, шаблонов, runtime-памяти, vacancy-артефактов, legacy prompt-материалов и manual output traces. — `python -m unittest discover -s tests` -> `36 tests, OK`; `pytest` отсутствует; runtime memory указывает на несуществующие vacancy folders. — Status: `in_progress`.
-- `2026-04-21 16:43` — Создан master plan и выделены самостоятельные workstreams для дальнейшей работы без повторного обследования. — Валидация опирается на файловую структуру, `unittest` и документированные команды CLI. — Status: `in_progress`.
-- `2026-04-21 19:51` — Master plan пересобран после повторного review всех plans и superseded artifacts. — Последовательность зафиксирована как `M3 cleanup -> M4 completion gate -> M5 planning remaining workflows`. — Status: `in_progress`.
-- `2026-04-21 19:51` — Superseded plan/spec artifacts мигрированы в active plans и удалены из репозитория. — Валидация migration/removal теперь опирается на `Test-Path = False` для старых файлов и на содержимое новых plan files. — Status: `in_progress`.
-- `2026-04-21 20:35` — M1 в workstream-плане root normalization завершен: добавлены inventory matrix и migration map, подтверждено, что runtime реально живет на `resumes/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores. — M1 validation passed with `root/plans = False`, `profile/contact-regions.yml = False` and 3 current vacancy directories; активный шаг M3 смещен на canonical root contracts. — Status: `in_progress`.
-- `2026-04-21 21:02` — M2 в workstream-плане root normalization завершен: canonical contract map зафиксировал разделение между durable root stores, generated vacancy-local artifacts и historical/reference layers. — Ключевой результат: root `adoptions/` признан long-lived review layer, а `vacancies/<id>/adoptions.md` — staging artifact текущего runtime. — Status: `in_progress`.
-- `2026-04-21 20:33` — M3 output-placement substep в root-normalization workstream закрыт: validation confirmed the current contents of `employers/`, `archive/` и `resumes/versions/`, after which placement and lifecycle rules were fixed in the workstream plan. — Следующий cleanup focus внутри master M3 переместился на legacy prompt/doc distillation (`promts/`, `responses.md`, `adoptions_00.md`). — Status: `in_progress`.
-- `2026-04-22 09:10` — Master M3 закрыт: root-normalization workstream завершён полностью после фиксации distillation map по `promts/*.md`, `responses.md` и `adoptions_00.md`, а также подтверждения, что старые root plan/spec artifacts по-прежнему отсутствуют. — Cleanup больше не является активным этапом; следующий шаг смещён на explicit completion gate текущего workflow-стека. — Status: `done`.
-- `2026-04-22 09:10` — Master M4 стартовал: создан отдельный plan `2026-04-22-current-workflow-completion-gate.md` и зафиксирован initial baseline по CLI, runtime memory и tests. — `list-workflows` показывает только `ingest-vacancy` и `analyze-vacancy`, тогда как `show-memory` и `WORKFLOW_CATALOG` всё ещё включают `bootstrap`; `unittest` остаётся зелёным (`39 tests, OK`). — Status: `in_progress`.
-- `2026-04-22 09:17` — M4 продолжен внутри dedicated plan: baseline доведён до contradiction ledger и candidate completion criteria. — Дополнительная проверка показала реальный runtime blocker по path contract (`resumes/` существует, `CV/` отсутствует, но код всё ещё читает `CV/`) и незакрытый policy question по `response-monitoring.xlsx`. — Status: `in_progress`.
-- `2026-04-22 10:03` — Stage решений завершён: completion-gate plan закрыт как planning artifact, а следующий execution step перенесён в `2026-04-22-current-stack-contract-remediation.md`. — Это отделяет определение blocker-ов от их исправления и делает master M4 исполнимым. — Status: `in_progress`.
-- `2026-04-22 10:14` — Первый remediation substep завершён: `python run_agent.py --root ../.. list-workflows` теперь согласован с `project_memory.workflow_catalog`, а `python -m unittest tests.test_memory_store tests.test_cli` проходит (`5 tests, OK`). — Bootstrap catalog drift снят; remaining focus внутри M4 смещён на `CV/` -> `resumes/` и explicit Excel prerequisite. — Status: `in_progress`.
-- `2026-04-22 10:17` — Второй remediation substep завершён: targeted search по workflow/tests/runbook больше не находит `CV` path references, а `python -m unittest tests.test_analyze_workflow tests.test_prepare_screening_workflow` проходит (`5 tests, OK`). — Resume path drift снят; активным blocker-ом внутри master M4 остаётся только explicit Excel prerequisite contract. — Status: `in_progress`.
-- `2026-04-22 10:23` — Третий remediation substep завершён: `ingest-vacancy` больше не создаёт partial vacancy scaffold без workbook, а `python -m unittest tests.test_ingest_workflow tests.test_analyze_workflow tests.test_prepare_screening_workflow` проходит (`29 tests, OK`). — Все содержательные blocker-ы M4 сняты; master plan переходит к финальной remediation validation и handback. — Status: `in_progress`.
-- `2026-04-22 10:26` — Master M4 закрыт: `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory` и `python -m unittest discover -s tests` подтверждают, что current stack больше не имеет скрытых contract blocker-ов для feature planning. — Следующий этап master sequencing смещён на M5 ordered planning for remaining workflows. — Status: `done`.
-- `2026-04-22 10:41` — M5 revalidation завершена: evidence из safety/root plans и текущего кода подтверждает, что `prepare-screening` остаётся первым исполнимым кандидатом, потому что уже имеет runtime core, тогда как `rebuild-master`, `rebuild-role-resume`, `build-linkedin` и `export-resume-pdf` всё ещё зависят от отдельных downstream contracts. — Кодовая реализация M5 начинается с CLI/catalog/operator integration для `prepare-screening`. — Status: `in_progress`.
-- `2026-04-22 10:58` — CLI/catalog/operator integration для `prepare-screening` завершена: targeted tests и `list-workflows` подтверждают, что workflow теперь зарегистрирован и доступен через public entrypoint. — Master M5 остаётся активным, потому что для полного handoff этого первого remaining workflow ещё нужен M3 smoke-check на реальном vacancy scenario. — Status: `in_progress`.
-- `2026-04-22 11:08` — Первый remaining workflow закрыт end-to-end: `prepare-screening` теперь реализован, провалидирован и опробован на реальной вакансии. — Master M5 продолжается уже не вокруг этого workflow, а вокруг следующего dependency-gated этапа `rebuild-master`. — Status: `in_progress`.
-- `2026-04-22 11:18` — M5 продолжен через dedicated plan для `rebuild-master`: baseline contract inventory собран, а активный blocker сведён к product decision по permanent signals и accepted adoptions. — Это отделяет реальную нехватку решения от технической неопределённости и не даёт prematurely стартовать risky resume-editing workflow. — Status: `in_progress`.
-- `2026-04-22 11:42` — M5 перепоследован после owner clarification: ближайшим planning/execution step теперь является отдельный review/acceptance workflow, а `rebuild-master` переведён в downstream-зависимость от него. — Это повышает качество sequencing: сначала approval/normalization, потом master mutation, потом role rebuild. — Status: `in_progress`.
-- `2026-04-22 13:50` — В dedicated plan review/acceptance закрыт M2: interaction shape и file contract теперь закреплены без product ambiguity, включая shared ledger `adoptions/questions/open.md`, separate intake stage и отсутствие role-specific accepted artifacts. — Remaining work внутри M5 теперь сводится не к выбору модели, а к implementation-ready decomposition. — Status: `in_progress`.
-- `2026-04-22 15:53` — Dedicated planning plan review/acceptance завершён полностью: создан execution plan с отдельными milestones для intake workflow, review helper layer, agent-guided review support и rebuild-master handoff. — Ordered workflow backlog внутри M5 снова стал исполнимым без дополнительных product решений. — Status: `in_progress`.
-- `2026-04-22 18:49` — Upstream review/acceptance execution и downstream `rebuild-master` завершены end-to-end: `README.md` и dedicated plan фиксируют final contract, а full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (57 tests)`, `list-workflows`, `show-memory`). — Sequencing ambiguity для `MASTER` снята; следующий remaining-workflow step внутри M5 теперь сводится к открытию dedicated plan для `rebuild-role-resume`. — Status: `in_progress`.
-- `2026-04-22 19:33` — Dedicated plan для `build-linkedin` открыт и доведён до baseline M1: подтверждено отсутствие workflow-кода, пустой почти `profile/` layer и наличие only-historical prompt map в `promts/promt-create-linkedin-profile.md`. — M5 остаётся активным, но его текущий blocker теперь narrowed до одного contract-decision milestone внутри нового плана. — Status: `in_progress`.
-- `2026-04-22 20:05` — `rebuild-role-resume` завершён end-to-end: helper module, workflow wiring, runtime report, docs sync и full validation baseline подтверждены (`python -m unittest discover -s tests` -> `OK (62 tests)`, `list-workflows`, `show-memory`). — Sequencing для resume family теперь доведён от `accepted` до `MASTER` и выбранного role resume; следующий remaining-workflow step смещается на `build-linkedin`. — Status: `in_progress`.
-- `2026-04-23 08:57` — Contract ambiguity для `build-linkedin` снята: dedicated plan M2 закрепил one-pack output `profile/linkedin/<target_role>.md`, обязательный `target_role`, deterministic precedence между `MASTER`, role resume и optional profile metadata, а также privacy-safe contact policy. — Validation опиралась на повторное чтение dedicated plan, `profile/README.md` и historical LinkedIn prompt map. — Status: `in_progress`.
-- `2026-04-23 09:17` — Helper layer для `build-linkedin` реализован и провалидирован: `application_agent.linkedin_builder` рендерит deterministic artifact `profile/linkedin/<target_role>.md`, использует front matter `MASTER.md` как fallback profile surface, уважает optional metadata override и не выводит private contacts в public-ready blocks. — Validation: `python -m unittest tests.test_build_linkedin_helpers` -> `OK`. — Status: `in_progress`.
-- `2026-04-23 09:27` — `build-linkedin` M4 workflow wiring завершён: helper layer обёрнут в executable workflow, добавлены registry/cli/config/runtime-catalog wiring и per-role runtime report, а targeted validation подтверждает новый public entrypoint (`python -m unittest tests.test_build_linkedin_helpers tests.test_build_linkedin_workflow tests.test_cli tests.test_memory_store` -> `OK`, `python run_agent.py --root ../.. list-workflows` показывает `build-linkedin`). — Remaining work внутри master M5 теперь сводится к docs sync и full validation/handoff milestone M5 dedicated plan. — Status: `in_progress`.
-- `2026-04-23 09:46` — `build-linkedin` завершён end-to-end: operator docs и root profile docs синхронизированы, full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (67 tests)`, `list-workflows`, `show-memory`), а dedicated plan переведён в `done`. — Sequencing remaining workflows снова narrowed до одного шага: открыть dedicated plan для `export-resume-pdf`. — Status: `in_progress`.
-- `2026-04-23 10:08` — Для последнего remaining workflow открыт dedicated plan `2026-04-23-export-resume-pdf-workflow.md`. — Baseline inventory подтвердил отсутствие runtime PDF workflow, наличие только manual historical renderer в `employers/TaxDome/`, существование `profile/contact-regions.yml` и отсутствие PDF templates в `templates/`, а M2 того же плана сразу закрепил first executable contract: `MASTER`/role resume как source, `ru`-only baseline, durable output under `profile/pdf/` и mandatory preview/report trail under `agent_memory/runtime/export-resume-pdf/`. — Status: `in_progress`.
-- `2026-04-23 10:57` — В dedicated plan `export-resume-pdf` закрыт M3 helper milestone: `application_agent.export_resume_pdf` теперь детерминированно строит markdown projection, применяет `contact_region` overlay только к public surface, рендерит PDF через `reportlab`, собирает verification report и preview PNG trail, а targeted validation подтверждена (`python -m unittest tests.test_export_resume_pdf_helpers` -> `OK`). — Это снимает implementation blocker helper layer внутри master M5 и переводит execution focus на M4 workflow/CLI wiring для `export-resume-pdf`. — Status: `in_progress`.
-- `2026-04-23 15:04` — Master M5 закрыт полностью: `export-resume-pdf` завершён end-to-end, `README.md` и `profile/README.md` синхронизированы с final PDF contract, а full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (74 tests)`, `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory`). — Все planned remaining workflows из этого master plan теперь реализованы и провалидированы. — Status: `done`.
+- `2026-04-21 16:43` — Проведена первичная разведка корня, `tooling/`, submodule-кода, тестов, шаблонов, runtime-памяти, vacancy-артефактов, legacy prompt-материалов и manual output traces. — `python -m unittest discover -s tests` -> `36 tests, OK`; `pytest` отсутствует; runtime memory указывает на несуществующие vacancy folders. — Статус: `in_progress`.
+- `2026-04-21 16:43` — Создан master plan и выделены самостоятельные workstreams для дальнейшей работы без повторного обследования. — Валидация опирается на файловую структуру, `unittest` и документированные команды CLI. — Статус: `in_progress`.
+- `2026-04-21 19:51` — Master plan пересобран после повторного review всех plans и superseded artifacts. — Последовательность зафиксирована как `M3 cleanup -> M4 completion gate -> M5 planning remaining workflows`. — Статус: `in_progress`.
+- `2026-04-21 19:51` — Superseded plan/spec artifacts мигрированы в active plans и удалены из репозитория. — Валидация migration/removal теперь опирается на `Test-Path = False` для старых файлов и на содержимое новых plan files. — Статус: `in_progress`.
+- `2026-04-21 20:35` — M1 в workstream-плане root normalization завершен: добавлены inventory matrix и migration map, подтверждено, что runtime реально живет на `resumes/`, `vacancies/`, `agent_memory/` и Excel, а `profile/`, `knowledge/`, `adoptions/` пока остаются целевыми stores. — M1 validation passed with `root/plans = False`, `profile/contact-regions.yml = False` and 3 current vacancy directories; активный шаг M3 смещен на canonical root contracts. — Статус: `in_progress`.
+- `2026-04-21 21:02` — M2 в workstream-плане root normalization завершен: canonical contract map зафиксировал разделение между durable root stores, generated vacancy-local artifacts и historical/reference layers. — Ключевой результат: root `adoptions/` признан long-lived review layer, а `vacancies/<id>/adoptions.md` — staging artifact текущего runtime. — Статус: `in_progress`.
+- `2026-04-21 20:33` — M3 output-placement substep в root-normalization workstream закрыт: validation confirmed the current contents of `employers/`, `archive/` и `resumes/versions/`, after which placement and lifecycle rules were fixed in the workstream plan. — Следующий cleanup focus внутри master M3 переместился на legacy prompt/doc distillation (`promts/`, `responses.md`, `adoptions_00.md`). — Статус: `in_progress`.
+- `2026-04-22 09:10` — Master M3 закрыт: root-normalization workstream завершён полностью после фиксации distillation map по `promts/*.md`, `responses.md` и `adoptions_00.md`, а также подтверждения, что старые root plan/spec artifacts по-прежнему отсутствуют. — Cleanup больше не является активным этапом; следующий шаг смещён на explicit completion gate текущего workflow-стека. — Статус: `done`.
+- `2026-04-22 09:10` — Master M4 стартовал: создан отдельный plan `2026-04-22-current-workflow-completion-gate.md` и зафиксирован initial baseline по CLI, runtime memory и tests. — `list-workflows` показывает только `ingest-vacancy` и `analyze-vacancy`, тогда как `show-memory` и `WORKFLOW_CATALOG` всё ещё включают `bootstrap`; `unittest` остаётся зелёным (`39 tests, OK`). — Статус: `in_progress`.
+- `2026-04-22 09:17` — M4 продолжен внутри dedicated plan: baseline доведён до contradiction ledger и candidate completion criteria. — Дополнительная проверка показала реальный runtime blocker по path contract (`resumes/` существует, `CV/` отсутствует, но код всё ещё читает `CV/`) и незакрытый policy question по `response-monitoring.xlsx`. — Статус: `in_progress`.
+- `2026-04-22 10:03` — Stage решений завершён: completion-gate plan закрыт как planning artifact, а следующий execution step перенесён в `2026-04-22-current-stack-contract-remediation.md`. — Это отделяет определение blocker-ов от их исправления и делает master M4 исполнимым. — Статус: `in_progress`.
+- `2026-04-22 10:14` — Первый remediation substep завершён: `python run_agent.py --root ../.. list-workflows` теперь согласован с `project_memory.workflow_catalog`, а `python -m unittest tests.test_memory_store tests.test_cli` проходит (`5 tests, OK`). — Bootstrap catalog drift снят; remaining focus внутри M4 смещён на `CV/` -> `resumes/` и explicit Excel prerequisite. — Статус: `in_progress`.
+- `2026-04-22 10:17` — Второй remediation substep завершён: targeted search по workflow/tests/runbook больше не находит `CV` path references, а `python -m unittest tests.test_analyze_workflow tests.test_prepare_screening_workflow` проходит (`5 tests, OK`). — Resume path drift снят; активным blocker-ом внутри master M4 остаётся только explicit Excel prerequisite contract. — Статус: `in_progress`.
+- `2026-04-22 10:23` — Третий remediation substep завершён: `ingest-vacancy` больше не создаёт partial vacancy scaffold без workbook, а `python -m unittest tests.test_ingest_workflow tests.test_analyze_workflow tests.test_prepare_screening_workflow` проходит (`29 tests, OK`). — Все содержательные blocker-ы M4 сняты; master plan переходит к финальной remediation validation и handback. — Статус: `in_progress`.
+- `2026-04-22 10:26` — Master M4 закрыт: `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory` и `python -m unittest discover -s tests` подтверждают, что current stack больше не имеет скрытых contract blocker-ов для feature planning. — Следующий этап master sequencing смещён на M5 ordered planning for remaining workflows. — Статус: `done`.
+- `2026-04-22 10:41` — M5 revalidation завершена: evidence из safety/root plans и текущего кода подтверждает, что `prepare-screening` остаётся первым исполнимым кандидатом, потому что уже имеет runtime core, тогда как `rebuild-master`, `rebuild-role-resume`, `build-linkedin` и `export-resume-pdf` всё ещё зависят от отдельных downstream contracts. — Кодовая реализация M5 начинается с CLI/catalog/operator integration для `prepare-screening`. — Статус: `in_progress`.
+- `2026-04-22 10:58` — CLI/catalog/operator integration для `prepare-screening` завершена: targeted tests и `list-workflows` подтверждают, что workflow теперь зарегистрирован и доступен через public entrypoint. — Master M5 остаётся активным, потому что для полного handoff этого первого remaining workflow ещё нужен M3 smoke-check на реальном vacancy scenario. — Статус: `in_progress`.
+- `2026-04-22 11:08` — Первый remaining workflow закрыт end-to-end: `prepare-screening` теперь реализован, провалидирован и опробован на реальной вакансии. — Master M5 продолжается уже не вокруг этого workflow, а вокруг следующего dependency-gated этапа `rebuild-master`. — Статус: `in_progress`.
+- `2026-04-22 11:18` — M5 продолжен через dedicated plan для `rebuild-master`: baseline contract inventory собран, а активный blocker сведён к product decision по permanent signals и accepted adoptions. — Это отделяет реальную нехватку решения от технической неопределённости и не даёт prematurely стартовать risky resume-editing workflow. — Статус: `in_progress`.
+- `2026-04-22 11:42` — M5 перепоследован после owner clarification: ближайшим planning/execution step теперь является отдельный review/acceptance workflow, а `rebuild-master` переведён в downstream-зависимость от него. — Это повышает качество sequencing: сначала approval/normalization, потом master mutation, потом role rebuild. — Статус: `in_progress`.
+- `2026-04-22 13:50` — В dedicated plan review/acceptance закрыт M2: interaction shape и file contract теперь закреплены без product ambiguity, включая shared ledger `adoptions/questions/open.md`, separate intake stage и отсутствие role-specific accepted artifacts. — Remaining work внутри M5 теперь сводится не к выбору модели, а к implementation-ready decomposition. — Статус: `in_progress`.
+- `2026-04-22 15:53` — Dedicated planning plan review/acceptance завершён полностью: создан execution plan с отдельными milestones для intake workflow, review helper layer, agent-guided review support и rebuild-master handoff. — Ordered workflow backlog внутри M5 снова стал исполнимым без дополнительных product решений. — Статус: `in_progress`.
+- `2026-04-22 18:49` — Upstream review/acceptance execution и downstream `rebuild-master` завершены end-to-end: `README.md` и dedicated plan фиксируют final contract, а full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (57 tests)`, `list-workflows`, `show-memory`). — Sequencing ambiguity для `MASTER` снята; следующий remaining-workflow step внутри M5 теперь сводится к открытию dedicated plan для `rebuild-role-resume`. — Статус: `in_progress`.
+- `2026-04-22 19:33` — Dedicated plan для `build-linkedin` открыт и доведён до baseline M1: подтверждено отсутствие workflow-кода, пустой почти `profile/` layer и наличие only-historical prompt map в `promts/promt-create-linkedin-profile.md`. — M5 остаётся активным, но его текущий blocker теперь narrowed до одного contract-decision milestone внутри нового плана. — Статус: `in_progress`.
+- `2026-04-22 20:05` — `rebuild-role-resume` завершён end-to-end: helper module, workflow wiring, runtime report, docs sync и full validation baseline подтверждены (`python -m unittest discover -s tests` -> `OK (62 tests)`, `list-workflows`, `show-memory`). — Sequencing для resume family теперь доведён от `accepted` до `MASTER` и выбранного role resume; следующий remaining-workflow step смещается на `build-linkedin`. — Статус: `in_progress`.
+- `2026-04-23 08:57` — Contract ambiguity для `build-linkedin` снята: dedicated plan M2 закрепил one-pack output `profile/linkedin/<target_role>.md`, обязательный `target_role`, deterministic precedence между `MASTER`, role resume и optional profile metadata, а также privacy-safe contact policy. — Validation опиралась на повторное чтение dedicated plan, `profile/README.md` и historical LinkedIn prompt map. — Статус: `in_progress`.
+- `2026-04-23 09:17` — Helper layer для `build-linkedin` реализован и провалидирован: `application_agent.linkedin_builder` рендерит deterministic artifact `profile/linkedin/<target_role>.md`, использует front matter `MASTER.md` как fallback profile surface, уважает optional metadata override и не выводит private contacts в public-ready blocks. — Валидация: `python -m unittest tests.test_build_linkedin_helpers` -> `OK`. — Статус: `in_progress`.
+- `2026-04-23 09:27` — `build-linkedin` M4 workflow wiring завершён: helper layer обёрнут в executable workflow, добавлены registry/cli/config/runtime-catalog wiring и per-role runtime report, а targeted validation подтверждает новый public entrypoint (`python -m unittest tests.test_build_linkedin_helpers tests.test_build_linkedin_workflow tests.test_cli tests.test_memory_store` -> `OK`, `python run_agent.py --root ../.. list-workflows` показывает `build-linkedin`). — Remaining work внутри master M5 теперь сводится к docs sync и full validation/handoff milestone M5 dedicated plan. — Статус: `in_progress`.
+- `2026-04-23 09:46` — `build-linkedin` завершён end-to-end: operator docs и root profile docs синхронизированы, full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (67 tests)`, `list-workflows`, `show-memory`), а dedicated plan переведён в `done`. — Sequencing remaining workflows снова narrowed до одного шага: открыть dedicated plan для `export-resume-pdf`. — Статус: `in_progress`.
+- `2026-04-23 10:08` — Для последнего remaining workflow открыт dedicated plan `2026-04-23-export-resume-pdf-workflow.md`. — Baseline inventory подтвердил отсутствие runtime PDF workflow, наличие только manual historical renderer в `employers/TaxDome/`, существование `profile/contact-regions.yml` и отсутствие PDF templates в `templates/`, а M2 того же плана сразу закрепил first executable contract: `MASTER`/role resume как source, `ru`-only baseline, durable output under `profile/pdf/` и mandatory preview/report trail under `agent_memory/runtime/export-resume-pdf/`. — Статус: `in_progress`.
+- `2026-04-23 10:57` — В dedicated plan `export-resume-pdf` закрыт M3 helper milestone: `application_agent.export_resume_pdf` теперь детерминированно строит markdown projection, применяет `contact_region` overlay только к public surface, рендерит PDF через `reportlab`, собирает verification report и preview PNG trail, а targeted validation подтверждена (`python -m unittest tests.test_export_resume_pdf_helpers` -> `OK`). — Это снимает implementation blocker helper layer внутри master M5 и переводит execution focus на M4 workflow/CLI wiring для `export-resume-pdf`. — Статус: `in_progress`.
+- `2026-04-23 15:04` — Master M5 закрыт полностью: `export-resume-pdf` завершён end-to-end, `README.md` и `profile/README.md` синхронизированы с final PDF contract, а full validation baseline подтверждён (`python -m unittest discover -s tests` -> `OK (74 tests)`, `python run_agent.py --root ../.. list-workflows`, `python run_agent.py --root ../.. show-memory`). — Все planned remaining workflows из этого master plan теперь реализованы и провалидированы. — Статус: `done`.
 
-## Current state
+## Текущее состояние
 
-- Current milestone: `completed`
-- Current status: `done`
-- Next step: `Открыть новый dedicated или master plan только при появлении следующего workstream-а поверх текущего стабильного workflow catalog.`
-- Active blockers:
-  - none
-- Open questions:
-  - none
+- Текущий milestone: `completed`
+- Текущий статус: `done`
+- Следующий шаг: `Открыть новый dedicated или master plan только при появлении следующего workstream-а поверх текущего стабильного workflow catalog.`
+- Активные блокеры:
+  - нет
+- Открытые вопросы:
+  - нет
 
-## Completion summary
+## Итог завершения
 
 Master plan завершён: cleanup, completion gate и вся ordered wave remaining workflows доведены до исполнимого и провалидированного состояния.
 
