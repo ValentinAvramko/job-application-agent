@@ -134,9 +134,9 @@ job-application-agent --root ../.. list-workflows
 - `llm_text_verbosity=medium` подходит для `analysis.md` и `adoptions.md`: результат должен быть содержательным, но не расползаться.
 - Для русского результата `analyze-vacancy` обязательно загружает skill `humanize-russian-business-text` и передаёт его текст модели. Без доступного skill workflow должен завершиться ошибкой.
 
-Quality mode note: final cover-letter runs should use `gpt-5.4` or stronger with `llm_reasoning_effort=high` and `llm_text_verbosity=medium`. `gpt-5.4-mini` with `medium` reasoning is acceptable for smoke and draft runs, but it is not the recommended final mode for vacancy-specific cover letters.
+Для финальных запусков сопроводительного письма нужно использовать `gpt-5.4` или более сильную модель с `llm_reasoning_effort=high` и `llm_text_verbosity=medium`. Режим `gpt-5.4-mini` с `medium` reasoning допустим для smoke-проверок и черновиков, но не является рекомендуемым финальным режимом для писем под конкретную вакансию.
 
-For Russian output, `analyze-vacancy` performs a separate humanizer pass for `cover_letter_standard` and `cover_letter_short`. The pass is a required quality gate for the OpenAI provider and must not add new facts; the final signature is appended by code from `profile/contact-regions.yml`.
+Для русскоязычного результата `analyze-vacancy` выполняет отдельный humanizer-pass для `cover_letter_standard` и `cover_letter_short`. Этот проход является обязательным quality gate для OpenAI provider и не должен добавлять новые факты; итоговая подпись добавляется кодом из `profile/contact-regions.yml`.
 
 Prompt-тексты `analyze-vacancy` лежат вне Python-кода. Приоритет:
 
