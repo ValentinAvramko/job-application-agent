@@ -13,6 +13,7 @@ from application_agent.memory.store import JsonMemoryStore
 from application_agent.workspace import WorkspaceLayout
 from application_agent.workflows import ingest_vacancy
 from application_agent.workflows.analyze_vacancy import (
+    ANALYZE_PROMPT_FILES,
     AnalyzeVacancyError,
     AnalyzeVacancyRequest,
     AnalyzeVacancyWorkflow,
@@ -96,6 +97,16 @@ def test_analyze_creates_rich_package_and_selects_hoe_for_fintehrobot(monkeypatc
     assert "### Позиционирование" in analysis_text
     assert "Standard version" in analysis_text
     assert "Short version" in analysis_text
+    assert "engineering organization" in analysis_text
+    assert "30+" in analysis_text or "35+" in analysis_text
+    assert "DORA" in analysis_text
+    assert "Kubernetes" in analysis_text
+    assert "Kafka" in analysis_text
+    assert "PostgreSQL" in analysis_text
+    assert "fintech" not in analysis_text.lower()
+    assert "идеально подходит" not in analysis_text.lower()
+    assert "быстро принес" not in analysis_text.lower()
+    assert "успешно закро" not in analysis_text.lower()
     assert analysis_text.count("Валентин Аврамко") == 2
     assert analysis_text.count("Telegram: @ValentinAvramko") == 2
     assert "В качестве основной версии резюме" not in analysis_text
@@ -241,9 +252,17 @@ def test_prompt_bundle_uses_root_prompt_overrides(monkeypatch: pytest.MonkeyPatc
     skill_path.write_text("# Humanize Russian Business Text\n\nТестовые правила skill.", encoding="utf-8")
     prompt_dir = layout.agent_memory_dir / "prompts" / "analyze-vacancy"
     prompt_dir.mkdir(parents=True, exist_ok=True)
-    (prompt_dir / "system.ru.md").write_text("ROOT SYSTEM PROMPT RU", encoding="utf-8")
-    (prompt_dir / "task.ru.md").write_text("ROOT TASK PROMPT RU", encoding="utf-8")
-    (prompt_dir / "cover-letter-contract.ru.md").write_text("ROOT COVER CONTRACT RU", encoding="utf-8")
+    root_prompt_values = {
+        "system.ru.md": "ROOT SYSTEM PROMPT RU",
+        "task.ru.md": "ROOT TASK PROMPT RU",
+        "resume-selection.ru.md": "ROOT RESUME SELECTION RU",
+        "analysis-contract.ru.md": "ROOT ANALYSIS CONTRACT RU",
+        "cover-letter-contract.ru.md": "ROOT COVER CONTRACT RU",
+        "resume-adaptation-contract.ru.md": "ROOT RESUME ADAPTATION RU",
+        "humanizer-pass.ru.md": "ROOT HUMANIZER PASS RU",
+    }
+    for filename in ANALYZE_PROMPT_FILES.values():
+        (prompt_dir / filename).write_text(root_prompt_values[filename], encoding="utf-8")
     vacancy_id = ingest_vacancy_fixture(
         layout=layout,
         store=store,
@@ -273,7 +292,11 @@ def test_prompt_bundle_uses_root_prompt_overrides(monkeypatch: pytest.MonkeyPatc
     prompt_bundle = captured["prompt_bundle"]
     assert prompt_bundle["system_prompt"] == "ROOT SYSTEM PROMPT RU"
     assert prompt_bundle["task_prompt"] == "ROOT TASK PROMPT RU"
+    assert prompt_bundle["resume_selection_contract"] == "ROOT RESUME SELECTION RU"
+    assert prompt_bundle["analysis_contract"] == "ROOT ANALYSIS CONTRACT RU"
     assert prompt_bundle["cover_letter_contract"] == "ROOT COVER CONTRACT RU"
+    assert prompt_bundle["resume_adaptation_contract"] == "ROOT RESUME ADAPTATION RU"
+    assert prompt_bundle["humanizer_pass_prompt"] == "ROOT HUMANIZER PASS RU"
     assert "Humanize Russian Business Text" in prompt_bundle["russian_text_skill"]
 
 
@@ -308,6 +331,10 @@ def test_openai_provider_uses_responses_api_with_reasoning(monkeypatch: pytest.M
             "language": "ru",
             "vacancy_id": "v",
             "_prompt_bundle": {
+                "resume_selection_contract": "ROOT RESUME SELECTION RU",
+                "analysis_contract": "ROOT ANALYSIS CONTRACT RU",
+                "resume_adaptation_contract": "ROOT RESUME ADAPTATION RU",
+                "humanizer_pass_prompt": "ROOT HUMANIZER PASS RU",
                 "system_prompt": "Системная инструкция на русском языке.",
                 "task_prompt": "Создай пакет анализа вакансии.",
                 "cover_letter_contract": "# Контракт сопроводительного письма\n\nНе упоминай имена файлов резюме.",
@@ -327,7 +354,7 @@ def test_openai_provider_uses_responses_api_with_reasoning(monkeypatch: pytest.M
 
     assert result == package
     assert captured["url"] == "https://api.openai.com/v1/responses"
-    assert captured["timeout"] == 240
+    assert captured["timeout"] == 600
     payload = captured["payload"]
     assert payload["model"] == "gpt-5.4-mini"
     assert payload["reasoning"] == {"effort": "medium", "summary": "auto"}
@@ -335,12 +362,81 @@ def test_openai_provider_uses_responses_api_with_reasoning(monkeypatch: pytest.M
     assert payload["text"]["format"]["type"] == "json_schema"
     assert payload["input"][0]["content"][0]["text"] == "Системная инструкция на русском языке."
     user_payload = json.loads(payload["input"][1]["content"][0]["text"])
+    assert user_payload["контракт_выбора_резюме"] == "ROOT RESUME SELECTION RU"
+    assert user_payload["контракт_анализа"] == "ROOT ANALYSIS CONTRACT RU"
+    assert user_payload["контракт_адаптации_резюме"] == "ROOT RESUME ADAPTATION RU"
     assert user_payload["задача"] == "Создай пакет анализа вакансии."
     assert "Контракт сопроводительного письма" in user_payload["контракт_сопроводительного_письма"]
     assert "Humanize Russian Business Text" in user_payload["обязательный_skill_humanize_russian_business_text"]
     assert user_payload["путь_к_skill"] == "C:/skills/humanize-russian-business-text/SKILL.md"
     assert "_prompt_bundle" not in user_payload["evidence_pack"]
     assert "temperature" not in payload
+
+
+def test_openai_provider_humanizer_uses_prompt_module(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "output_text": json.dumps(
+                        {
+                            "cover_letter_standard": "edited standard",
+                            "cover_letter_short": "edited short",
+                        }
+                    )
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(request, timeout: int):
+        captured["payload"] = json.loads(request.data.decode("utf-8"))
+        captured["timeout"] = timeout
+        return _FakeResponse()
+
+    monkeypatch.setattr("application_agent.workflows.analyze_vacancy.urllib.request.urlopen", fake_urlopen)
+
+    package = {
+        "cover_letter_standard": "draft standard",
+        "cover_letter_short": "draft short",
+        "cover_letter_evidence": ["confirmed fact"],
+    }
+    updated, applied = OpenAICompatibleProvider().humanize_cover_letters(
+        evidence_pack={
+            "_prompt_bundle": {
+                "system_prompt": "system",
+                "task_prompt": "task",
+                "resume_selection_contract": "resume selection",
+                "analysis_contract": "analysis",
+                "cover_letter_contract": "cover letter",
+                "resume_adaptation_contract": "resume adaptation",
+                "humanizer_pass_prompt": "ROOT HUMANIZER PASS RU",
+                "russian_text_skill": "# Humanize Russian Business Text\n\nSkill rules.",
+                "russian_text_skill_path": "C:/skills/humanize-russian-business-text/SKILL.md",
+            },
+            "selected_resume_text": "selected resume",
+            "master_text": "master",
+        },
+        package=package,
+        config=LLMRuntimeConfig(model="gpt-5.4-mini", api_key="test-key"),
+    )
+
+    assert applied is True
+    assert updated["cover_letter_standard"] == "edited standard"
+    assert updated["cover_letter_short"] == "edited short"
+    assert captured["timeout"] == 300
+    payload = captured["payload"]
+    assert payload["input"][0]["content"][0]["text"] == "ROOT HUMANIZER PASS RU"
+    user_payload = json.loads(payload["input"][1]["content"][0]["text"])
+    assert user_payload["humanizer_pass_task"] == "ROOT HUMANIZER PASS RU"
+    assert "rules" not in user_payload
+    assert user_payload["required_json_keys"] == ["cover_letter_standard", "cover_letter_short"]
 
 
 def test_role_catalog_supports_russian_headings() -> None:
