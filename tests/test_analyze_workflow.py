@@ -327,7 +327,7 @@ def test_openai_provider_uses_responses_api_with_reasoning(monkeypatch: pytest.M
 
     assert result == package
     assert captured["url"] == "https://api.openai.com/v1/responses"
-    assert captured["timeout"] == 90
+    assert captured["timeout"] == 240
     payload = captured["payload"]
     assert payload["model"] == "gpt-5.4-mini"
     assert payload["reasoning"] == {"effort": "medium", "summary": "auto"}
@@ -438,9 +438,36 @@ def build_workspace(prefix: str) -> tuple[Path, WorkspaceLayout, JsonMemoryStore
     workspace_dir.mkdir(parents=True, exist_ok=True)
     layout = WorkspaceLayout(workspace_dir)
     layout.bootstrap()
+    seed_contact_regions(layout)
     store = JsonMemoryStore(layout)
     store.bootstrap()
     return workspace_dir, layout, store
+
+
+def seed_contact_regions(layout: WorkspaceLayout) -> None:
+    layout.profile_dir.mkdir(parents=True, exist_ok=True)
+    (layout.profile_dir / "contact-regions.yml").write_text(
+        "\n".join(
+            [
+                "full_name:",
+                "  ru: \"Валентин Аврамко\"",
+                "  eu: \"Valentin Avramko\"",
+                "regions:",
+                "  RU:",
+                "    telegram: \"@ValentinAvramko\"",
+                "  EU:",
+                "    telegram: \"@ValentinAvramko\"",
+                "defaults:",
+                "  contact_region_by_vacancy_country:",
+                "    Russia: RU",
+                "    Россия: RU",
+                "    default: EU",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
 
 
 def seed_role_profile(layout: WorkspaceLayout, role_id: str, signals: list[str], ats_terms: list[str]) -> None:

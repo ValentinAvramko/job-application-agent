@@ -93,9 +93,13 @@ def build_workspace(prefix: str) -> tuple[Path, WorkspaceLayout, JsonMemoryStore
     workspace_dir.mkdir(parents=True, exist_ok=True)
     layout = WorkspaceLayout(workspace_dir)
     layout.bootstrap()
+    seed_contact_regions(layout)
     store = JsonMemoryStore(layout)
     store.bootstrap()
     return (workspace_dir, layout, store)
+
+def seed_contact_regions(layout: WorkspaceLayout) -> None:
+    (layout.profile_dir / 'contact-regions.yml').write_text('\n'.join(['full_name:', '  ru: "Валентин Аврамко"', '  eu: "Valentin Avramko"', 'regions:', '  RU:', '    telegram: "@ValentinAvramko"', '  EU:', '    telegram: "@ValentinAvramko"', 'defaults:', '  contact_region_by_vacancy_country:', '    Russia: RU', '    Россия: RU', '    default: EU']) + '\n', encoding='utf-8', newline='\n')
 
 def write_resume(workspace_dir: Path, role: str, lines: list[str]) -> None:
     resumes_dir = workspace_dir / 'resumes'

@@ -88,8 +88,8 @@ job-application-agent --root ../.. list-workflows
 {
   "analyze-vacancy": {
     "llm_provider": "openai",
-    "llm_model": "gpt-5.4-mini",
-    "llm_reasoning_effort": "medium",
+    "llm_model": "gpt-5.4",
+    "llm_reasoning_effort": "high",
     "llm_reasoning_summary": "auto",
     "llm_text_verbosity": "medium",
     "target_mode": "balanced",
@@ -118,8 +118,8 @@ job-application-agent --root ../.. list-workflows
 ```json
 {
   "llm_provider": "openai",
-  "llm_model": "gpt-5.4-mini",
-  "llm_reasoning_effort": "medium",
+  "llm_model": "gpt-5.4",
+  "llm_reasoning_effort": "high",
   "llm_reasoning_summary": "auto",
   "llm_text_verbosity": "medium",
   "russian_text_skill_path": "C:\\Users\\avramko\\.agents\\skills\\humanize-russian-business-text\\SKILL.md"
@@ -133,6 +133,10 @@ job-application-agent --root ../.. list-workflows
 - `llm_reasoning_effort=medium` даёт модели достаточно reasoning для сопоставления требований и фактов, но не делает каждый запуск максимально дорогим.
 - `llm_text_verbosity=medium` подходит для `analysis.md` и `adoptions.md`: результат должен быть содержательным, но не расползаться.
 - Для русского результата `analyze-vacancy` обязательно загружает skill `humanize-russian-business-text` и передаёт его текст модели. Без доступного skill workflow должен завершиться ошибкой.
+
+Quality mode note: final cover-letter runs should use `gpt-5.4` or stronger with `llm_reasoning_effort=high` and `llm_text_verbosity=medium`. `gpt-5.4-mini` with `medium` reasoning is acceptable for smoke and draft runs, but it is not the recommended final mode for vacancy-specific cover letters.
+
+For Russian output, `analyze-vacancy` performs a separate humanizer pass for `cover_letter_standard` and `cover_letter_short`. The pass is a required quality gate for the OpenAI provider and must not add new facts; the final signature is appended by code from `profile/contact-regions.yml`.
 
 Prompt-тексты `analyze-vacancy` лежат вне Python-кода. Приоритет:
 

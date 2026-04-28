@@ -30,6 +30,7 @@ LLM_PACKAGE_REQUIRED_KEYS = [
     "final_recommendation",
     "cover_letter_standard",
     "cover_letter_short",
+    "cover_letter_evidence",
     "adaptation_overview",
     "temp_signals",
     "perm_signals",
@@ -42,8 +43,8 @@ LLM_PACKAGE_REQUIRED_KEYS = [
 RU_PRIORITY = {"must": "Обязательное", "nice": "Плюс"}
 RU_COVERAGE = {"full": "Полное", "partial": "Частичное", "none": "Нет", "unclear": "Неясно"}
 RU_CONFIDENCE = {"high": "Высокая", "medium": "Средняя", "low": "Низкая"}
-COVER_LETTER_SIGNATURE = "Валентин Аврамко\nTelegram: @ValentinAvramko"
 PROMPT_BUNDLE_KEY = "_prompt_bundle"
+MOJIBAKE_TOKENS = ("Рџ", "РЎ", "Рђ", "Р’", "Рљ", "Рќ", "Рѕ", "Рё", "СЃ", "СЏ", "СЊ", "вЂ")
 ANALYZE_PROMPT_FILES = {
     "system_prompt": "system.ru.md",
     "task_prompt": "task.ru.md",
@@ -142,6 +143,14 @@ class AnalyzePromptBundle:
 
 
 @dataclass(frozen=True)
+class ContactSignature:
+    full_name: str
+    telegram: str
+    region: str
+    signature: str
+
+
+@dataclass(frozen=True)
 class RoleCandidate:
     role_id: str
     resume_path: Path
@@ -179,6 +188,15 @@ class AnalyzeVacancyError(RuntimeError):
 class LLMProvider:
     def generate(self, *, evidence_pack: dict[str, Any], config: LLMRuntimeConfig) -> dict[str, Any]:
         raise NotImplementedError
+
+    def humanize_cover_letters(
+        self,
+        *,
+        evidence_pack: dict[str, Any],
+        package: dict[str, Any],
+        config: LLMRuntimeConfig,
+    ) -> tuple[dict[str, Any], bool]:
+        return package, False
 
 
 class FakeLLMProvider(LLMProvider):
@@ -230,16 +248,92 @@ class OpenAICompatibleProvider(LLMProvider):
             ],
             "text": {"format": build_llm_response_format()},
         }
-        if config.temperature is not None:
-            payload["temperature"] = config.temperature
-        if config.reasoning_effort or config.reasoning_summary:
-            payload["reasoning"] = {}
-            if config.reasoning_effort:
-                payload["reasoning"]["effort"] = config.reasoning_effort
-            if config.reasoning_summary:
-                payload["reasoning"]["summary"] = config.reasoning_summary
-        if config.text_verbosity:
-            payload["text"]["verbosity"] = config.text_verbosity
+        apply_llm_config(payload, config)
+        raw = self._request_json(payload=payload, config=config, timeout=240)
+        content = extract_response_output_text(raw)
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise AnalyzeVacancyError("LLM returned invalid JSON content.") from exc
+
+    def humanize_cover_letters(
+        self,
+        *,
+        evidence_pack: dict[str, Any],
+        package: dict[str, Any],
+        config: LLMRuntimeConfig,
+    ) -> tuple[dict[str, Any], bool]:
+        prompt_bundle = prompt_bundle_from_evidence_pack(evidence_pack)
+        if not prompt_bundle.russian_text_skill:
+            return package, False
+        payload = {
+            "model": config.model,
+            "input": [
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": (
+                                "Ты редактор русскоязычного делового текста. "
+                                "Отредактируй только сопроводительные письма по переданному skill. "
+                                "Не добавляй новые факты, цифры, компании, домены или технологии."
+                            ),
+                        }
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": json.dumps(
+                                {
+                                    "skill_humanize_russian_business_text": prompt_bundle.russian_text_skill,
+                                    "cover_letter_contract": prompt_bundle.cover_letter_contract,
+                                    "confirmed_evidence": {
+                                        "cover_letter_evidence": package.get("cover_letter_evidence", []),
+                                        "selected_resume_text": evidence_pack.get("selected_resume_text", ""),
+                                        "master_text": evidence_pack.get("master_text", ""),
+                                        "careful_claims": evidence_pack.get("careful_claims", []),
+                                        "forbidden_claims": evidence_pack.get("forbidden_claims", []),
+                                    },
+                                    "letters": {
+                                        "cover_letter_standard": package.get("cover_letter_standard", ""),
+                                        "cover_letter_short": package.get("cover_letter_short", ""),
+                                    },
+                                    "rules": [
+                                        "Return only valid JSON with cover_letter_standard and cover_letter_short.",
+                                        "Preserve all confirmed facts that make the letter relevant to the vacancy.",
+                                        "Do not invent facts; do not add unsupported fintech/domain experience.",
+                                        "Do not add placeholders or signatures; signature is appended by code.",
+                                    ],
+                                },
+                                ensure_ascii=False,
+                            ),
+                        }
+                    ],
+                },
+            ],
+            "text": {"format": build_humanizer_response_format()},
+        }
+        apply_llm_config(payload, config)
+        raw = self._request_json(payload=payload, config=config, timeout=180)
+        content = extract_response_output_text(raw)
+        try:
+            updates = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise AnalyzeVacancyError("Humanizer pass returned invalid JSON content.") from exc
+        standard = str(updates.get("cover_letter_standard", "")).strip()
+        short = str(updates.get("cover_letter_short", "")).strip()
+        if not standard or not short:
+            raise AnalyzeVacancyError("Humanizer pass returned empty cover letter content.")
+        updated = dict(package)
+        updated["cover_letter_standard"] = standard
+        updated["cover_letter_short"] = short
+        return updated, True
+
+    def _request_json(self, *, payload: dict[str, Any], config: LLMRuntimeConfig, timeout: int) -> dict[str, Any]:
         request = urllib.request.Request(
             f"{config.base_url.rstrip('/')}/responses",
             data=json.dumps(payload).encode("utf-8"),
@@ -247,16 +341,12 @@ class OpenAICompatibleProvider(LLMProvider):
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=90) as response:
-                raw = json.loads(response.read().decode("utf-8"))
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
         except urllib.error.URLError as exc:
             raise AnalyzeVacancyError(f"LLM request failed: {exc}") from exc
-
-        content = extract_response_output_text(raw)
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError as exc:
-            raise AnalyzeVacancyError("LLM returned invalid JSON content.") from exc
+        except TimeoutError as exc:
+            raise AnalyzeVacancyError(f"LLM request timed out after {timeout} seconds.") from exc
 
 
 def build_llm_runtime_config(request: AnalyzeVacancyRequest) -> LLMRuntimeConfig:
@@ -271,6 +361,19 @@ def build_llm_runtime_config(request: AnalyzeVacancyRequest) -> LLMRuntimeConfig
         reasoning_summary=request.llm_reasoning_summary.strip(),
         text_verbosity=request.llm_text_verbosity.strip(),
     )
+
+
+def apply_llm_config(payload: dict[str, Any], config: LLMRuntimeConfig) -> None:
+    if config.temperature is not None:
+        payload["temperature"] = config.temperature
+    if config.reasoning_effort or config.reasoning_summary:
+        payload["reasoning"] = {}
+        if config.reasoning_effort:
+            payload["reasoning"]["effort"] = config.reasoning_effort
+        if config.reasoning_summary:
+            payload["reasoning"]["summary"] = config.reasoning_summary
+    if config.text_verbosity:
+        payload.setdefault("text", {})["verbosity"] = config.text_verbosity
 
 
 def build_llm_response_format() -> dict[str, Any]:
@@ -295,6 +398,23 @@ def build_llm_response_format() -> dict[str, Any]:
             "additionalProperties": False,
             "properties": properties,
             "required": LLM_PACKAGE_REQUIRED_KEYS,
+        },
+    }
+
+
+def build_humanizer_response_format() -> dict[str, Any]:
+    return {
+        "type": "json_schema",
+        "name": "cover_letter_humanized",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "cover_letter_standard": {"type": "string"},
+                "cover_letter_short": {"type": "string"},
+            },
+            "required": ["cover_letter_standard", "cover_letter_short"],
         },
     }
 
@@ -353,6 +473,7 @@ def load_analyze_prompt_bundle(
         skill_text = resolved_skill_path.read_text(encoding="utf-8").strip()
         if not skill_text:
             raise AnalyzeVacancyError(f"Russian text skill is empty: {resolved_skill_path}")
+        validate_no_mojibake(skill_text, label=str(resolved_skill_path))
     return AnalyzePromptBundle(
         system_prompt=prompts["system_prompt"],
         task_prompt=prompts["task_prompt"],
@@ -365,9 +486,25 @@ def load_analyze_prompt_bundle(
 def load_analyze_prompt_text(*, layout: WorkspaceLayout, filename: str) -> str:
     root_override = layout.agent_memory_dir / "prompts" / "analyze-vacancy" / filename
     if root_override.exists():
-        return root_override.read_text(encoding="utf-8").strip()
+        text = root_override.read_text(encoding="utf-8").strip()
+        validate_no_mojibake(text, label=str(root_override))
+        return text
     package_file = resources.files("application_agent.data").joinpath("prompts", "analyze-vacancy", filename)
-    return package_file.read_text(encoding="utf-8").strip()
+    text = package_file.read_text(encoding="utf-8").strip()
+    validate_no_mojibake(text, label=str(package_file))
+    return text
+
+
+def validate_no_mojibake(text: str, *, label: str) -> None:
+    if is_probable_mojibake(text):
+        raise AnalyzeVacancyError(f"Runtime text appears to contain mojibake/broken encoding: {label}. Save it as UTF-8.")
+
+
+def is_probable_mojibake(text: str) -> bool:
+    if not text:
+        return False
+    hits = sum(text.count(token) for token in MOJIBAKE_TOKENS)
+    return hits >= 4 or "Р РѕСЃСЃ" in text or "Р’Р°Р»РµРЅС‚РёРЅ" in text
 
 
 def resolve_russian_text_skill_path(configured_path: str) -> Path | None:
@@ -391,6 +528,105 @@ def resolve_russian_text_skill_path(configured_path: str) -> Path | None:
 
 def resolve_user_path(raw_path: str) -> Path:
     return Path(os.path.expandvars(raw_path)).expanduser()
+
+
+def load_contact_signature(*, layout: WorkspaceLayout, country: str, language: str) -> ContactSignature:
+    path = layout.profile_dir / "contact-regions.yml"
+    if not path.exists():
+        raise AnalyzeVacancyError(f"Contact regions file is missing: {path}")
+    text = path.read_text(encoding="utf-8")
+    validate_no_mojibake(text, label=str(path))
+    contacts = parse_contact_regions(text)
+    defaults = contacts.get("defaults", {})
+    region = resolve_contact_region(country, defaults)
+    full_names = contacts.get("full_name", {})
+    regions = contacts.get("regions", {})
+    region_contacts = regions.get(region, {}) if isinstance(regions, dict) else {}
+    fallback_region = str(defaults.get("default", "EU") or "EU")
+    fallback_contacts = regions.get(fallback_region, {}) if isinstance(regions, dict) else {}
+    full_name = (
+        str(full_names.get(language, "")).strip()
+        or str(full_names.get("ru", "")).strip()
+        or str(full_names.get("eu", "")).strip()
+    )
+    telegram = str(region_contacts.get("telegram", "") or fallback_contacts.get("telegram", "")).strip()
+    if not full_name or not telegram:
+        raise AnalyzeVacancyError(f"Contact signature is incomplete for region {region}: {path}")
+    return ContactSignature(
+        full_name=full_name,
+        telegram=telegram,
+        region=region,
+        signature=f"{full_name}\nTelegram: {telegram}",
+    )
+
+
+def parse_contact_regions(text: str) -> dict[str, Any]:
+    result: dict[str, Any] = {"full_name": {}, "regions": {}, "defaults": {}}
+    section = ""
+    region = ""
+    default_map = ""
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        stripped = line.strip()
+        if indent == 0 and stripped.endswith(":"):
+            section = stripped[:-1]
+            region = ""
+            default_map = ""
+            continue
+        key, value = split_yaml_scalar(stripped)
+        if section == "full_name" and indent == 2 and key:
+            result["full_name"][key] = value
+        elif section == "regions":
+            if indent == 2 and stripped.endswith(":"):
+                region = stripped[:-1]
+                result["regions"][region] = {}
+            elif indent == 4 and region and key:
+                result["regions"][region][key] = value
+        elif section == "defaults":
+            if indent == 2 and stripped.endswith(":"):
+                default_map = stripped[:-1]
+                result["defaults"][default_map] = {}
+            elif indent == 2 and key:
+                result["defaults"][key] = value
+            elif indent == 4 and default_map and key:
+                result["defaults"].setdefault(default_map, {})[key] = value
+    return result
+
+
+def split_yaml_scalar(line: str) -> tuple[str, str]:
+    if ":" not in line:
+        return "", ""
+    key, value = line.split(":", 1)
+    return key.strip(), unquote_yaml_scalar(value.strip())
+
+
+def unquote_yaml_scalar(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def resolve_contact_region(country: str, defaults: dict[str, Any]) -> str:
+    normalized_country = repair_common_mojibake(country).strip()
+    country_map = defaults.get("contact_region_by_vacancy_country", {})
+    if not isinstance(country_map, dict):
+        country_map = {}
+    if normalized_country in country_map:
+        return str(country_map[normalized_country])
+    lowered = normalized_country.lower()
+    if "russia" in lowered or "росси" in lowered:
+        return str(country_map.get("Russia", "RU"))
+    return str(country_map.get("default") or defaults.get("default") or "EU")
+
+
+def repair_common_mojibake(text: str) -> str:
+    try:
+        return text.encode("cp1251").decode("utf-8")
+    except UnicodeError:
+        return text
 
 
 def is_russian_language(language: str) -> bool:
@@ -456,8 +692,10 @@ class AnalyzeVacancyWorkflow:
         position = request.position.strip() or str(meta.get("position", "")).strip()
         company = request.company.strip() or str(meta.get("company", "")).strip()
         language = normalize_language(request.language or str(meta.get("language", "ru")))
+        vacancy_country = request.country.strip() or str(meta.get("country", "")).strip()
         target_mode = request.target_mode or str(meta.get("target_mode", "balanced"))
         include_employer_channels = request.include_employer_channels or bool(meta.get("include_employer_channels", False))
+        contact_signature = load_contact_signature(layout=layout, country=vacancy_country, language=language)
 
         role_profiles, role_diagnostics = load_role_profiles(layout)
         role_candidates = build_role_candidates(layout=layout, profiles=role_profiles)
@@ -506,6 +744,7 @@ class AnalyzeVacancyWorkflow:
             fit=fit,
             master_text=master_text,
             raw_source=raw_source,
+            contact_signature=contact_signature,
         )
         evidence_pack[PROMPT_BUNDLE_KEY] = asdict(
             load_analyze_prompt_bundle(
@@ -517,7 +756,16 @@ class AnalyzeVacancyWorkflow:
         provider = self.provider or build_llm_provider(request.llm_provider)
         llm_config = build_llm_runtime_config(request)
         llm_package = provider.generate(evidence_pack=evidence_pack, config=llm_config)
-        analysis_package = validate_llm_package(llm_package)
+        draft_package = validate_llm_package(llm_package, contact_signature=None)
+        if hasattr(provider, "humanize_cover_letters"):
+            draft_package, humanizer_applied = provider.humanize_cover_letters(
+                evidence_pack=evidence_pack,
+                package=draft_package,
+                config=llm_config,
+            )
+        else:
+            humanizer_applied = False
+        analysis_package = validate_llm_package(draft_package, contact_signature=contact_signature)
 
         analysis_path.write_text(
             render_analysis(evidence_pack=evidence_pack, analysis_package=analysis_package),
@@ -538,6 +786,8 @@ class AnalyzeVacancyWorkflow:
         meta["llm_reasoning_effort"] = request.llm_reasoning_effort or "n/a"
         meta["llm_reasoning_summary"] = request.llm_reasoning_summary or "n/a"
         meta["llm_text_verbosity"] = request.llm_text_verbosity or "n/a"
+        meta["contact_region"] = contact_signature.region
+        meta["humanizer_pass_applied"] = humanizer_applied
         meta["russian_text_skill_path"] = (
             evidence_pack[PROMPT_BUNDLE_KEY].get("russian_text_skill_path") or "n/a"
         )
@@ -1020,7 +1270,9 @@ def build_evidence_pack(
     fit: FitResult,
     master_text: str,
     raw_source: str,
+    contact_signature: ContactSignature,
 ) -> dict[str, Any]:
+    confirmed_text = "\n\n".join([selected_resume_text, master_text])
     return {
         "vacancy_id": vacancy_id,
         "company": company,
@@ -1043,8 +1295,16 @@ def build_evidence_pack(
         "assessments": [assessment_to_dict(item) for item in assessments],
         "fit": asdict(fit),
         "resume_highlights": extract_resume_highlights(selected_resume_text, limit=8),
+        "selected_resume_text": selected_resume_text,
+        "master_text": master_text,
         "master_available": bool(master_text.strip()),
-        "forbidden_claims": build_forbidden_claims(assessments, selected_profile),
+        "forbidden_claims": build_forbidden_claims(assessments, confirmed_text=confirmed_text),
+        "careful_claims": build_careful_claims(assessments, selected_profile),
+        "contact_region": contact_signature.region,
+        "contact_signature": {
+            "full_name": contact_signature.full_name,
+            "telegram": contact_signature.telegram,
+        },
         "raw_source_excerpt": raw_source[:3000],
     }
 
@@ -1069,10 +1329,33 @@ def assessment_to_dict(item: RequirementAssessment) -> dict[str, str]:
     }
 
 
-def build_forbidden_claims(assessments: list[RequirementAssessment], profile: RoleProfile) -> list[str]:
-    claims = [item.requirement for item in assessments if item.coverage == "none"]
+def build_forbidden_claims(assessments: list[RequirementAssessment], *, confirmed_text: str) -> list[str]:
+    claims = [
+        item.requirement
+        for item in assessments
+        if item.coverage == "none" and not has_claim_evidence(item.requirement, confirmed_text)
+    ]
+    return unique_nonempty(claims)[:8]
+
+
+def build_careful_claims(assessments: list[RequirementAssessment], profile: RoleProfile) -> list[str]:
+    claims = [
+        f"{item.requirement} - аккуратно, опираться только на подтвержденную смежную фактуру"
+        for item in assessments
+        if item.coverage in {"partial", "unclear"}
+    ]
     claims.extend(profile.risky_claims)
     return unique_nonempty(claims)[:8]
+
+
+def has_claim_evidence(claim: str, confirmed_text: str) -> bool:
+    claim_terms = tokenize(claim)
+    text_terms = tokenize(confirmed_text)
+    meaningful = {term for term in claim_terms if term not in STOPWORDS and len(term) >= 4}
+    if not meaningful:
+        return False
+    overlap = meaningful & text_terms
+    return len(overlap) >= min(2, len(meaningful))
 
 
 def build_llm_provider(name: str) -> LLMProvider:
@@ -1084,7 +1367,7 @@ def build_llm_provider(name: str) -> LLMProvider:
     raise AnalyzeVacancyError(f"Unsupported llm_provider '{name}'. Supported providers: openai, fake.")
 
 
-def validate_llm_package(payload: dict[str, Any]) -> dict[str, Any]:
+def validate_llm_package(payload: dict[str, Any], *, contact_signature: ContactSignature | None) -> dict[str, Any]:
     required = LLM_PACKAGE_REQUIRED_KEYS
     missing = [key for key in required if key not in payload]
     if missing:
@@ -1092,7 +1375,8 @@ def validate_llm_package(payload: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(payload)
     for key in required:
         if key in {"cover_letter_standard", "cover_letter_short"}:
-            normalized[key] = ensure_cover_letter_signature(str(normalized[key]).strip())
+            text = str(normalized[key]).strip()
+            normalized[key] = normalize_cover_letter_signature(text, contact_signature) if contact_signature else text
         elif key in {"positioning", "final_recommendation", "adaptation_overview"}:
             normalized[key] = str(normalized[key]).strip()
         else:
@@ -1100,13 +1384,38 @@ def validate_llm_package(payload: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def ensure_cover_letter_signature(text: str) -> str:
+def normalize_cover_letter_signature(text: str, contact_signature: ContactSignature) -> str:
     stripped = text.strip()
     if not stripped:
-        return COVER_LETTER_SIGNATURE
-    if COVER_LETTER_SIGNATURE in stripped:
-        return stripped
-    return f"{stripped}\n\n{COVER_LETTER_SIGNATURE}"
+        return contact_signature.signature
+    stripped = remove_placeholder_signatures(stripped)
+    stripped = remove_existing_signature(stripped, contact_signature)
+    return f"{stripped.rstrip()}\n\n{contact_signature.signature}"
+
+
+def remove_placeholder_signatures(text: str) -> str:
+    cleaned = text
+    patterns = [
+        r"(?im)^\s*С\s+уважением,?\s*$\n\s*\[Имя\]\s*$\n?\s*(?:Telegram:\s*\[Telegram\]\s*)?",
+        r"(?im)^\s*\[Имя\]\s*$",
+        r"(?im)^\s*Telegram:\s*\[Telegram\]\s*$",
+    ]
+    for pattern in patterns:
+        cleaned = re.sub(pattern, "", cleaned).strip()
+    return cleaned
+
+
+def remove_existing_signature(text: str, contact_signature: ContactSignature) -> str:
+    lines = text.splitlines()
+    while lines and not lines[-1].strip():
+        lines.pop()
+    if lines and lines[-1].strip().lower() == f"telegram: {contact_signature.telegram}".lower():
+        lines.pop()
+        if lines and lines[-1].strip() == contact_signature.full_name:
+            lines.pop()
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return "\n".join(lines)
 
 
 def build_deterministic_llm_package(evidence_pack: dict[str, Any]) -> dict[str, Any]:
@@ -1127,6 +1436,15 @@ def build_deterministic_llm_package(evidence_pack: dict[str, Any]) -> dict[str, 
         f"{item['requirement']} - {item['selected_evidence'] or item['master_evidence']}"
         for item in full[:5]
     ] or [f"`{selected_resume}` даёт наиболее релевантный подтверждённый контур для роли."]
+    cover_letter_evidence = unique_nonempty(
+        strengths
+        + [
+            f"{item['requirement']} - {item['selected_evidence'] or item['master_evidence']}"
+            for item in partial[:5]
+            if item.get("selected_evidence") or item.get("master_evidence")
+        ]
+        + list(evidence_pack.get("resume_highlights", []))
+    )[:10]
     gap_items = [
         f"{item['requirement']} - {item['notes']}"
         for item in (gaps + partial)[:5]
@@ -1180,6 +1498,7 @@ def build_deterministic_llm_package(evidence_pack: dict[str, Any]) -> dict[str, 
         "final_recommendation": f"Apply with caveats: score {fit['score']}%, {fit['verdict']}.",
         "cover_letter_standard": cover_standard,
         "cover_letter_short": cover_short,
+        "cover_letter_evidence": cover_letter_evidence,
         "adaptation_overview": (
             "В `adoptions.md` переданы draft-правки для summary, skills и experience. "
             "Все спорные или неподтверждённые пункты помечены как NEW DATA NEEDED или factual boundary."
@@ -1259,6 +1578,10 @@ def render_analysis(*, evidence_pack: dict[str, Any], analysis_package: dict[str
         [
             "",
             "## 2. Сопроводительное письмо",
+            "",
+            "### Cover letter evidence",
+            "",
+            *format_bullets(analysis_package["cover_letter_evidence"]),
             "",
             "### Standard version",
             "",
