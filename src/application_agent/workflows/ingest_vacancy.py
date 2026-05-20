@@ -48,6 +48,7 @@ def build_response_monitoring_record(request: "IngestVacancyRequest", vacancy_id
         country=request.country.strip(),
         work_mode=request.work_mode.strip(),
         ingest_date=request.ingest_date,
+        updated_date=request.source_updated_date,
     )
 
 
@@ -72,6 +73,7 @@ def enrich_request(request: "IngestVacancyRequest") -> "IngestVacancyRequest":
         or is_unspecified(request.country)
         or is_unspecified(request.work_mode)
         or not request.key_skills
+        or request.source_updated_date is None
     )
     if not needs_enrichment:
         return request
@@ -113,6 +115,7 @@ def enrich_request(request: "IngestVacancyRequest") -> "IngestVacancyRequest":
         position=request.position.strip() or details.position,
         source_text=request.source_text.strip() or details.source_text,
         source_markdown=source_markdown,
+        source_updated_date=request.source_updated_date or details.source_updated_date,
         language=language,
         source_channel=request.source_channel.strip() or details.source_channel or infer_source_channel(request.source_url, details.source_text),
         country=country,
@@ -130,6 +133,7 @@ class IngestVacancyRequest:
     position: str = ""
     source_text: str = ""
     source_markdown: str = ""
+    source_updated_date: date | None = None
     source_url: str = ""
     source_channel: str = ""
     source_type: str = ""

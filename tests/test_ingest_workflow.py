@@ -9,7 +9,7 @@ from unittest.mock import patch
 from xml.etree import ElementTree as ET
 from zipfile import ZIP_DEFLATED, ZipFile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from application_agent.integrations.response_monitoring import ResponseMonitoringIngestRecord, append_ingest_record
+from application_agent.integrations.response_monitoring import ResponseMonitoringIngestRecord, append_ingest_record, list_active_response_monitoring_rows, update_response_monitoring_updated_dates
 from application_agent.integrations.playwright_renderer import PlaywrightRenderedPage
 from application_agent.memory.store import JsonMemoryStore
 from application_agent.workspace import WorkspaceLayout
@@ -20,7 +20,7 @@ from application_agent.workflows.registry import build_default_registry
 def create_response_monitoring_workbook(path: Path) -> None:
     workbook_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">\n  <sheets>\n    <sheet name="Данные" sheetId="1" r:id="rId1"/>\n  </sheets>\n</workbook>\n'
     workbook_rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>\n</Relationships>\n'
-    worksheet_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\n  <dimension ref="A1:P4"/>\n  <sheetData>\n    <row r="1">\n      <c r="A1" t="inlineStr"><is><t>Header</t></is></c>\n    </row>\n    <row r="2">\n      <c r="A2" t="inlineStr"><is><t>vacancy_id</t></is></c>\n    </row>\n    <row r="3">\n      <c r="A3" s="5"/>\n      <c r="B3" s="1"/>\n      <c r="C3" s="2"/>\n      <c r="D3" s="3"/>\n      <c r="E3" s="1"/>\n      <c r="F3" s="1"/>\n      <c r="G3" s="1"/>\n      <c r="H3" s="39"/>\n      <c r="I3" s="28"/>\n      <c r="J3" s="25"/>\n      <c r="K3" s="9"/>\n      <c r="L3" s="4"/>\n      <c r="M3" s="4"/>\n      <c r="N3" s="4"/>\n      <c r="O3" s="4"/>\n      <c r="P3" s="10"/>\n    </row>\n    <row r="4">\n      <c r="A4" s="6"/>\n      <c r="B4" s="6"/>\n      <c r="C4" s="7"/>\n      <c r="D4" s="8"/>\n      <c r="E4" s="7"/>\n      <c r="F4" s="7"/>\n      <c r="G4" s="7"/>\n      <c r="H4" s="11"/>\n      <c r="I4" s="29"/>\n      <c r="J4" s="26"/>\n      <c r="K4" s="12"/>\n      <c r="L4" s="13"/>\n      <c r="M4" s="13"/>\n      <c r="N4" s="13"/>\n      <c r="O4" s="13"/>\n      <c r="P4" s="14"/>\n    </row>\n  </sheetData>\n</worksheet>\n'
+    worksheet_xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\n  <dimension ref="A1:Q4"/>\n  <sheetData>\n    <row r="1">\n      <c r="A1" t="inlineStr"><is><t>Header</t></is></c>\n    </row>\n    <row r="2">\n      <c r="A2" t="inlineStr"><is><t>vacancy_id</t></is></c>\n    </row>\n    <row r="3">\n      <c r="A3" s="5"/>\n      <c r="B3" s="1"/>\n      <c r="C3" s="2"/>\n      <c r="D3" s="3"/>\n      <c r="E3" s="1"/>\n      <c r="F3" s="1"/>\n      <c r="G3" s="1"/>\n      <c r="H3" s="39"/>\n      <c r="I3" s="28"/>\n      <c r="J3" s="25"/>\n      <c r="K3" s="9"/>\n      <c r="L3" s="4"/>\n      <c r="M3" s="4"/>\n      <c r="N3" s="4"/>\n      <c r="O3" s="4"/>\n      <c r="P3" s="10"/>\n      <c r="Q3" s="10"/>\n    </row>\n    <row r="4">\n      <c r="A4" s="6"/>\n      <c r="B4" s="6"/>\n      <c r="C4" s="7"/>\n      <c r="D4" s="8"/>\n      <c r="E4" s="7"/>\n      <c r="F4" s="7"/>\n      <c r="G4" s="7"/>\n      <c r="H4" s="11"/>\n      <c r="I4" s="29"/>\n      <c r="J4" s="26"/>\n      <c r="K4" s="12"/>\n      <c r="L4" s="13"/>\n      <c r="M4" s="13"/>\n      <c r="N4" s="13"/>\n      <c r="O4" s="13"/>\n      <c r="P4" s="14"/>\n      <c r="Q4" s="14"/>\n    </row>\n  </sheetData>\n</worksheet>\n'
     content_types = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n  <Default Extension="xml" ContentType="application/xml"/>\n  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>\n  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>\n</Types>\n'
     root_rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>\n</Relationships>\n'
     with ZipFile(path, 'w', compression=ZIP_DEFLATED) as workbook:
@@ -91,8 +91,8 @@ class TestIngestWorkflow:
         assert '\n### Ключевые навыки\n' in source_text
 
     def test_build_response_monitoring_record_maps_ingest_fields(self) -> None:
-        record = build_response_monitoring_record(IngestVacancyRequest(company='Центр электронных финансов', position='Технический лидер', source_url='https://hh.ru/vacancy/132242694', source_channel='HeadHunter', country='Казахстан', work_mode='на месте работодателя', ingest_date=date(2026, 4, 21)), '20260421-tsentr-elektronnyh-finansov-tehnicheskiy-lider')
-        assert record == ResponseMonitoringIngestRecord(vacancy_id='20260421-tsentr-elektronnyh-finansov-tehnicheskiy-lider', source_channel='HeadHunter', source_url='https://hh.ru/vacancy/132242694', company='Центр электронных финансов', position='Технический лидер', country='Казахстан', work_mode='на месте работодателя', ingest_date=date(2026, 4, 21))
+        record = build_response_monitoring_record(IngestVacancyRequest(company='Центр электронных финансов', position='Технический лидер', source_url='https://hh.ru/vacancy/132242694', source_channel='HeadHunter', country='Казахстан', work_mode='на месте работодателя', ingest_date=date(2026, 4, 21), source_updated_date=date(2026, 4, 20)), '20260421-tsentr-elektronnyh-finansov-tehnicheskiy-lider')
+        assert record == ResponseMonitoringIngestRecord(vacancy_id='20260421-tsentr-elektronnyh-finansov-tehnicheskiy-lider', source_channel='HeadHunter', source_url='https://hh.ru/vacancy/132242694', company='Центр электронных финансов', position='Технический лидер', country='Казахстан', work_mode='на месте работодателя', ingest_date=date(2026, 4, 21), updated_date=date(2026, 4, 20))
 
     def test_ingest_requires_existing_response_monitoring_workbook(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
@@ -127,12 +127,12 @@ class TestIngestWorkflow:
         vacancy_id = build_vacancy_id(request.ingest_date, request.company, request.position)
         assert not layout.vacancy_dir(vacancy_id).exists()
 
-    def test_append_ingest_record_writes_columns_a_to_k(self) -> None:
+    def test_append_ingest_record_writes_columns_a_to_l(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
         temp_root.mkdir(exist_ok=True)
         workbook_path = temp_root / f'response-monitoring-{uuid.uuid4().hex}.xlsx'
         create_response_monitoring_workbook(workbook_path)
-        row_index = append_ingest_record(workbook_path, ResponseMonitoringIngestRecord(vacancy_id='20260421-tsentr-elektronnyh-finansov-tehnicheskiy-lider', source_channel='HeadHunter', source_url='https://hh.ru/vacancy/132242694', company='Центр электронных финансов', position='Технический лидер', country='Казахстан', work_mode='на месте работодателя', ingest_date=date(2026, 4, 21)))
+        row_index = append_ingest_record(workbook_path, ResponseMonitoringIngestRecord(vacancy_id='20260421-tsentr-elektronnyh-finansov-tehnicheskiy-lider', source_channel='HeadHunter', source_url='https://hh.ru/vacancy/132242694', company='Центр электронных финансов', position='Технический лидер', country='Казахстан', work_mode='на месте работодателя', ingest_date=date(2026, 4, 21), updated_date=date(2026, 4, 20)))
         assert row_index == 3
         with ZipFile(workbook_path) as workbook:
             sheet_xml = workbook.read('xl/worksheets/sheet1.xml')
@@ -156,13 +156,45 @@ class TestIngestWorkflow:
         assert values['B'] == 'HeadHunter'
         assert values['C'] == 'https://hh.ru/vacancy/132242694'
         assert values['D'] == 'Да'
-        assert values['E'] == 'Центр электронных финансов'
-        assert values['F'] == 'Технический лидер'
-        assert values['G'] == 'Казахстан'
-        assert values['H'] == 'на месте работодателя'
-        assert values['I'] == 'Сайт HH'
-        assert values['J'] == 'Нет'
-        assert values['K'] == '46133'
+        assert values['E'] == '46132'
+        assert values['F'] == 'Центр электронных финансов'
+        assert values['G'] == 'Технический лидер'
+        assert values['H'] == 'Казахстан'
+        assert values['I'] == 'на месте работодателя'
+        assert values['J'] == 'Сайт HH'
+        assert values['K'] == 'Да'
+        assert values['L'] == '46133'
+
+    def test_backfill_helpers_update_only_updated_column(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
+        temp_root.mkdir(exist_ok=True)
+        workbook_path = temp_root / f'response-monitoring-backfill-{uuid.uuid4().hex}.xlsx'
+        create_response_monitoring_workbook(workbook_path)
+        row_index = append_ingest_record(workbook_path, ResponseMonitoringIngestRecord(vacancy_id='20260421-tsentr-elektronnyh-finansov-tehnicheskiy-lider', source_channel='HeadHunter', source_url='https://hh.ru/vacancy/132242694', company='Центр электронных финансов', position='Технический лидер', country='Казахстан', work_mode='на месте работодателя', ingest_date=date(2026, 4, 21)))
+        active_rows = list_active_response_monitoring_rows(workbook_path)
+        assert [row.row_index for row in active_rows] == [row_index]
+        assert active_rows[0].updated_value == ''
+
+        assert update_response_monitoring_updated_dates(workbook_path, {row_index: date(2026, 4, 20)}) == 1
+        with ZipFile(workbook_path) as workbook:
+            sheet_xml = workbook.read('xl/worksheets/sheet1.xml')
+            root = ET.fromstring(sheet_xml)
+        ns = {'a': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+        row = root.find(".//a:row[@r='3']", ns)
+        assert row is not None
+        values: dict[str, str] = {}
+        for cell in row.findall('a:c', ns):
+            ref = cell.attrib['r']
+            column = ''.join((char for char in ref if char.isalpha()))
+            cell_type = cell.attrib.get('t')
+            if cell_type == 'inlineStr':
+                values[column] = ''.join((node.text or '' for node in cell.findall('.//a:t', ns)))
+            else:
+                value_node = cell.find('a:v', ns)
+                values[column] = value_node.text if value_node is not None else ''
+        assert values['E'] == '46132'
+        assert values['K'] == 'Да'
+        assert values['L'] == '46133'
 
     def test_render_source_keeps_full_passport_and_params_with_no_data_fallback(self) -> None:
         workflow = build_default_registry().get('ingest-vacancy')
@@ -181,11 +213,12 @@ class TestIngestWorkflow:
         assert '- Формат работы: нет данных' in source_text
 
     def test_parse_hh_vacancy_payload_extracts_fields(self) -> None:
-        payload = json.dumps({'name': 'Head of Development / Руководитель разработки', 'employer': {'name': 'Финтехробот'}, 'description': '<h2>Зона</h2><ul><li>Руководить</li></ul>', 'language': 'ru', 'employment': {'name': 'Полная занятость'}, 'schedule': {'name': 'Удалённая работа'}, 'area': {'name': 'Москва', 'country': 'Россия'}, 'key_skills': [{'name': 'DevSecOps'}, {'name': 'CI/CD'}]}, ensure_ascii=False)
+        payload = json.dumps({'name': 'Head of Development / Руководитель разработки', 'employer': {'name': 'Финтехробот'}, 'description': '<h2>Зона</h2><ul><li>Руководить</li></ul>', 'published_at': '2026-04-20T12:30:00+0300', 'language': 'ru', 'employment': {'name': 'Полная занятость'}, 'schedule': {'name': 'Удалённая работа'}, 'area': {'name': 'Москва', 'country': 'Россия'}, 'key_skills': [{'name': 'DevSecOps'}, {'name': 'CI/CD'}]}, ensure_ascii=False)
         details = parse_hh_vacancy_payload(payload)
         assert details.company == 'Финтехробот'
         assert details.city == 'Москва'
         assert details.country == 'Россия'
+        assert details.source_updated_date == date(2026, 4, 20)
         assert 'DevSecOps' in details.key_skills
         assert 'Ключевые навыки' in details.source_text
         assert '### Зона' in details.source_markdown
@@ -241,13 +274,14 @@ class TestIngestWorkflow:
         assert '#### Ключевые навыки' not in request.source_markdown
 
     def test_parse_generic_vacancy_page_uses_structured_data(self) -> None:
-        html = '\n        <html lang="ru">\n          <head>\n            <title>Вакансия Head of Development в компании Финтехробот</title>\n            <meta property="og:title" content="Вакансия Head of Development в компании Финтехробот" />\n            <script type="application/ld+json">\n              {\n                "@context": "https://schema.org",\n                "@type": "JobPosting",\n                "title": "Head of Development",\n                "description": "<p>Управлять командой разработки и delivery.</p>",\n                "hiringOrganization": {"@type": "Organization", "name": "Финтехробот"},\n                "jobLocation": {\n                  "@type": "Place",\n                  "address": {\n                    "@type": "PostalAddress",\n                    "addressLocality": "Астана",\n                    "addressCountry": "KZ"\n                  }\n                },\n                "applicantLocationRequirements": {\n                  "@type": "Country",\n                  "name": "Казахстан"\n                }\n              }\n            </script>\n          </head>\n          <body>\n            <h1>Head of Development</h1>\n          </body>\n        </html>\n        '
+        html = '\n        <html lang="ru">\n          <head>\n            <title>Вакансия Head of Development в компании Финтехробот</title>\n            <meta property="og:title" content="Вакансия Head of Development в компании Финтехробот" />\n            <script type="application/ld+json">\n              {\n                "@context": "https://schema.org",\n                "@type": "JobPosting",\n                "title": "Head of Development",\n                "datePosted": "2026-04-19",\n                "dateModified": "2026-04-22T09:15:00+03:00",\n                "description": "<p>Управлять командой разработки и delivery.</p>",\n                "hiringOrganization": {"@type": "Organization", "name": "Финтехробот"},\n                "jobLocation": {\n                  "@type": "Place",\n                  "address": {\n                    "@type": "PostalAddress",\n                    "addressLocality": "Астана",\n                    "addressCountry": "KZ"\n                  }\n                },\n                "applicantLocationRequirements": {\n                  "@type": "Country",\n                  "name": "Казахстан"\n                }\n              }\n            </script>\n          </head>\n          <body>\n            <h1>Head of Development</h1>\n          </body>\n        </html>\n        '
         details = parse_generic_vacancy_page(html, 'https://example.com/jobs/1')
         assert details.company == 'Финтехробот'
         assert details.position == 'Head of Development'
         assert details.source_channel == 'Company Site'
         assert details.city == 'Астана'
         assert details.country == 'Казахстан'
+        assert details.source_updated_date == date(2026, 4, 22)
         assert 'Управлять командой разработки и delivery.' in details.source_text
         assert 'Управлять командой разработки' in details.source_markdown
         assert details.language == 'ru'

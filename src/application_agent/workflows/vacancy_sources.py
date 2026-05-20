@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from html import unescape
 from html.parser import HTMLParser
 from urllib.parse import urlparse
@@ -561,6 +562,7 @@ class VacancySourceDetails:
     position: str = ""
     source_text: str = ""
     source_markdown: str = ""
+    source_updated_date: date | None = None
     language: str = ""
     source_channel: str = ""
     country: str = ""
@@ -612,6 +614,26 @@ def parse_hh_vacancy_url(source_url: str) -> str | None:
     if not match:
         return None
     return match.group(1)
+
+
+def parse_source_date(value: object) -> date | None:
+    if value is None:
+        return None
+    cleaned = clean_text(str(value))
+    if not cleaned:
+        return None
+    normalized = cleaned.replace("Z", "+00:00")
+    normalized = re.sub(r"([+-]\d{2})(\d{2})$", r"\1:\2", normalized)
+    try:
+        return datetime.fromisoformat(normalized).date()
+    except ValueError:
+        pass
+    for date_format in ("%Y-%m-%d", "%d.%m.%Y"):
+        try:
+            return datetime.strptime(cleaned, date_format).date()
+        except ValueError:
+            continue
+    return None
 
 
 def infer_source_channel(source_url: str, source_text: str, explicit: str = "") -> str:
@@ -675,6 +697,7 @@ def parse_hh_vacancy_payload(payload: str) -> VacancySourceDetails:
         position=clean_text(str(data.get("name", "") or "")),
         source_text=build_enriched_source_text(description, key_skills, "", "", ""),
         source_markdown=build_enriched_source_markdown(description_markdown, key_skills),
+        source_updated_date=parse_source_date(data.get("published_at")),
         language=normalize_language_tag(str(data.get("language", "") or "")) or infer_language_from_text(description),
         source_channel="HeadHunter",
         country=country,
@@ -838,6 +861,7 @@ def parse_structured_job_posting(chunks: list[str]) -> VacancySourceDetails:
                 position=clean_text(str(node.get("title", "") or node.get("name", "") or "")),
                 source_text=description_text,
                 source_markdown=description_markdown,
+                source_updated_date=parse_source_date(node.get("dateModified") or node.get("datePosted")),
                 language=infer_language_from_text(description_text),
                 country=country,
                 city=city,
@@ -1069,6 +1093,7 @@ def parse_hh_vacancy_page(html: str) -> VacancySourceDetails:
         position=page.h1 or structured.position or title_parts.position,
         source_text=build_enriched_source_text(description_text, key_skills, employment_type, work_schedule, work_mode),
         source_markdown=build_enriched_source_markdown(description_markdown, key_skills),
+        source_updated_date=structured.source_updated_date,
         language=normalize_language_tag(page.html_lang) or structured.language or infer_language_from_text(description_text),
         source_channel="HeadHunter",
         country=country,
@@ -1123,6 +1148,7 @@ def parse_generic_vacancy_page(html: str, source_url: str = "") -> VacancySource
         position=structured.position or parser.h1 or title_parts.position,
         source_text=source_text,
         source_markdown=source_markdown,
+        source_updated_date=structured.source_updated_date,
         language=normalize_language_tag(parser.html_lang) or structured.language or infer_language_from_text(source_text),
         source_channel=infer_source_channel(source_url, source_text),
         country=structured.country,
@@ -1210,6 +1236,7 @@ def merge_source_details(base: VacancySourceDetails, overlay: VacancySourceDetai
         position=overlay.position or base.position,
         source_text=description_text,
         source_markdown=description_markdown,
+        source_updated_date=overlay.source_updated_date or base.source_updated_date,
         language=overlay.language or base.language,
         source_channel=overlay.source_channel or base.source_channel or infer_source_channel(source_url, description_text),
         country=overlay.country or base.country,
