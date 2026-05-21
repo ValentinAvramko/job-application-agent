@@ -15,6 +15,7 @@
 - workflow `rebuild-role-resume`, который синхронизирует managed canonical block в выбранном `resumes/<role>.md` из уже согласованного `resumes/MASTER.md` и optional `knowledge/roles/<role>.md`.
 - workflow `build-linkedin`, который собирает per-role LinkedIn draft pack в `profile/linkedin/<target_role>.md` из canonical `MASTER`, выбранного role resume и optional profile metadata, а runtime report пишет в `agent_memory/runtime/build-linkedin/<target_role>.md`.
 - workflow `export-resume-pdf`, который рендерит проверяемый PDF-артефакт из `resumes/MASTER.md` или выбранного `resumes/<role>.md`, пишет итоговый файл в `profile/pdf/<target_resume>/<language>-<region>.pdf` и сохраняет verification trail в `agent_memory/runtime/export-resume-pdf/<target_resume>/<language>-<region>/`.
+- workflow `check-response-monitoring`, который проверяет активные строки `response-monitoring.xlsx`, обновляет `Активна` и `Обновлена`, выводит журнал проверки в консоль и сохраняет его в `agent_memory/runtime/check-response-monitoring/`.
 
 ## Структура private workspace
 
@@ -40,6 +41,7 @@ python job-application-agent.py --root ../.. rebuild-master
 python job-application-agent.py --root ../.. rebuild-role-resume --target-role CTO
 python job-application-agent.py --root ../.. build-linkedin --target-role CTO
 python job-application-agent.py --root ../.. export-resume-pdf --target-resume CTO --contact-region EU
+python job-application-agent.py --root ../.. check-response-monitoring --dry-run
 python job-application-agent.py --root ../.. show-memory
 ```
 
@@ -212,6 +214,8 @@ python -m pytest tests
   Читает `resumes/MASTER.md` или выбранное `resumes/<role>.md`, применяет public contact overlay из `profile/contact-regions.yml` только к верхнему contact/location surface и рендерит PDF в `profile/pdf/CTO/ru-EU.pdf`.
   `--target-resume` обязателен; `--output-language` в baseline поддерживает только `ru`, `--contact-region` принимает `RU`, `KZ`, `EU` и по умолчанию берётся из `profile/contact-regions.yml` (иначе `EU`), `--template-id` сейчас поддерживает только `default`.
   Успешный run обязан сохранить `report.md` и preview PNG pages в `agent_memory/runtime/export-resume-pdf/CTO/ru-EU/`; если отсутствует `pdftoppm` из Poppler, workflow завершается явной ошибкой вместо partial success.
+- `python job-application-agent.py --root ../.. check-response-monitoring --dry-run`
+  Проверяет строки `response-monitoring.xlsx`, где `Активна = Да`, сверяет доступность и дату страницы вакансии, выводит журнал в консоль и сохраняет его в `agent_memory/runtime/check-response-monitoring/`. Без `--dry-run` команда пакетно обновляет `D=Активна` и `E=Обновлена`; `--log-file` задаёт явный путь к файлу журнала.
 - `python job-application-agent.py --root ../.. show-memory`
   Показывает текущее содержимое файловой памяти агента: задачи, артефакты и журнал запусков workflow, а также reconciliation-сводку по отсутствующим vacancy artifacts.
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -42,6 +42,13 @@ class ResponseMonitoringActiveRow:
     vacancy_id: str
     source_url: str
     updated_value: str
+    updated_date: date | None = None
+
+
+@dataclass(frozen=True)
+class ResponseMonitoringRowUpdate:
+    active_value: str | None = None
+    updated_date: date | None = None
 
 
 @dataclass(frozen=True)
@@ -150,12 +157,24 @@ def list_active_response_monitoring_rows(workbook_path: Path) -> list[ResponseMo
                 vacancy_id=cell_value(cells["A"], workbook_data.shared_strings) if "A" in cells else "",
                 source_url=cell_value(cells["C"], workbook_data.shared_strings) if "C" in cells else "",
                 updated_value=cell_value(cells["E"], workbook_data.shared_strings) if "E" in cells else "",
+                updated_date=parse_response_monitoring_date(
+                    cell_value(cells["E"], workbook_data.shared_strings) if "E" in cells else ""
+                ),
             )
         )
     return active_rows
 
 
 def update_response_monitoring_updated_dates(workbook_path: Path, updates: dict[int, date]) -> int:
+    if not updates:
+        return 0
+    return update_response_monitoring_rows(
+        workbook_path,
+        {row_index: ResponseMonitoringRowUpdate(updated_date=updated_date) for row_index, updated_date in updates.items()},
+    )
+
+
+def update_response_monitoring_rows(workbook_path: Path, updates: dict[int, ResponseMonitoringRowUpdate]) -> int:
     if not updates:
         return 0
     validate_response_monitoring_workbook(workbook_path)
@@ -165,8 +184,17 @@ def update_response_monitoring_updated_dates(workbook_path: Path, updates: dict[
         row_index = int(row.attrib.get("r", "0") or 0)
         if row_index not in updates:
             continue
+        update = updates[row_index]
         cells = ensure_row_has_cells(row)
-        set_cell_number(cells["E"], excel_date_serial(updates[row_index]))
+        changed = False
+        if update.active_value is not None:
+            set_cell_text(cells["D"], update.active_value)
+            changed = True
+        if update.updated_date is not None:
+            set_cell_number(cells["E"], excel_date_serial(update.updated_date))
+            changed = True
+        if not changed:
+            continue
         updated_count += 1
     write_response_monitoring_workbook(workbook_path, workbook_data)
     return updated_count
@@ -215,6 +243,26 @@ def read_shared_strings(archive_entries: dict[str, bytes]) -> list[str]:
 def excel_date_serial(value: date) -> int:
     epoch = date(1899, 12, 30)
     return (value - epoch).days
+
+
+def parse_response_monitoring_date(value: str) -> date | None:
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    if cleaned.isdigit():
+        epoch = date(1899, 12, 30)
+        return date.fromordinal(epoch.toordinal() + int(cleaned))
+    for date_format in ("%Y-%m-%d", "%d.%m.%Y"):
+        try:
+            if date_format == "%Y-%m-%d":
+                return date.fromisoformat(cleaned)
+            return datetime.strptime(cleaned, date_format).date()
+        except ValueError:
+            continue
+    try:
+        return date.fromisoformat(cleaned.split("T", maxsplit=1)[0])
+    except ValueError:
+        return None
 
 
 def find_response_monitoring_sheet_path(workbook_xml: ET.Element, relationships_xml: ET.Element) -> str:

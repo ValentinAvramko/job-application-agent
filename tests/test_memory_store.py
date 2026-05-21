@@ -46,7 +46,7 @@ class TestMemoryStore:
         store.project_memory_path.write_text(json.dumps(legacy_payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
         store.bootstrap()
         project_memory = json.loads(store.project_memory_path.read_text(encoding='utf-8'))
-        assert project_memory['workflow_catalog'] == ['ingest-vacancy', 'analyze-vacancy', 'prepare-screening', 'intake-adoptions', 'rebuild-master', 'rebuild-role-resume', 'build-linkedin', 'export-resume-pdf']
+        assert project_memory['workflow_catalog'] == ['ingest-vacancy', 'analyze-vacancy', 'prepare-screening', 'intake-adoptions', 'rebuild-master', 'rebuild-role-resume', 'build-linkedin', 'export-resume-pdf', 'check-response-monitoring']
         assert project_memory['role_resumes'] == ['CIO', 'CTO', 'HoE', 'HoD', 'EM']
         assert project_memory['contact_regions'] == ['RU', 'KZ', 'EU']
 

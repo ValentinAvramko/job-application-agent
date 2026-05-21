@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from html import unescape
 from html.parser import HTMLParser
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
@@ -571,6 +572,19 @@ class VacancySourceDetails:
     employment_type: str = ""
     work_schedule: str = ""
     key_skills: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class VacancySourceCheckResult:
+    status: str
+    reason: str
+    updated_date: date | None = None
+    final_url: str = ""
+    details: VacancySourceDetails | None = None
+
+    @property
+    def should_deactivate(self) -> bool:
+        return self.status in {"inactive", "auth_required", "not_found"}
 
 
 def html_to_text(html: str) -> str:
@@ -1188,6 +1202,195 @@ def should_use_playwright_fallback(html: str, details: VacancySourceDetails) -> 
     if not details.company.strip() or not details.position.strip():
         return True
     return False
+
+
+def check_vacancy_source(source_url: str) -> VacancySourceCheckResult:
+    cleaned_url = source_url.strip()
+    if not cleaned_url:
+        return VacancySourceCheckResult(status="warning", reason="missing source url")
+
+    vacancy_id = parse_hh_vacancy_url(cleaned_url)
+    if vacancy_id:
+        return check_hh_vacancy_source(cleaned_url, vacancy_id)
+    return check_generic_vacancy_source(cleaned_url)
+
+
+def check_hh_vacancy_source(source_url: str, vacancy_id: str) -> VacancySourceCheckResult:
+    api_details: VacancySourceDetails | None = None
+    api_warning = ""
+    try:
+        payload = fetch_url(f"https://api.hh.ru/vacancies/{vacancy_id}", accept="application/json")
+        data = json.loads(payload)
+        updated_date = parse_source_date(data.get("published_at"))
+        if data.get("archived") is True:
+            return VacancySourceCheckResult(
+                status="inactive",
+                reason="hh api reports archived vacancy",
+                updated_date=updated_date,
+                final_url=source_url,
+            )
+        api_details = parse_hh_vacancy_payload(payload)
+    except HTTPError as exc:
+        if exc.code in {404, 410}:
+            return classify_http_error(exc, source_url)
+        if exc.code not in {401, 403}:
+            return classify_http_error(exc, source_url)
+        api_warning = f"hh api returned HTTP {exc.code}; html fallback required"
+    except (TimeoutError, URLError, OSError) as exc:
+        api_warning = f"hh api transient error: {exc}"
+    except Exception as exc:
+        api_warning = f"hh api parse error: {exc}"
+
+    try:
+        html = fetch_url(source_url, accept="text/html,application/xhtml+xml")
+    except HTTPError as exc:
+        if api_details is not None and exc.code in {429} | set(range(500, 600)):
+            return VacancySourceCheckResult(
+                status="active",
+                reason=f"hh api ok; html transient HTTP {exc.code}",
+                updated_date=api_details.source_updated_date,
+                final_url=source_url,
+                details=api_details,
+            )
+        return classify_http_error(exc, source_url)
+    except (TimeoutError, URLError, OSError) as exc:
+        if api_details is not None:
+            return VacancySourceCheckResult(
+                status="active",
+                reason=f"hh api ok; html transient error: {exc}",
+                updated_date=api_details.source_updated_date,
+                final_url=source_url,
+                details=api_details,
+            )
+        return VacancySourceCheckResult(status="transient_error", reason=f"{api_warning}; html error: {exc}", final_url=source_url)
+
+    html_status = classify_vacancy_html(html, source_url)
+    if html_status is not None:
+        return html_status
+    html_details = parse_hh_vacancy_page(html)
+    details = merge_source_details(api_details, html_details, source_url) if api_details is not None else html_details
+    return VacancySourceCheckResult(
+        status="active",
+        reason="hh vacancy page is reachable",
+        updated_date=details.source_updated_date,
+        final_url=source_url,
+        details=details,
+    )
+
+
+def check_generic_vacancy_source(source_url: str) -> VacancySourceCheckResult:
+    try:
+        html = fetch_url(source_url, accept="text/html,application/xhtml+xml")
+    except HTTPError as exc:
+        return classify_http_error(exc, source_url)
+    except (TimeoutError, URLError, OSError) as exc:
+        return VacancySourceCheckResult(status="transient_error", reason=f"page fetch transient error: {exc}", final_url=source_url)
+
+    html_status = classify_vacancy_html(html, source_url)
+    if html_status is not None:
+        return html_status
+    details = parse_generic_vacancy_page(html, source_url)
+    final_url = source_url
+
+    if should_use_playwright_fallback(html, details):
+        try:
+            rendered_page = render_page_with_playwright(source_url)
+            rendered_status = classify_vacancy_html(rendered_page.html, rendered_page.url or source_url)
+            if rendered_status is not None:
+                return rendered_status
+            rendered_details = parse_generic_vacancy_page(rendered_page.html, rendered_page.url or source_url)
+            details = merge_source_details(details, rendered_details, rendered_page.url or source_url)
+            final_url = rendered_page.url or source_url
+        except Exception as exc:
+            if not details.source_text.strip():
+                return VacancySourceCheckResult(status="transient_error", reason=f"browser fallback failed: {exc}", final_url=source_url)
+            return VacancySourceCheckResult(
+                status="active",
+                reason=f"page is reachable; browser fallback failed: {exc}",
+                updated_date=details.source_updated_date,
+                final_url=source_url,
+                details=details,
+            )
+
+    return VacancySourceCheckResult(
+        status="active",
+        reason="vacancy page is reachable",
+        updated_date=details.source_updated_date,
+        final_url=final_url,
+        details=details,
+    )
+
+
+def classify_http_error(error: HTTPError, source_url: str) -> VacancySourceCheckResult:
+    if error.code in {401, 403}:
+        return VacancySourceCheckResult(status="auth_required", reason=f"HTTP {error.code}", final_url=source_url)
+    if error.code in {404, 410}:
+        return VacancySourceCheckResult(status="not_found", reason=f"HTTP {error.code}", final_url=source_url)
+    if error.code == 429 or 500 <= error.code <= 599:
+        return VacancySourceCheckResult(status="transient_error", reason=f"HTTP {error.code}", final_url=source_url)
+    return VacancySourceCheckResult(status="warning", reason=f"HTTP {error.code}", final_url=source_url)
+
+
+def classify_vacancy_html(html: str, source_url: str) -> VacancySourceCheckResult | None:
+    if looks_like_auth_required_html(html):
+        return VacancySourceCheckResult(status="auth_required", reason="login/password screen detected", final_url=source_url)
+    if looks_like_inactive_vacancy_html(html):
+        return VacancySourceCheckResult(status="inactive", reason="inactive vacancy marker detected", final_url=source_url)
+    return None
+
+
+def looks_like_auth_required_html(html: str) -> bool:
+    raw = html.lower()
+    text = clean_multiline_text(html_to_text(html)).lower()
+    if re.search(r"<input[^>]+type=[\"']?password", raw):
+        return True
+    auth_terms = (
+        "sign in",
+        "log in",
+        "login",
+        "password",
+        "authorization",
+        "authentication",
+        "авторизац",
+        "войдите",
+        "логин",
+        "пароль",
+    )
+    if re.search(r"<form[^>]*(login|signin|sign-in|auth)", raw) and any(term in text for term in auth_terms):
+        return True
+    strong_markers = (
+        "please sign in",
+        "sign in to continue",
+        "log in to continue",
+        "authentication required",
+        "authorization required",
+        "требуется авторизация",
+        "для доступа необходимо войти",
+        "введите логин",
+        "введите пароль",
+    )
+    return len(text) < 1000 and any(marker in text for marker in strong_markers)
+
+
+def looks_like_inactive_vacancy_html(html: str) -> bool:
+    text = clean_multiline_text(html_to_text(html)).lower()
+    inactive_markers = (
+        "вакансия в архиве",
+        "вакансия недоступна",
+        "вакансия закрыта",
+        "работодатель уже не ищет",
+        "такой вакансии нет",
+        "job is no longer available",
+        "this job is no longer available",
+        "position is no longer available",
+        "job has expired",
+        "this job has been closed",
+        "no longer accepting applications",
+        "not accepting applications",
+        "vacancy is closed",
+        "vacancy is archived",
+    )
+    return any(marker in text for marker in inactive_markers)
 
 
 def fetch_source_details(source_url: str) -> VacancySourceDetails:

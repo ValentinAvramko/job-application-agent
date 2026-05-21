@@ -43,7 +43,7 @@ class TestCli:
             exit_code = main()
         assert exit_code == 0
         payload = json.loads(stdout.getvalue())
-        assert [item['name'] for item in payload] == ['analyze-vacancy', 'build-linkedin', 'export-resume-pdf', 'ingest-vacancy', 'intake-adoptions', 'prepare-screening', 'rebuild-master', 'rebuild-role-resume']
+        assert [item['name'] for item in payload] == ['analyze-vacancy', 'build-linkedin', 'check-response-monitoring', 'export-resume-pdf', 'ingest-vacancy', 'intake-adoptions', 'prepare-screening', 'rebuild-master', 'rebuild-role-resume']
 
     def test_ingest_cli_returns_workflow_result_without_git_publication_suffix(self) -> None:
         temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
@@ -272,3 +272,21 @@ class TestCli:
         payload = json.loads(stdout.getvalue())
         assert payload['workflow'] == 'export-resume-pdf'
         assert 'PDF' in payload['summary']
+
+    def test_check_response_monitoring_cli_prints_workflow_log(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f'cli-check-response-monitoring-{uuid.uuid4().hex}'
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+        summary = 'check-response-monitoring started\nSUMMARY processed=0 deactivated=0 updated_dates=0 unchanged=0 warnings=0 log_path=log.txt'
+        result = WorkflowResult(workflow='check-response-monitoring', status='completed', summary=summary, artifacts=[str(workspace_dir / 'log.txt')])
+        registry = _FakeRegistry(result)
+        stdout = io.StringIO()
+        with patch('application_agent.cli.build_default_registry', return_value=registry), patch.object(sys, 'argv', ['run_agent.py', '--root', str(workspace_dir), 'check-response-monitoring', '--dry-run', '--log-file', 'log.txt']), patch('sys.stdout', new=stdout):
+            exit_code = main()
+        request = registry.last_run_kwargs['request']
+        assert exit_code == 0
+        assert registry.requested == ['check-response-monitoring']
+        assert request.dry_run is True
+        assert request.log_file == 'log.txt'
+        assert stdout.getvalue() == summary + '\n'

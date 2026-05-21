@@ -5,16 +5,18 @@ import sys
 import uuid
 from datetime import date
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from unittest.mock import patch
 from xml.etree import ElementTree as ET
 from zipfile import ZIP_DEFLATED, ZipFile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
-from application_agent.integrations.response_monitoring import ResponseMonitoringIngestRecord, append_ingest_record, list_active_response_monitoring_rows, update_response_monitoring_updated_dates
+from application_agent.integrations.response_monitoring import ResponseMonitoringIngestRecord, ResponseMonitoringRowUpdate, append_ingest_record, list_active_response_monitoring_rows, parse_response_monitoring_date, update_response_monitoring_rows, update_response_monitoring_updated_dates
 from application_agent.integrations.playwright_renderer import PlaywrightRenderedPage
 from application_agent.memory.store import JsonMemoryStore
 from application_agent.workspace import WorkspaceLayout
+from application_agent.workflows.check_response_monitoring import CheckResponseMonitoringRequest, CheckResponseMonitoringWorkflow
 from application_agent.workflows.ingest_vacancy import IngestVacancyRequest, VacancySourceDetails, build_vacancy_id, build_response_monitoring_record, enrich_request, fetch_source_details, infer_source_channel, normalize_country_value, normalize_language_tag, parse_generic_vacancy_page, parse_hh_vacancy_page, parse_hh_vacancy_payload
-from application_agent.workflows.vacancy_sources import should_use_playwright_fallback
+from application_agent.workflows.vacancy_sources import VacancySourceCheckResult, check_vacancy_source, should_use_playwright_fallback
 from application_agent.workflows.registry import build_default_registry
 
 def create_response_monitoring_workbook(path: Path) -> None:
@@ -196,6 +198,94 @@ class TestIngestWorkflow:
         assert values['K'] == 'Да'
         assert values['L'] == '46133'
 
+    def test_response_monitoring_date_parser_supports_excel_and_text_values(self) -> None:
+        assert parse_response_monitoring_date('46132') == date(2026, 4, 20)
+        assert parse_response_monitoring_date('2026-04-20') == date(2026, 4, 20)
+        assert parse_response_monitoring_date('20.04.2026') == date(2026, 4, 20)
+        assert parse_response_monitoring_date('2026-04-20T12:30:00+03:00') == date(2026, 4, 20)
+        assert parse_response_monitoring_date('') is None
+
+    def test_response_monitoring_row_updates_active_and_updated_columns(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
+        temp_root.mkdir(exist_ok=True)
+        workbook_path = temp_root / f'response-monitoring-row-update-{uuid.uuid4().hex}.xlsx'
+        create_response_monitoring_workbook(workbook_path)
+        row_index = append_ingest_record(workbook_path, ResponseMonitoringIngestRecord(vacancy_id='20260421-example-role', source_channel='HeadHunter', source_url='https://hh.ru/vacancy/132242694', company='Example', position='Role', country='Казахстан', work_mode='удаленно', ingest_date=date(2026, 4, 21)))
+
+        assert update_response_monitoring_rows(workbook_path, {row_index: ResponseMonitoringRowUpdate(active_value='Нет', updated_date=date(2026, 4, 20))}) == 1
+        active_rows = list_active_response_monitoring_rows(workbook_path)
+        assert active_rows == []
+
+        with ZipFile(workbook_path) as workbook:
+            sheet_xml = workbook.read('xl/worksheets/sheet1.xml')
+            root = ET.fromstring(sheet_xml)
+        ns = {'a': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+        row = root.find(".//a:row[@r='3']", ns)
+        assert row is not None
+        cells = {''.join((char for char in cell.attrib['r'] if char.isalpha())): cell for cell in row.findall('a:c', ns)}
+        d_text = ''.join((node.text or '' for node in cells['D'].findall('.//a:t', ns)))
+        e_value = cells['E'].find('a:v', ns)
+        k_text = ''.join((node.text or '' for node in cells['K'].findall('.//a:t', ns)))
+        l_value = cells['L'].find('a:v', ns)
+        assert d_text == 'Нет'
+        assert e_value is not None and e_value.text == '46132'
+        assert k_text == 'Да'
+        assert l_value is not None and l_value.text == '46133'
+        assert cells['D'].attrib.get('s') == '3'
+        assert cells['E'].attrib.get('s') == '1'
+
+    def test_check_response_monitoring_workflow_updates_workbook_and_writes_log(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f'check-response-monitoring-{uuid.uuid4().hex}'
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+        layout = WorkspaceLayout(workspace_dir)
+        store = JsonMemoryStore(layout)
+        store.bootstrap()
+        workbook_path = workspace_dir / 'response-monitoring.xlsx'
+        create_response_monitoring_workbook(workbook_path)
+        append_ingest_record(workbook_path, ResponseMonitoringIngestRecord(vacancy_id='20260421-example-role', source_channel='HeadHunter', source_url='https://hh.ru/vacancy/132242694', company='Example', position='Role', country='Казахстан', work_mode='удаленно', ingest_date=date(2026, 4, 21), updated_date=date(2026, 4, 20)))
+        log_path = workspace_dir / 'check.log'
+
+        with patch('application_agent.workflows.check_response_monitoring.check_vacancy_source', return_value=VacancySourceCheckResult(status='inactive', reason='fixture inactive', updated_date=date(2026, 4, 22))):
+            result = CheckResponseMonitoringWorkflow().run(layout=layout, store=store, request=CheckResponseMonitoringRequest(log_file=str(log_path)))
+
+        assert result.status == 'completed'
+        assert log_path.exists()
+        assert 'CHANGE row=3 column=D' in log_path.read_text(encoding='utf-8')
+        active_rows = list_active_response_monitoring_rows(workbook_path)
+        assert active_rows == []
+        with ZipFile(workbook_path) as workbook:
+            root = ET.fromstring(workbook.read('xl/worksheets/sheet1.xml'))
+        ns = {'a': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
+        row = root.find(".//a:row[@r='3']", ns)
+        assert row is not None
+        cells = {''.join((char for char in cell.attrib['r'] if char.isalpha())): cell for cell in row.findall('a:c', ns)}
+        d_text = ''.join((node.text or '' for node in cells['D'].findall('.//a:t', ns)))
+        e_value = cells['E'].find('a:v', ns)
+        assert d_text == 'Нет'
+        assert e_value is not None and e_value.text == '46134'
+
+    def test_check_response_monitoring_dry_run_does_not_update_workbook(self) -> None:
+        temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
+        temp_root.mkdir(exist_ok=True)
+        workspace_dir = temp_root / f'check-response-monitoring-dry-{uuid.uuid4().hex}'
+        workspace_dir.mkdir(parents=True, exist_ok=True)
+        layout = WorkspaceLayout(workspace_dir)
+        store = JsonMemoryStore(layout)
+        store.bootstrap()
+        workbook_path = workspace_dir / 'response-monitoring.xlsx'
+        create_response_monitoring_workbook(workbook_path)
+        append_ingest_record(workbook_path, ResponseMonitoringIngestRecord(vacancy_id='20260421-example-role', source_channel='HeadHunter', source_url='https://hh.ru/vacancy/132242694', company='Example', position='Role', country='Казахстан', work_mode='удаленно', ingest_date=date(2026, 4, 21), updated_date=date(2026, 4, 20)))
+
+        with patch('application_agent.workflows.check_response_monitoring.check_vacancy_source', return_value=VacancySourceCheckResult(status='active', reason='fixture active', updated_date=date(2026, 4, 22))):
+            result = CheckResponseMonitoringWorkflow().run(layout=layout, store=store, request=CheckResponseMonitoringRequest(dry_run=True))
+
+        assert 'dry_run workbook_not_updated planned_rows=1' in result.summary
+        active_rows = list_active_response_monitoring_rows(workbook_path)
+        assert len(active_rows) == 1
+        assert active_rows[0].updated_date == date(2026, 4, 20)
+
     def test_render_source_keeps_full_passport_and_params_with_no_data_fallback(self) -> None:
         workflow = build_default_registry().get('ingest-vacancy')
         source_text = workflow._render_source(IngestVacancyRequest(company='', position='', source_url='', source_channel='', country='', city='', employment_type='', work_schedule='', work_mode='Не указано', source_text='Example source'), '20260421-example-role')
@@ -324,6 +414,67 @@ class TestIngestWorkflow:
             details = fetch_source_details('https://careers.bancoplata.mx/vacancy/details?id=5107481008')
         assert details.company == 'Plata'
         assert 'Full rendered vacancy text' in details.source_text
+
+    def test_check_vacancy_source_marks_hh_archived_as_inactive(self) -> None:
+        payload = json.dumps({'archived': True, 'published_at': '2026-04-20T12:30:00+0300'}, ensure_ascii=False)
+        with patch('application_agent.workflows.vacancy_sources.fetch_url', return_value=payload):
+            result = check_vacancy_source('https://hh.ru/vacancy/132242694')
+        assert result.status == 'inactive'
+        assert result.should_deactivate
+        assert result.updated_date == date(2026, 4, 20)
+
+    def test_check_vacancy_source_marks_inactive_html_as_inactive(self) -> None:
+        html = '<html><body><main><h1>VP Engineering</h1><p>This job is no longer available.</p></main></body></html>'
+        with patch('application_agent.workflows.vacancy_sources.fetch_url', return_value=html):
+            result = check_vacancy_source('https://example.com/jobs/1')
+        assert result.status == 'inactive'
+        assert result.should_deactivate
+
+    def test_check_vacancy_source_marks_login_screen_as_auth_required(self) -> None:
+        html = '<html><body><form action="/login"><label>Password</label><input type="password" /></form></body></html>'
+        with patch('application_agent.workflows.vacancy_sources.fetch_url', return_value=html):
+            result = check_vacancy_source('https://example.com/jobs/1')
+        assert result.status == 'auth_required'
+        assert result.should_deactivate
+
+    def test_check_vacancy_source_marks_not_found_http_as_not_found(self) -> None:
+        error = HTTPError('https://example.com/jobs/1', 404, 'Not Found', hdrs=None, fp=None)
+        with patch('application_agent.workflows.vacancy_sources.fetch_url', side_effect=error):
+            result = check_vacancy_source('https://example.com/jobs/1')
+        assert result.status == 'not_found'
+        assert result.should_deactivate
+
+    def test_check_vacancy_source_keeps_transient_errors_active(self) -> None:
+        with patch('application_agent.workflows.vacancy_sources.fetch_url', side_effect=URLError('timed out')):
+            result = check_vacancy_source('https://example.com/jobs/1')
+        assert result.status == 'transient_error'
+        assert not result.should_deactivate
+
+    def test_check_vacancy_source_extracts_generic_updated_date(self) -> None:
+        description = 'Lead engineering delivery across several product teams. ' * 12
+        html = f'''
+        <html lang="en">
+          <head>
+            <script type="application/ld+json">
+              {{
+                "@context": "https://schema.org",
+                "@type": "JobPosting",
+                "title": "VP Engineering",
+                "datePosted": "2026-04-19",
+                "dateModified": "2026-04-22T09:15:00+03:00",
+                "description": "<p>{description}</p>",
+                "hiringOrganization": {{"@type": "Organization", "name": "Example"}}
+              }}
+            </script>
+          </head>
+          <body><main><h1>VP Engineering</h1><p>{description}</p></main></body>
+        </html>
+        '''
+        with patch('application_agent.workflows.vacancy_sources.fetch_url', return_value=html):
+            result = check_vacancy_source('https://example.com/jobs/1')
+        assert result.status == 'active'
+        assert not result.should_deactivate
+        assert result.updated_date == date(2026, 4, 22)
 
     def test_enrich_request_surfaces_fetch_error_when_required_fields_are_missing(self) -> None:
         with patch('application_agent.workflows.ingest_vacancy.fetch_source_details', side_effect=RuntimeError('connection refused')):

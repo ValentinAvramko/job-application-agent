@@ -11,4 +11,5 @@ WORKFLOW_CATALOG = (
     "rebuild-role-resume",
     "build-linkedin",
     "export-resume-pdf",
+    "check-response-monitoring",
 )

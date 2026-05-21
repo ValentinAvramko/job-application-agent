@@ -9,6 +9,7 @@ from application_agent.memory.store import JsonMemoryStore
 from application_agent.workspace import WorkspaceLayout
 from application_agent.workflows.analyze_vacancy import AnalyzeVacancyRequest
 from application_agent.workflows.build_linkedin import BuildLinkedInRequest
+from application_agent.workflows.check_response_monitoring import CheckResponseMonitoringRequest
 from application_agent.workflows.export_resume_pdf import ExportResumePdfRequest
 from application_agent.workflows.ingest_vacancy import IngestVacancyRequest
 from application_agent.workflows.intake_adoptions import IntakeAdoptionsRequest
@@ -112,6 +113,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Build a deterministic LinkedIn draft pack for a selected role resume.",
     )
     build_linkedin.add_argument("--target-role", default="")
+    check_response_monitoring = subparsers.add_parser(
+        "check-response-monitoring",
+        help="Check active rows in response-monitoring.xlsx and update vacancy status/date columns.",
+    )
+    check_response_monitoring.add_argument("--log-file", default="")
+    check_response_monitoring.add_argument("--dry-run", action="store_true")
     export_resume_pdf = subparsers.add_parser(
         "export-resume-pdf",
         help="Render a PDF artifact and verification trail for a selected resume source.",
@@ -314,6 +321,13 @@ def main() -> int:
         workflow = build_default_registry().get("build-linkedin")
         result = workflow.run(layout=layout, store=store, request=request)
         print(json.dumps(result.__dict__, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.command == "check-response-monitoring":
+        request = CheckResponseMonitoringRequest(log_file=args.log_file, dry_run=args.dry_run)
+        workflow = build_default_registry().get("check-response-monitoring")
+        result = workflow.run(layout=layout, store=store, request=request)
+        print(result.summary)
         return 0
 
     if args.command == "export-resume-pdf":
