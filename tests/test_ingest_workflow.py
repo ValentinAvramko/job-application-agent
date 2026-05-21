@@ -423,6 +423,28 @@ class TestIngestWorkflow:
         assert result.should_deactivate
         assert result.updated_date == date(2026, 4, 20)
 
+    def test_check_vacancy_source_keeps_hh_active_when_fallback_html_contains_inactive_copy(self) -> None:
+        api_error = HTTPError('https://api.hh.ru/vacancies/126880285', 403, 'Forbidden', hdrs=None, fp=None)
+        html = '''
+        <html lang="ru">
+          <head>
+            <title>Vacancy CTO at Example</title>
+          </head>
+          <body>
+            <h1>CTO</h1>
+            <div class="g-user-content" data-qa="vacancy-description">
+              <p>Active leadership vacancy with enough readable page content.</p>
+            </div>
+            <template>This job is no longer available.</template>
+          </body>
+        </html>
+        '''
+        with patch('application_agent.workflows.vacancy_sources.fetch_url', side_effect=[api_error, html]):
+            result = check_vacancy_source('https://hh.ru/vacancy/126880285')
+        assert result.status == 'active'
+        assert not result.should_deactivate
+        assert result.reason == 'hh vacancy page is reachable'
+
     def test_check_vacancy_source_marks_inactive_html_as_inactive(self) -> None:
         html = '<html><body><main><h1>VP Engineering</h1><p>This job is no longer available.</p></main></body></html>'
         with patch('application_agent.workflows.vacancy_sources.fetch_url', return_value=html):

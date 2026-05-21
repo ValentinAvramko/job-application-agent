@@ -1264,7 +1264,8 @@ def check_hh_vacancy_source(source_url: str, vacancy_id: str) -> VacancySourceCh
             )
         return VacancySourceCheckResult(status="transient_error", reason=f"{api_warning}; html error: {exc}", final_url=source_url)
 
-    html_status = classify_vacancy_html(html, source_url)
+    # HH can ship archived-page copy in hidden templates; API archived/HTTP/auth signals are safer deactivation sources.
+    html_status = classify_vacancy_html(html, source_url, check_inactive=False)
     if html_status is not None:
         return html_status
     html_details = parse_hh_vacancy_page(html)
@@ -1331,10 +1332,10 @@ def classify_http_error(error: HTTPError, source_url: str) -> VacancySourceCheck
     return VacancySourceCheckResult(status="warning", reason=f"HTTP {error.code}", final_url=source_url)
 
 
-def classify_vacancy_html(html: str, source_url: str) -> VacancySourceCheckResult | None:
+def classify_vacancy_html(html: str, source_url: str, *, check_inactive: bool = True) -> VacancySourceCheckResult | None:
     if looks_like_auth_required_html(html):
         return VacancySourceCheckResult(status="auth_required", reason="login/password screen detected", final_url=source_url)
-    if looks_like_inactive_vacancy_html(html):
+    if check_inactive and looks_like_inactive_vacancy_html(html):
         return VacancySourceCheckResult(status="inactive", reason="inactive vacancy marker detected", final_url=source_url)
     return None
 
