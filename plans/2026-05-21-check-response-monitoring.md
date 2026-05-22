@@ -163,11 +163,14 @@
 
 Решение: сохранить защиту от ложной деактивации по скрытым HH HTML-шаблонам, но добавить отдельную HH-проверку архивного статуса только по видимым верхнеуровневым сигналам страницы (`title` и `h1`). Общий поиск inactive-маркеров по всему HTML для HH не возвращается.
 
+Дополнение: если в видимом HH archival marker есть дата архивации, например `В архиве с 22 мая 2026`, эта дата возвращается как `updated_date`. При деактивации workflow обновляет не только `D=Активна`, но и `E=Обновлена`, если значение отличается от текущего.
+
 Проверка:
 
 - `pytest tests\test_ingest_workflow.py`: 37 passed.
 - `python job-application-agent.py --root ../.. check-response-monitoring --dry-run --log-file agent_memory/runtime/check-response-monitoring/20260522-fix-dry-run.log`: `processed=72 deactivated=11 updated_dates=0 unchanged=61 warnings=0`, workbook не изменён.
 - `pytest tests`: 109 passed.
+- `2026-05-22` follow-up: targeted тест HH archived heading теперь проверяет `updated_date=2026-05-22`.
 
 Текущее состояние:
 

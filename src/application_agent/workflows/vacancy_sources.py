@@ -650,6 +650,40 @@ def parse_source_date(value: object) -> date | None:
     return None
 
 
+def parse_russian_date(value: str) -> date | None:
+    cleaned = clean_text(value).casefold()
+    months = {
+        "\u044f\u043d\u0432\u0430\u0440\u044f": 1,
+        "\u0444\u0435\u0432\u0440\u0430\u043b\u044f": 2,
+        "\u043c\u0430\u0440\u0442\u0430": 3,
+        "\u0430\u043f\u0440\u0435\u043b\u044f": 4,
+        "\u043c\u0430\u044f": 5,
+        "\u0438\u044e\u043d\u044f": 6,
+        "\u0438\u044e\u043b\u044f": 7,
+        "\u0430\u0432\u0433\u0443\u0441\u0442\u0430": 8,
+        "\u0441\u0435\u043d\u0442\u044f\u0431\u0440\u044f": 9,
+        "\u043e\u043a\u0442\u044f\u0431\u0440\u044f": 10,
+        "\u043d\u043e\u044f\u0431\u0440\u044f": 11,
+        "\u0434\u0435\u043a\u0430\u0431\u0440\u044f": 12,
+    }
+    match = re.search(
+        r"\b(?P<day>\d{1,2})\s+"
+        r"(?P<month>\u044f\u043d\u0432\u0430\u0440\u044f|\u0444\u0435\u0432\u0440\u0430\u043b\u044f|\u043c\u0430\u0440\u0442\u0430|\u0430\u043f\u0440\u0435\u043b\u044f|\u043c\u0430\u044f|\u0438\u044e\u043d\u044f|\u0438\u044e\u043b\u044f|\u0430\u0432\u0433\u0443\u0441\u0442\u0430|\u0441\u0435\u043d\u0442\u044f\u0431\u0440\u044f|\u043e\u043a\u0442\u044f\u0431\u0440\u044f|\u043d\u043e\u044f\u0431\u0440\u044f|\u0434\u0435\u043a\u0430\u0431\u0440\u044f)"
+        r"\s+(?P<year>\d{4})\b",
+        cleaned,
+    )
+    if match is None:
+        return None
+    try:
+        return date(
+            int(match.group("year")),
+            months[match.group("month")],
+            int(match.group("day")),
+        )
+    except ValueError:
+        return None
+
+
 def infer_source_channel(source_url: str, source_text: str, explicit: str = "") -> str:
     return infer_source_channel_value(source_url, source_text, explicit)
 
@@ -1275,7 +1309,7 @@ def check_hh_vacancy_source(source_url: str, vacancy_id: str) -> VacancySourceCh
         return VacancySourceCheckResult(
             status="inactive",
             reason="hh vacancy page reports archived vacancy",
-            updated_date=details.source_updated_date,
+            updated_date=parse_hh_archived_vacancy_date(html) or details.source_updated_date,
             final_url=source_url,
             details=details,
         )
@@ -1403,16 +1437,24 @@ def looks_like_inactive_vacancy_html(html: str) -> bool:
     return any(marker in text for marker in inactive_markers)
 
 
-def looks_like_hh_archived_vacancy_page(html: str) -> bool:
+def hh_heading_text(html: str) -> str:
     parser = VacancyPageParser()
     parser.feed(html)
-    heading_text = clean_multiline_text("\n".join(part for part in (parser.title, parser.h1) if part)).lower()
+    return clean_multiline_text("\n".join(part for part in (parser.title, parser.h1) if part)).lower()
+
+
+def looks_like_hh_archived_vacancy_page(html: str) -> bool:
+    heading_text = hh_heading_text(html)
     archived_markers = (
         "\u0432\u0430\u043a\u0430\u043d\u0441\u0438\u044f \u0432 \u0430\u0440\u0445\u0438\u0432\u0435",
         "\u0432 \u0430\u0440\u0445\u0438\u0432\u0435 \u0441",
         "\u0432 \u0430\u0440\u0445\u0438\u0432\u0435 c",
     )
     return any(marker in heading_text for marker in archived_markers)
+
+
+def parse_hh_archived_vacancy_date(html: str) -> date | None:
+    return parse_russian_date(hh_heading_text(html))
 
 
 def fetch_source_details(source_url: str) -> VacancySourceDetails:

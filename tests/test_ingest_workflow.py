@@ -462,6 +462,7 @@ class TestIngestWorkflow:
             result = check_vacancy_source('https://hh.ru/vacancy/132520570')
         assert result.status == 'inactive'
         assert result.should_deactivate
+        assert result.updated_date == date(2026, 5, 22)
         assert result.reason == 'hh vacancy page reports archived vacancy'
 
     def test_check_vacancy_source_marks_inactive_html_as_inactive(self) -> None:
