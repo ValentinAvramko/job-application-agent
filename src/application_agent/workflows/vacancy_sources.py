@@ -1264,12 +1264,21 @@ def check_hh_vacancy_source(source_url: str, vacancy_id: str) -> VacancySourceCh
             )
         return VacancySourceCheckResult(status="transient_error", reason=f"{api_warning}; html error: {exc}", final_url=source_url)
 
-    # HH can ship archived-page copy in hidden templates; API archived/HTTP/auth signals are safer deactivation sources.
+    # HH can ship archived-page copy in hidden templates; keep the broad inactive scan off,
+    # but still trust archive markers visible in the page title or h1.
     html_status = classify_vacancy_html(html, source_url, check_inactive=False)
     if html_status is not None:
         return html_status
     html_details = parse_hh_vacancy_page(html)
     details = merge_source_details(api_details, html_details, source_url) if api_details is not None else html_details
+    if looks_like_hh_archived_vacancy_page(html):
+        return VacancySourceCheckResult(
+            status="inactive",
+            reason="hh vacancy page reports archived vacancy",
+            updated_date=details.source_updated_date,
+            final_url=source_url,
+            details=details,
+        )
     return VacancySourceCheckResult(
         status="active",
         reason="hh vacancy page is reachable",
@@ -1392,6 +1401,18 @@ def looks_like_inactive_vacancy_html(html: str) -> bool:
         "vacancy is archived",
     )
     return any(marker in text for marker in inactive_markers)
+
+
+def looks_like_hh_archived_vacancy_page(html: str) -> bool:
+    parser = VacancyPageParser()
+    parser.feed(html)
+    heading_text = clean_multiline_text("\n".join(part for part in (parser.title, parser.h1) if part)).lower()
+    archived_markers = (
+        "\u0432\u0430\u043a\u0430\u043d\u0441\u0438\u044f \u0432 \u0430\u0440\u0445\u0438\u0432\u0435",
+        "\u0432 \u0430\u0440\u0445\u0438\u0432\u0435 \u0441",
+        "\u0432 \u0430\u0440\u0445\u0438\u0432\u0435 c",
+    )
+    return any(marker in heading_text for marker in archived_markers)
 
 
 def fetch_source_details(source_url: str) -> VacancySourceDetails:

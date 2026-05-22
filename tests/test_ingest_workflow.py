@@ -445,6 +445,25 @@ class TestIngestWorkflow:
         assert not result.should_deactivate
         assert result.reason == 'hh vacancy page is reachable'
 
+    def test_check_vacancy_source_marks_hh_archived_heading_as_inactive(self) -> None:
+        api_error = HTTPError('https://api.hh.ru/vacancies/132520570', 403, 'Forbidden', hdrs=None, fp=None)
+        html = '''
+        <html lang="ru">
+          <head>
+            <title>\u0412\u0430\u043a\u0430\u043d\u0441\u0438\u044f \u0414\u0438\u0440\u0435\u043a\u0442\u043e\u0440 \u043f\u043e \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u043e\u043d\u043d\u044b\u043c \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0438\u044f\u043c (\u0432\u0430\u043a\u0430\u043d\u0441\u0438\u044f \u0432 \u0430\u0440\u0445\u0438\u0432\u0435 c 22 \u043c\u0430\u044f 2026)</title>
+          </head>
+          <body>
+            <h1>\u0414\u0438\u0440\u0435\u043a\u0442\u043e\u0440 \u043f\u043e \u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u043e\u043d\u043d\u044b\u043c \u0442\u0435\u0445\u043d\u043e\u043b\u043e\u0433\u0438\u044f\u043c <span>\u0412 \u0430\u0440\u0445\u0438\u0432\u0435 \u0441 22 \u043c\u0430\u044f 2026</span></h1>
+            <div data-qa="vacancy-description"><p>\u0420\u0443\u043a\u043e\u0432\u043e\u0434\u0438\u0442\u044c IT.</p></div>
+          </body>
+        </html>
+        '''
+        with patch('application_agent.workflows.vacancy_sources.fetch_url', side_effect=[api_error, html]):
+            result = check_vacancy_source('https://hh.ru/vacancy/132520570')
+        assert result.status == 'inactive'
+        assert result.should_deactivate
+        assert result.reason == 'hh vacancy page reports archived vacancy'
+
     def test_check_vacancy_source_marks_inactive_html_as_inactive(self) -> None:
         html = '<html><body><main><h1>VP Engineering</h1><p>This job is no longer available.</p></main></body></html>'
         with patch('application_agent.workflows.vacancy_sources.fetch_url', return_value=html):
