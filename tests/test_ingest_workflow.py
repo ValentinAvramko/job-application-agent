@@ -445,6 +445,32 @@ class TestIngestWorkflow:
         assert not result.should_deactivate
         assert result.reason == 'hh vacancy page is reachable'
 
+    def test_check_vacancy_source_keeps_hh_active_with_embedded_auth_form(self) -> None:
+        api_error = HTTPError('https://api.hh.ru/vacancies/126880285', 403, 'Forbidden', hdrs=None, fp=None)
+        html = '''
+        <html lang="ru">
+          <head>
+            <title>Vacancy Teamlead 1C at Example</title>
+          </head>
+          <body>
+            <h1>Teamlead 1C</h1>
+            <div class="g-user-content" data-qa="vacancy-description">
+              <p>Active vacancy with a full role description.</p>
+            </div>
+            <form data-qa="auth-form" method="post">
+              <input type="hidden" name="_xsrf" value="token" />
+              <button>Login</button>
+            </form>
+            <span>Password</span>
+          </body>
+        </html>
+        '''
+        with patch('application_agent.workflows.vacancy_sources.fetch_url', side_effect=[api_error, html]):
+            result = check_vacancy_source('https://hh.ru/vacancy/126880285')
+        assert result.status == 'active'
+        assert not result.should_deactivate
+        assert result.reason == 'hh vacancy page is reachable'
+
     def test_check_vacancy_source_marks_hh_archived_heading_as_inactive(self) -> None:
         api_error = HTTPError('https://api.hh.ru/vacancies/132520570', 403, 'Forbidden', hdrs=None, fp=None)
         html = '''
@@ -476,6 +502,14 @@ class TestIngestWorkflow:
         html = '<html><body><form action="/login"><label>Password</label><input type="password" /></form></body></html>'
         with patch('application_agent.workflows.vacancy_sources.fetch_url', return_value=html):
             result = check_vacancy_source('https://example.com/jobs/1')
+        assert result.status == 'auth_required'
+        assert result.should_deactivate
+
+    def test_check_vacancy_source_marks_hh_login_only_page_as_auth_required(self) -> None:
+        api_error = HTTPError('https://api.hh.ru/vacancies/126880285', 403, 'Forbidden', hdrs=None, fp=None)
+        html = '<html><body><form action="/login"><label>Password</label><input type="password" /></form></body></html>'
+        with patch('application_agent.workflows.vacancy_sources.fetch_url', side_effect=[api_error, html]):
+            result = check_vacancy_source('https://hh.ru/vacancy/126880285')
         assert result.status == 'auth_required'
         assert result.should_deactivate
 

@@ -21,6 +21,7 @@ from application_agent.normalization.generic_page_rules import (
     GENERIC_UI_NOISE_LINES as DATA_GENERIC_UI_NOISE_LINES,
 )
 from application_agent.normalization.source_channels import infer_source_channel as infer_source_channel_value
+from application_agent.workspace import WorkspaceLayout
 
 CYRILLIC_MAP = {
     "\u0430": "a",
@@ -1300,7 +1301,7 @@ def check_hh_vacancy_source(source_url: str, vacancy_id: str) -> VacancySourceCh
 
     # HH can ship archived-page copy in hidden templates; keep the broad inactive scan off,
     # but still trust archive markers visible in the page title or h1.
-    html_status = classify_vacancy_html(html, source_url, check_inactive=False)
+    html_status = classify_hh_vacancy_html(html, source_url)
     if html_status is not None:
         return html_status
     html_details = parse_hh_vacancy_page(html)
@@ -1381,6 +1382,30 @@ def classify_vacancy_html(html: str, source_url: str, *, check_inactive: bool = 
     if check_inactive and looks_like_inactive_vacancy_html(html):
         return VacancySourceCheckResult(status="inactive", reason="inactive vacancy marker detected", final_url=source_url)
     return None
+
+
+def classify_hh_vacancy_html(html: str, source_url: str) -> VacancySourceCheckResult | None:
+    if looks_like_active_hh_vacancy_html(html):
+        return None
+    return classify_vacancy_html(html, source_url, check_inactive=False)
+
+
+def looks_like_active_hh_vacancy_html(html: str) -> bool:
+    has_description_signal = bool(
+        extract_hh_description_html(html)
+        or re.search(r"data-qa\s*=\s*([\"'])vacancy-description\1", html, flags=re.I)
+    )
+    if not has_description_signal:
+        return False
+
+    page = VacancyPageParser()
+    page.feed(html)
+    if page.h1:
+        return True
+
+    title = page.title
+    title_lower = title.casefold()
+    return bool(title and ("\u0432\u0430\u043a\u0430\u043d\u0441\u0438\u044f" in title_lower or "vacancy" in title_lower))
 
 
 def looks_like_auth_required_html(html: str) -> bool:
