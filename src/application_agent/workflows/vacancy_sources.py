@@ -584,7 +584,7 @@ class VacancySourceCheckResult:
 
     @property
     def should_deactivate(self) -> bool:
-        return self.status in {"inactive", "not_found"}
+        return self.status in {"inactive", "auth_required", "not_found"}
 
 
 def html_to_text(html: str) -> str:
@@ -1425,13 +1425,7 @@ def looks_like_inactive_vacancy_html(html: str) -> bool:
         "работодатель уже не ищет",
         "такой вакансии нет",
         "job is no longer available",
-        "job not found",
-        "posting not found",
-        "role not found",
-        "we couldn't find this job",
-        "we could not find this job",
         "this job is no longer available",
-        "this job posting could not be found",
         "position is no longer available",
         "job has expired",
         "this job has been closed",

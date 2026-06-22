@@ -286,27 +286,6 @@ class TestIngestWorkflow:
         assert len(active_rows) == 1
         assert active_rows[0].updated_date == date(2026, 4, 20)
 
-    def test_check_response_monitoring_auth_required_warns_without_workbook_update(self) -> None:
-        temp_root = Path(__file__).resolve().parents[1] / '.tmp-tests'
-        temp_root.mkdir(exist_ok=True)
-        workspace_dir = temp_root / f'check-response-monitoring-auth-{uuid.uuid4().hex}'
-        workspace_dir.mkdir(parents=True, exist_ok=True)
-        layout = WorkspaceLayout(workspace_dir)
-        store = JsonMemoryStore(layout)
-        store.bootstrap()
-        workbook_path = workspace_dir / 'response-monitoring.xlsx'
-        create_response_monitoring_workbook(workbook_path)
-        append_ingest_record(workbook_path, ResponseMonitoringIngestRecord(vacancy_id='20260421-example-role', source_channel='HeadHunter', source_url='https://hh.ru/vacancy/132242694', company='Example', position='Role', country='Kazakhstan', work_mode='remote', ingest_date=date(2026, 4, 21), updated_date=date(2026, 4, 20)))
-
-        with patch('application_agent.workflows.check_response_monitoring.check_vacancy_source', return_value=VacancySourceCheckResult(status='auth_required', reason='login/password screen detected')):
-            result = CheckResponseMonitoringWorkflow().run(layout=layout, store=store, request=CheckResponseMonitoringRequest())
-
-        assert 'WARNING row=3 url=https://hh.ru/vacancy/132242694 status=auth_required reason=login/password screen detected' in result.summary
-        assert 'workbook_updated rows=0' in result.summary
-        active_rows = list_active_response_monitoring_rows(workbook_path)
-        assert len(active_rows) == 1
-        assert active_rows[0].updated_date == date(2026, 4, 20)
-
     def test_render_source_keeps_full_passport_and_params_with_no_data_fallback(self) -> None:
         workflow = build_default_registry().get('ingest-vacancy')
         source_text = workflow._render_source(IngestVacancyRequest(company='', position='', source_url='', source_channel='', country='', city='', employment_type='', work_schedule='', work_mode='Не указано', source_text='Example source'), '20260421-example-role')
@@ -498,32 +477,13 @@ class TestIngestWorkflow:
         with patch('application_agent.workflows.vacancy_sources.fetch_url', return_value=html):
             result = check_vacancy_source('https://example.com/jobs/1')
         assert result.status == 'auth_required'
-        assert not result.should_deactivate
-
-    def test_check_vacancy_source_keeps_http_403_for_manual_check(self) -> None:
-        error = HTTPError('https://example.com/jobs/1', 403, 'Forbidden', hdrs=None, fp=None)
-        with patch('application_agent.workflows.vacancy_sources.fetch_url', side_effect=error):
-            result = check_vacancy_source('https://example.com/jobs/1')
-        assert result.status == 'auth_required'
-        assert not result.should_deactivate
+        assert result.should_deactivate
 
     def test_check_vacancy_source_marks_not_found_http_as_not_found(self) -> None:
         error = HTTPError('https://example.com/jobs/1', 404, 'Not Found', hdrs=None, fp=None)
         with patch('application_agent.workflows.vacancy_sources.fetch_url', side_effect=error):
             result = check_vacancy_source('https://example.com/jobs/1')
         assert result.status == 'not_found'
-        assert result.should_deactivate
-
-    def test_check_vacancy_source_marks_rendered_job_not_found_as_inactive(self) -> None:
-        initial_html = '<html><body><div id="root">You need to enable JavaScript to run this app.</div></body></html>'
-        rendered_page = PlaywrightRenderedPage(
-            html='<html><body><main><h1>Job not found</h1><p>This job posting could not be found.</p></main></body></html>',
-            url='https://jobs.ashbyhq.com/example/missing',
-            title='Job not found',
-        )
-        with patch('application_agent.workflows.vacancy_sources.fetch_url', return_value=initial_html), patch('application_agent.workflows.vacancy_sources.parse_generic_vacancy_page', return_value=VacancySourceDetails()), patch('application_agent.workflows.vacancy_sources.render_page_with_playwright', return_value=rendered_page):
-            result = check_vacancy_source('https://jobs.ashbyhq.com/example/missing')
-        assert result.status == 'inactive'
         assert result.should_deactivate
 
     def test_check_vacancy_source_keeps_transient_errors_active(self) -> None:
