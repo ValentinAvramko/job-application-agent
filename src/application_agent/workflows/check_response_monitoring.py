@@ -134,7 +134,7 @@ def check_response_monitoring_row(
             f"row={row.row_index} column=E url={row.source_url} "
             f"old={display_date(row.updated_date, row.updated_value)} new={updated_date.isoformat()} reason={check.reason}"
         )
-    if check.status in {"transient_error", "warning"}:
+    if check.status in {"auth_required", "transient_error", "warning"}:
         lines.append(
             f"WARNING row={row.row_index} url={row.source_url} status={check.status} reason={check.reason}"
         )
